@@ -630,7 +630,7 @@ struct CompanyDetailView: View {
                 // ── Entity Command Plate ─────────────────────────────────────
                 companyHeader
                     .padding(.horizontal, 20)
-                    .padding(.top, usesDuoPortraitLayout ? 0 : 8)
+                    .padding(.top, companyHeaderTopInset)
                     .padding(.bottom, 4)
                     .zIndex(10)
                     .background(
@@ -803,8 +803,8 @@ struct CompanyDetailView: View {
             vm: vm,
             activeInternalTab: $vm.activeTab,
             compactTopSpacing: false,
-            tabSelectorHeaderHeight: usesDuoPortraitLayout ? tutFrameHeader.height : nil,
-            tabSelectorBottomInset: usesDuoPortraitLayout ? companyHeaderVerticalPadding : nil,
+            tabSelectorHeaderHeight: duoLayout.isDuoDevice ? max(0, tutFrameHeader.height - companyHeaderTopInset) : nil,
+            tabSelectorBottomInset: duoLayout.isDuoDevice ? companyHeaderVerticalPadding : nil,
             vaultPresentation: usesDuoVaultSplit ? .categories : .combined,
             vaultCategorySelection: duoLayout.isDuoDevice ? $duoVaultCategory : nil
         )
@@ -1058,6 +1058,10 @@ struct CompanyDetailView: View {
     // MARK: - Entity Command Plate
     private let companyHeaderVerticalPadding: CGFloat = 12
 
+    private var companyHeaderTopInset: CGFloat {
+        usesDuoPortraitLayout ? 0 : 8
+    }
+
     private var companyHeader: some View {
         HStack(alignment: .center, spacing: 10) {
             ZStack {
@@ -1078,6 +1082,7 @@ struct CompanyDetailView: View {
                         .font(.system(size: 24, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
+                        .minimumScaleFactor(duoLayout.isDuoDevice ? 0.78 : 1)
 
                     Spacer(minLength: 8)
 
@@ -1091,7 +1096,7 @@ struct CompanyDetailView: View {
                     }
                 }
 
-                if !usesDuoPortraitLayout {
+                if !duoLayout.isDuoDevice {
                     metricSubLine
                 }
             }
@@ -1100,7 +1105,7 @@ struct CompanyDetailView: View {
         .padding(.leading, 12)
         .padding(.trailing, 16)
         .background {
-            if !usesDuoPortraitLayout {
+            if !duoLayout.isDuoDevice {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color.zifrBG)
@@ -1111,7 +1116,7 @@ struct CompanyDetailView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay {
-            if !usesDuoPortraitLayout {
+            if !duoLayout.isDuoDevice {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
@@ -1126,7 +1131,7 @@ struct CompanyDetailView: View {
                     )
             }
         }
-        .shadow(color: usesDuoPortraitLayout ? .clear : .black.opacity(0.45), radius: 6, x: 0, y: 3)
+        .shadow(color: duoLayout.isDuoDevice ? .clear : .black.opacity(0.45), radius: 6, x: 0, y: 3)
     }
 
     private var transactionHeaderButton: some View {
