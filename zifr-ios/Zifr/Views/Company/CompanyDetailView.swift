@@ -607,9 +607,7 @@ struct CompanyDetailView: View {
     }
 
     private func presentReport(_ report: DuoEntityReport) {
-        if usesDuoPortraitLayout {
-            duoPortraitSheet = .reports(report)
-        } else if usesInlineEntityPanel && !usesDuoVaultSplit {
+        if usesInlineEntityPanel && !usesDuoVaultSplit {
             duoReport = report
             duoSection = .reports
         } else {
@@ -1070,7 +1068,7 @@ struct CompanyDetailView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                // Top row: Company name & Receipt Icon
+                // Company name and shortcuts for layouts without the report toolbar
                 HStack(alignment: .center) {
                     Text(company.name.isEmpty ? "Company" : company.name)
                         .font(.system(size: 24, weight: .bold))
@@ -1079,13 +1077,14 @@ struct CompanyDetailView: View {
 
                     Spacer(minLength: 8)
 
-                    if usesDuoPortraitLayout || (vm.activeTab == .financial && !usesInlineEntityPanel) {
-                        transactionHeaderButton
+                    if !usesDuoPortraitLayout {
+                        if vm.activeTab == .financial && !usesInlineEntityPanel {
+                            transactionHeaderButton
+                        }
+                        // Keep Share reachable in any layout without a side toolbar.
+                        if isDuoDevice && !usesDuoSideToolbar { duoShareControl }
+                        headerActionMenu
                     }
-
-                    // Keep Share reachable in any layout without a side toolbar.
-                    if isDuoDevice && !usesDuoSideToolbar { duoShareControl }
-                    headerActionMenu
                 }
 
                 // Dynamic metrics sub-line per tab (full width below)
@@ -1124,51 +1123,36 @@ struct CompanyDetailView: View {
     private var transactionHeaderButton: some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            if usesDuoPortraitLayout { duoPortraitSheet = .transactions }
-            else { showTransactionCenter = true }
+            showTransactionCenter = true
         } label: {
             Image(systemName: "list.bullet.rectangle.portrait")
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.70))
-                .frame(width: usesDuoPortraitLayout ? 44 : 28, height: usesDuoPortraitLayout ? 44 : 28)
-                .background {
-                    if usesDuoPortraitLayout {
-                        Circle().fill(.ultraThinMaterial)
-                    }
-                }
+                .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(usesDuoPortraitLayout ? "Entity transactions" : "All transactions")
+        .accessibilityLabel("All transactions")
     }
 
-    @ViewBuilder
     private var headerActionMenu: some View {
-        if usesDuoPortraitLayout {
-            Button {
-                duoPortraitSheet = .reports(vm.activeTab == .subscriptions ? .subscriptions : .financial)
-            } label: { headerReportIcon }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Entity reports")
-        } else {
-            Menu {
-                if !isDuoDevice { sharingMenuItems }
-                Section("Reports") {
-                    Button {
-                        presentReport(.financial)
-                    } label: {
-                        Label("Financial Report", systemImage: "dollarsign.circle")
-                    }
-                    Button {
-                        presentReport(.subscriptions)
-                    } label: {
-                        Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
-                    }
+        Menu {
+            if !isDuoDevice { sharingMenuItems }
+            Section("Reports") {
+                Button {
+                    presentReport(.financial)
+                } label: {
+                    Label("Financial Report", systemImage: "dollarsign.circle")
                 }
-            } label: { headerReportIcon }
-            .accessibilityLabel(isDuoDevice ? "Entity reports" : "Entity actions")
-            .accessibilityHint(!isDuoDevice && canManageSharing ? "Sharing scopes and reports" : "Entity reports")
-        }
+                Button {
+                    presentReport(.subscriptions)
+                } label: {
+                    Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
+                }
+            }
+        } label: { headerReportIcon }
+        .accessibilityLabel(isDuoDevice ? "Entity reports" : "Entity actions")
+        .accessibilityHint(!isDuoDevice && canManageSharing ? "Sharing scopes and reports" : "Entity reports")
     }
 
     private var headerReportIcon: some View {
