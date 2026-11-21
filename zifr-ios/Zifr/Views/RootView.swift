@@ -189,7 +189,7 @@ struct RootView: View {
 }
 
 /// Observe the whole window, not an entity's potentially narrow detail column.
-private struct MiloomDuoLayoutObserver: ViewModifier {
+struct MiloomDuoLayoutObserver: ViewModifier {
     let layout: MiloomDuoLayoutState
 
     @ViewBuilder
