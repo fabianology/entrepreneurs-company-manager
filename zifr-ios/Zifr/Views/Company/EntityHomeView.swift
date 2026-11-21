@@ -142,6 +142,7 @@ struct EntityHomeView: View {
                 isStandalone: tabSelectorHeaderHeight != nil,
                 backgroundTopExtension: tabSelectorHeaderHeight.map { $0 + tabSelectorTopPadding } ?? 0,
                 contentBottomInset: tabSelectorBottomInset,
+                usesDuoMotion: tabSelectorHeaderHeight != nil,
                 institutions: institutions,
                 loans: loans,
                 subscriptions: subscriptions,

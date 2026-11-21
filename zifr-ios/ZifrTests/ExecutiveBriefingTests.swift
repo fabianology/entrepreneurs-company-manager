@@ -3,6 +3,65 @@ import SwiftUI
 @testable import Zifr
 
 final class ExecutiveBriefingTests: XCTestCase {
+    func testDuoTabSliderGentleFlickMovesOneTabInEitherDirection() {
+        XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+            from: 0, tabCount: 3, tabWidth: 135, translation: 18, predictedEndTranslation: 65
+        ), 1)
+        XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+            from: 2, tabCount: 3, tabWidth: 135, translation: -18, predictedEndTranslation: -65
+        ), 1)
+    }
+
+    func testDuoTabSliderVeryShortFlickCannotSkipTheMiddleTab() {
+        XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+            from: 0, tabCount: 3, tabWidth: 135, translation: 16, predictedEndTranslation: 400
+        ), 1)
+        XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+            from: 2, tabCount: 3, tabWidth: 135, translation: -16, predictedEndTranslation: -400
+        ), 1)
+    }
+
+    func testDuoTabSliderHardFlickCarriesAcrossTwoTabsInEitherDirection() {
+        for tabWidth: CGFloat in [72, 135, 190] {
+            let translation = tabWidth * 0.33
+            let projected = tabWidth * 1.8
+            XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+                from: 0, tabCount: 3, tabWidth: tabWidth, translation: translation,
+                predictedEndTranslation: projected
+            ), 2)
+            XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+                from: 2, tabCount: 3, tabWidth: tabWidth, translation: -translation,
+                predictedEndTranslation: -projected
+            ), 0)
+        }
+    }
+
+    func testDuoTabSliderSettlesWhereLongDragEnded() {
+        for projection: CGFloat in [120, 220, 300] {
+            XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+                from: 0, tabCount: 3, tabWidth: 135, translation: 220, predictedEndTranslation: projection
+            ), 2)
+            XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+                from: 2, tabCount: 3, tabWidth: 135, translation: -220, predictedEndTranslation: -projection
+            ), 0)
+        }
+    }
+
+    func testDuoTabSliderSnapsSlowDragsToTheNearestSlotAndStopsAtEdges() {
+        XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+            from: 1, tabCount: 3, tabWidth: 135, translation: 20, predictedEndTranslation: 20
+        ), 1)
+        XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+            from: 1, tabCount: 3, tabWidth: 135, translation: 80, predictedEndTranslation: 80
+        ), 2)
+        XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+            from: 0, tabCount: 3, tabWidth: 135, translation: -200, predictedEndTranslation: -500
+        ), 0)
+        XCTAssertEqual(DuoTabSliderMotion.targetIndex(
+            from: 2, tabCount: 3, tabWidth: 135, translation: 200, predictedEndTranslation: 500
+        ), 2)
+    }
+
     func testDuoExpandedLayoutsRequireRoomInTheAppWindow() {
         let layout = MiloomDuoLayoutState()
         layout.isDuoDevice = true

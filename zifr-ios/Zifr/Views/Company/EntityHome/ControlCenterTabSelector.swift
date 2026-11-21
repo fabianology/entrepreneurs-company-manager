@@ -1,5 +1,36 @@
 import SwiftUI
 
+enum DuoTabSliderMotion {
+    static func targetIndex(
+        from index: Int,
+        tabCount: Int,
+        tabWidth: CGFloat,
+        translation: CGFloat,
+        predictedEndTranslation: CGFloat
+    ) -> Int {
+        let travel = translation / tabWidth
+        let projection = (predictedEndTranslation - translation) / tabWidth
+        // Very short gestures can advance one tab even if their velocity spikes.
+        let momentumLimit = min(1.6, 0.6 + abs(travel) * 2)
+        // A small reversal at lift-off should not undo the distance already dragged.
+        let momentum = travel == 0 || travel.sign == projection.sign
+            ? min(momentumLimit, max(-momentumLimit, projection * 0.85))
+            : 0
+        var steps = (travel + momentum).rounded()
+        if steps == 0, abs(momentum) >= 0.22 {
+            steps = momentum.sign == .minus ? -1 : 1
+        }
+        return Int(min(CGFloat(tabCount - 1), max(0, CGFloat(index) + steps)))
+    }
+
+    static func resistedOffset(_ offset: CGFloat, lastTabOffset: CGFloat, tabWidth: CGFloat) -> CGFloat {
+        let edge = min(lastTabOffset, max(0, offset))
+        let overshoot = offset - edge
+        let limit = min(16, tabWidth * 0.15)
+        return edge + limit * overshoot / (limit + abs(overshoot))
+    }
+}
+
 private struct ActiveTabLensLabelMotion: AnimatableModifier {
     var position: CGFloat
     let destination: CGFloat
@@ -56,6 +87,9 @@ struct ControlCenterTabSelector: View {
     var backgroundTopExtension: CGFloat = 0
     var contentBottomInset: CGFloat?
     var usesReducedMotion = false
+    var usesDuoMotion = false
+
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
     private func title(for tab: EntityHomeTab) -> String { labels[tab] ?? tab.rawValue }
     private func icon(for tab: EntityHomeTab) -> String { icons[tab] ?? tab.icon }
@@ -84,6 +118,10 @@ struct ControlCenterTabSelector: View {
         tabs.firstIndex(of: activeTab) ?? 0
     }
 
+    private var reduceMotion: Bool {
+        usesReducedMotion || (usesDuoMotion && systemReduceMotion)
+    }
+
     @ViewBuilder
     private func tabBarGlassBackground<S: Shape>(
         _ shape: S,
@@ -106,11 +144,18 @@ struct ControlCenterTabSelector: View {
         }
     }
 
+    private func duoSettleAnimation(initialVelocity: Double = 0) -> Animation? {
+        reduceMotion ? nil : .interpolatingSpring(stiffness: 240, damping: 32, initialVelocity: initialVelocity)
+    }
+
     private func selectTab(_ tab: EntityHomeTab) {
         impactFeedback.impactOccurred()
         guard tab != activeTab else { return }
 
-        withAnimation(usesReducedMotion ? nil : .spring(response: 0.36, dampingFraction: 0.82)) {
+        let animation = usesDuoMotion
+            ? duoSettleAnimation()
+            : (reduceMotion ? nil : .spring(response: 0.36, dampingFraction: 0.82))
+        withAnimation(animation) {
             activeTab = tab
             dragOffset = 0
         }
@@ -148,6 +193,9 @@ struct ControlCenterTabSelector: View {
             dragOffset = 0
             isDragging = false
             activeHover = nil
+            if usesDuoMotion {
+                lastHapticIndex = currentIndex
+            }
         }
     }
 
@@ -163,6 +211,13 @@ struct ControlCenterTabSelector: View {
         let minX = innerPadding
         let maxX = innerPadding + (CGFloat(tabs.count - 1) * tabW)
         let clampedOffset: CGFloat = {
+            if usesDuoMotion {
+                return innerPadding + DuoTabSliderMotion.resistedOffset(
+                    targetOffset - innerPadding,
+                    lastTabOffset: maxX - innerPadding,
+                    tabWidth: tabW
+                )
+            }
             if targetOffset < minX {
                 return minX - ((minX - targetOffset) * 0.25)
             } else if targetOffset > maxX {
@@ -176,10 +231,11 @@ struct ControlCenterTabSelector: View {
             tabs.count - 1,
             max(0, Int(round(pillPosition)))
         )
-        let displayedTab = tabs[displayedIndex]
-        let pillAnimation: Animation? = usesReducedMotion ? nil : isDragging
+        let pillAnimation: Animation? = reduceMotion ? nil : isDragging
             ? Animation.interactiveSpring(response: 0.15, dampingFraction: 0.86)
             : Animation.spring(response: 0.3, dampingFraction: 0.75)
+        // Duo tracks the finger directly and animates only taps and the release.
+        let implicitAnimationOffset = usesDuoMotion ? 0 : clampedOffset
         
         return ZStack(alignment: .leading) {
             // 1. Sliding Pill (Active Indicator) - Liquid Glass Pill
@@ -204,9 +260,7 @@ struct ControlCenterTabSelector: View {
                 )
                 .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
                 .offset(x: clampedOffset)
-                // When dragging, use interactiveSpring for instantaneous smooth tracking.
-                // When released, use a bouncy spring to settle into the slot.
-                .animation(pillAnimation, value: clampedOffset)
+                .animation(pillAnimation, value: implicitAnimationOffset)
                 // Render the glass above the labels so it refracts their pixels like a lens,
                 // while allowing the buttons underneath to continue receiving interaction.
                 .allowsHitTesting(false)
@@ -237,36 +291,42 @@ struct ControlCenterTabSelector: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(isStandalone && currentIndex == index ? .isSelected : [])
-                    .animation(usesReducedMotion ? nil : .easeInOut(duration: 0.15), value: isHighlighted)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: isHighlighted)
                 }
             }
             .padding(.horizontal, innerPadding)
             .zIndex(0)
 
-            // A crisp label floats over the lens. Its visibility is derived from how much
-            // of the destination tab the pill actually covers, so it never pops in abruptly.
-            HStack(spacing: 6) {
-                Image(systemName: icon(for: displayedTab))
-                    .font(.system(size: 13.5, weight: .bold))
-                    .foregroundStyle(Color(hex: "#C1AA78"))
+            // Keep every Duo label mounted so it can fade as the lens passes over it.
+            let lensIndices = usesDuoMotion ? Array(tabs.indices) : [0]
+            ZStack(alignment: .leading) {
+                ForEach(lensIndices, id: \.self) { slot in
+                    let index = usesDuoMotion ? slot : displayedIndex
+                    HStack(spacing: 6) {
+                        Image(systemName: icon(for: tabs[index]))
+                            .font(.system(size: 13.5, weight: .bold))
+                            .foregroundStyle(Color(hex: "#C1AA78"))
 
-                Text(title(for: displayedTab).uppercased())
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(isStandalone ? 2 : 1)
-                    .minimumScaleFactor(0.85)
-                    .multilineTextAlignment(.center)
+                        Text(title(for: tabs[index]).uppercased())
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(isStandalone ? 2 : 1)
+                            .minimumScaleFactor(0.85)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(width: tabW, height: tabHeight)
+                    .accessibilityHidden(true)
+                    .modifier(
+                        ActiveTabLensLabelMotion(
+                            position: pillPosition,
+                            destination: CGFloat(index),
+                            tabWidth: tabW,
+                            innerPadding: innerPadding
+                        )
+                    )
+                }
             }
-            .frame(width: tabW, height: tabHeight)
-            .modifier(
-                ActiveTabLensLabelMotion(
-                    position: pillPosition,
-                    destination: CGFloat(displayedIndex),
-                    tabWidth: tabW,
-                    innerPadding: innerPadding
-                )
-            )
-            .animation(pillAnimation, value: clampedOffset)
+            .animation(pillAnimation, value: implicitAnimationOffset)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
             .zIndex(2)
@@ -285,6 +345,9 @@ struct ControlCenterTabSelector: View {
             DragGesture(minimumDistance: 5, coordinateSpace: .local)
                 .onChanged { value in
                     if !isDragging {
+                        if usesDuoMotion, abs(value.translation.width) < abs(value.translation.height) {
+                            return
+                        }
                         isDragging = true
                         selectionFeedback.prepare()
                         impactFeedback.prepare()
@@ -292,7 +355,8 @@ struct ControlCenterTabSelector: View {
                     dragOffset = value.translation.width
                     
                     // Haptic feedback as it crosses tab boundaries
-                    let center = clampedOffset + (tabW / 2) - innerPadding
+                    let liveOffset = usesDuoMotion ? baseOffset + value.translation.width : clampedOffset
+                    let center = liveOffset + (tabW / 2) - innerPadding
                     let hover = min(tabs.count - 1, max(0, Int(center / tabW)))
                     
                     activeHover = hover
@@ -303,13 +367,21 @@ struct ControlCenterTabSelector: View {
                     }
                 }
                 .onEnded { value in
+                    guard !usesDuoMotion || isDragging else { return }
                     let velX = value.velocity.width
                     let flingX = value.predictedEndTranslation.width
                     
-                    var targetIndex = currentIndex
+                    let targetIndex: Int
                     
-                    // Evaluate momentum fling
-                    if velX > 200 || flingX > tabW * 0.4 {
+                    if usesDuoMotion {
+                        targetIndex = DuoTabSliderMotion.targetIndex(
+                            from: currentIndex,
+                            tabCount: tabs.count,
+                            tabWidth: tabW,
+                            translation: value.translation.width,
+                            predictedEndTranslation: flingX
+                        )
+                    } else if velX > 200 || flingX > tabW * 0.4 {
                         targetIndex = min(tabs.count - 1, currentIndex + 1)
                     } else if velX < -200 || flingX < -tabW * 0.4 {
                         targetIndex = max(0, currentIndex - 1)
@@ -319,10 +391,25 @@ struct ControlCenterTabSelector: View {
                         targetIndex = min(tabs.count - 1, max(0, Int(round(releaseCenter / tabW))))
                     }
                     
+                    let animation: Animation?
+                    if usesDuoMotion {
+                        let remainingDistance = innerPadding + CGFloat(targetIndex) * tabW - clampedOffset
+                        let initialVelocity = abs(remainingDistance) > 1
+                            ? min(5, max(0, velX / remainingDistance))
+                            : 0
+                        animation = duoSettleAnimation(initialVelocity: Double(initialVelocity))
+                    } else {
+                        animation = reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.75)
+                    }
                     lastHapticIndex = targetIndex
-                    
-                    impactFeedback.impactOccurred()
-                    withAnimation(usesReducedMotion ? nil : .spring(response: 0.3, dampingFraction: 0.75)) {
+                    if usesDuoMotion {
+                        if targetIndex != currentIndex, targetIndex != activeHover {
+                            selectionFeedback.selectionChanged()
+                        }
+                    } else {
+                        impactFeedback.impactOccurred()
+                    }
+                    withAnimation(animation) {
                         activeTab = tabs[targetIndex]
                         dragOffset = 0
                         isDragging = false
