@@ -361,7 +361,6 @@ struct CompanyDetailView: View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
             companyWithLeftPanel
-                .toolbar(usesDuoPortraitLayout ? .hidden : .automatic, for: .navigationBar)
                 .modifier(DuoSideToolbar(
                 usesSideToolbar: $usesDuoSideToolbar,
                 bottomControlCenterY: .constant(nil),

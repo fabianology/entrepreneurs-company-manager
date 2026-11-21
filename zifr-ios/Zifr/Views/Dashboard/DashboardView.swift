@@ -1408,16 +1408,18 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     var showsPrimaryActions = true
     var portraitActionsTopInset: CGFloat = 16
 
-    // Do not gate native toolbar creation on its own emitted edge: the edge
-    // can briefly disappear during a fold and prevent the items returning.
-    private var hasNativeSideToolbar: Bool { layout.isDuoDevice && !hasPortraitToolbar }
-    private var hasPortraitToolbar: Bool { layout.usesExpandedPortrait }
-    private var hasSideToolbar: Bool { hasNativeSideToolbar || hasPortraitToolbar }
+    private var hasNativeSideToolbar: Bool { layout.usesExpandedLandscape }
+    private var hasTrailingToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar }
 
     func body(content: Content) -> some View {
+        let usesClosedRail = hasTrailingToolbar && !layout.usesExpandedPortrait && isActive
+        // The closed screen leaves space above the rail for the camera and status indicators.
+        let topInset = layout.usesExpandedPortrait
+            ? portraitActionsTopInset
+            : min(164, max(16, layout.windowSize.height - 300))
         content
-            .safeAreaInset(edge: .trailing, spacing: 8) {
-                if hasPortraitToolbar && isActive {
+            .safeAreaInset(edge: .trailing, spacing: usesClosedRail ? 22 : 8) {
+                if hasTrailingToolbar && isActive {
                     VStack(spacing: 16) {
                         if showsPrimaryActions {
                             primaryAction.padding(.bottom, 4)
@@ -1428,15 +1430,18 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                         measuredAdmin
                     }
                     .frame(width: 52)
-                    .padding(.top, showsPrimaryActions ? portraitActionsTopInset : 12)
-                    .padding(.bottom, 12)
-                    // Match the expanded-portrait Wi-Fi indicator center on every page.
+                    .padding(.top, showsPrimaryActions ? topInset : 12)
+                    .padding(.bottom, usesClosedRail ? 0 : 12)
                     .padding(.trailing, 22)
                     .frame(maxHeight: .infinity)
                     .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("duo.portraitToolbar")
+                    .accessibilityIdentifier(layout.usesExpandedPortrait ? "duo.portraitToolbar" : "duo.closedToolbar")
                 }
             }
+            // Measure the rail from the window edge, then let the inset reserve
+            // space for it once. The system's own trailing strip varies in Split View.
+            .ignoresSafeArea(.container, edges: usesClosedRail ? .trailing : [])
+            .toolbar(hasTrailingToolbar && isActive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if hasNativeSideToolbar && isActive {
                     if showsPrimaryActions {
@@ -1461,12 +1466,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
             }
             .onChange(of: layout.isDuoDevice, initial: true) { _, next in
                 if reportsDuoDevice != next { reportsDuoDevice = next }
-            }
-            .onChange(of: isActive) { _, value in
-                if value { usesSideToolbar = hasSideToolbar }
-            }
-            .onChange(of: hasSideToolbar, initial: true) { _, value in
-                usesSideToolbar = value
+                if usesSideToolbar != next { usesSideToolbar = next }
             }
     }
 
