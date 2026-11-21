@@ -247,8 +247,7 @@ struct DashboardView: View {
     private var dashboardBottomControls: some View {
         if usesDuoPortraitDashboard {
             GeometryReader { geometry in
-                let frames = DuoPortraitFilingFrames.resolve(size: geometry.size,
-                    landscapePageWidth: duoLayout.portraitEntityWidth)
+                let frames = DuoPortraitFilingFrames.resolve(size: geometry.size)
                 dashboardBottomControlsRow
                     .background {
                         #if compiler(>=6.4)
@@ -699,8 +698,7 @@ struct DashboardView: View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *), usesDuoPortraitDashboard {
             GeometryReader { geometry in
-                let frames = DuoPortraitFilingFrames.resolve(size: geometry.size,
-                    landscapePageWidth: duoLayout.portraitEntityWidth)
+                let frames = DuoPortraitFilingFrames.resolve(size: geometry.size)
                 entityList(isDuoExpanded: true)
                     .frame(width: frames.page.width, height: frames.page.height)
                     .offset(x: frames.page.minX)
@@ -1213,8 +1211,7 @@ struct DashboardView: View {
     private var headerSection: some View {
         ZStack {
             GeometryReader { geometry in
-                let cardFrames = DuoPortraitFilingFrames.resolve(size: geometry.size,
-                    landscapePageWidth: duoLayout.portraitEntityWidth)
+                let cardFrames = DuoPortraitFilingFrames.resolve(size: geometry.size)
                 Image("miloom_text_embossed")
                     .resizable()
                     .scaledToFit()

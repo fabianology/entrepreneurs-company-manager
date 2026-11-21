@@ -32,13 +32,10 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertFalse(layout.usesExpandedLandscape)
     }
 
-    func testDuoEntityPortraitWidensContentAndKeepsItRightOfCenter() {
+    func testDuoEntityPortraitUsesItsAvailableWidthAndKeepsContentRightOfCenter() {
         let size = CGSize(width: 700, height: 1000)
-        let landscape = DuoEntityPanelFrames.resolve(size: CGSize(width: 972, height: 700),
-            expanded: true, portrait: false)
-        let frames = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: true,
-            landscapePageWidth: landscape.page.width)
-        XCTAssertEqual(frames.page.width, min(size.width - 124, landscape.page.width * 1.2), accuracy: 0.001)
+        let frames = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: true)
+        XCTAssertEqual(frames.page.width, size.width - 124, accuracy: 0.001)
         XCTAssertEqual(frames.page.minX, min(size.width - frames.page.width, (size.width - frames.page.width) / 2 + 44))
         XCTAssertEqual(frames.page.height, size.height)
         XCTAssertLessThan(frames.sections.maxX, frames.page.minX)
@@ -48,10 +45,21 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertEqual(frames.divider, .zero)
     }
 
+    func testDuoPortraitContentWidthIsIndependentOfHeightAndLandscapeDivision() {
+        let size = CGSize(width: 587, height: 951)
+        let frames = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: true)
+        let resized = DuoEntityPanelFrames.resolve(size: CGSize(width: size.width, height: 620),
+            expanded: true, portrait: true, division: CGRect(x: 520, y: 0, width: 24, height: 620))
+
+        XCTAssertEqual(frames.page.width, 463)
+        XCTAssertEqual(resized.page.width, frames.page.width)
+        XCTAssertEqual(resized.page.minX, frames.page.minX)
+    }
+
     func testDuoEntityPortraitFilingFramesStayInBoundsForSmallWindows() {
         for size in [CGSize.zero, CGSize(width: 80, height: 30), CGSize(width: 320, height: 200), CGSize(width: 700, height: 1000)] {
             let frames = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: true,
-                division: CGRect(x: 0, y: size.height / 2, width: size.width, height: 40), landscapePageWidth: 480)
+                division: CGRect(x: 0, y: size.height / 2, width: size.width, height: 40))
             XCTAssertGreaterThanOrEqual(frames.page.minX, 0)
             XCTAssertGreaterThanOrEqual(frames.page.width, 0)
             XCTAssertEqual(frames.page.minX, min(size.width - frames.page.width, (size.width - frames.page.width) / 2 + 44))

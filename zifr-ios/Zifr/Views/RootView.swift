@@ -7,7 +7,6 @@ final class MiloomDuoLayoutState {
     var isPartiallyOpen = false
     var dashboardRequest = 0
     var windowSize: CGSize = .zero
-    var landscapeEntityWidth: CGFloat?
 
     private var hasRoomForExpandedLayout: Bool {
         // Full Duo layouts keep space for two panes or the portrait filing
@@ -22,14 +21,6 @@ final class MiloomDuoLayoutState {
 
     var usesExpandedLandscape: Bool {
         hasRoomForExpandedLayout && windowSize.width >= windowSize.height
-    }
-
-    var portraitEntityWidth: CGFloat? {
-        if let landscapeEntityWidth { return landscapeEntityWidth }
-        let longEdge = max(windowSize.width, windowSize.height)
-        // Cold portrait launch: allow for the landscape side controls before
-        // the first actual landscape measurement replaces this estimate.
-        return longEdge > 0 ? max(0, longEdge / 2 - 42) : nil
     }
 }
 

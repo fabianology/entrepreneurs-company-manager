@@ -34,17 +34,16 @@ private enum DuoPortraitSheet: Identifiable {
     }
 }
 
-/// The portrait page retains a landscape pane's measured point width. The
-/// remaining left margin holds filing tabs; no lower pane is reserved.
+/// Size the portrait page from its own window, reserving room for the filing
+/// toolbar on the left and keeping the page clear of the trailing actions.
 struct DuoPortraitFilingFrames: Equatable {
     let page: CGRect
     let tabs: CGRect
 
-    static func resolve(size: CGSize, landscapePageWidth: CGFloat? = nil) -> Self {
+    static func resolve(size: CGSize) -> Self {
         let width = max(0, size.width), height = max(0, size.height)
         let rail = min(width, 124)
-        let reference = landscapePageWidth ?? max(width, height) / 2 - 6
-        let pageWidth = min(max(0, width - rail), max(0, reference * 1.2))
+        let pageWidth = width - rail
         let pageX = min(width - pageWidth, (width - pageWidth) / 2 + 44)
         let tabWidth = min(56, max(0, pageX))
         return Self(page: CGRect(x: pageX, y: 0, width: pageWidth, height: height),
@@ -62,11 +61,10 @@ struct DuoEntityPanelFrames: Equatable {
     let sections: CGRect
 
     static func resolve(size: CGSize, expanded: Bool, portrait: Bool,
-                        foldY: CGFloat? = nil, division: CGRect? = nil,
-                        landscapePageWidth: CGFloat? = nil) -> Self {
+                        foldY: CGFloat? = nil, division: CGRect? = nil) -> Self {
         let width = max(0, size.width), height = max(0, size.height)
         if expanded && portrait {
-            let files = DuoPortraitFilingFrames.resolve(size: size, landscapePageWidth: landscapePageWidth)
+            let files = DuoPortraitFilingFrames.resolve(size: size)
             return Self(page: files.page, panel: .zero, divider: .zero, sections: files.tabs)
         }
         guard expanded else {
@@ -162,7 +160,6 @@ struct MiloomCircularToolbarLabel<Icon: View>: View {
 private struct DuoEntityPanels<Page: View, Panel: View>: View {
     let isSplit: Bool
     let isPortrait: Bool
-    @Environment(MiloomDuoLayoutState.self) private var layout
     @ViewBuilder let page: () -> Page
     @ViewBuilder let panel: () -> Panel
     @State private var hasShownPanel = false
@@ -178,10 +175,7 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
                        width: $0.frame.width + $0.margins.leading + $0.margins.trailing,
                        height: $0.frame.height + $0.margins.top + $0.margins.bottom)
             }
-            let measuredWidth = isSplit && geometry.size.width >= geometry.size.height
-                ? DuoDashboardPanelFrames.resolve(size: geometry.size, expanded: true, division: division).cards.width : nil
-            DuoEntityPanelLayout(isSplit: isSplit, isPortrait: isPortrait, division: division,
-                                 landscapePageWidth: layout.portraitEntityWidth) {
+            DuoEntityPanelLayout(isSplit: isSplit, isPortrait: isPortrait, division: division) {
                 page().contentShape(Rectangle())
                     .mask { Rectangle().padding(-64) }
                 ZStack {
@@ -197,11 +191,6 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
                 .accessibilityHidden(!isSplit)
                 .accessibilityIdentifier("duo.entityPanel")
             }
-            .onChange(of: measuredWidth, initial: true) { _, width in
-                if let width, width > 0, layout.landscapeEntityWidth != width {
-                    layout.landscapeEntityWidth = width
-                }
-            }
         }
         .background(Color.zifrBG.ignoresSafeArea())
         .onChange(of: isSplit, initial: true) { _, visible in
@@ -215,7 +204,6 @@ private struct DuoEntityPanelLayout: Layout {
     let isSplit: Bool
     let isPortrait: Bool
     let division: CGRect?
-    let landscapePageWidth: CGFloat?
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         proposal.replacingUnspecifiedDimensions()
@@ -224,7 +212,7 @@ private struct DuoEntityPanelLayout: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard subviews.count == 2 else { return }
         let frames = DuoEntityPanelFrames.resolve(size: bounds.size, expanded: isSplit || isPortrait,
-            portrait: isPortrait, division: division, landscapePageWidth: landscapePageWidth)
+            portrait: isPortrait, division: division)
         for (index, frame) in [frames.page, frames.panel].enumerated() {
             subviews[index].place(at: frame.offsetBy(dx: bounds.minX, dy: bounds.minY).origin, anchor: .topLeading,
                                   proposal: ProposedViewSize(frame.size))
