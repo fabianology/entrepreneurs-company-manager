@@ -68,26 +68,33 @@ final class ExecutiveBriefingTests: XCTestCase {
         layout.isExpanded = true
 
         layout.windowSize = CGSize(width: 475, height: 669)
+        XCTAssertTrue(layout.usesCompactLayout)
         XCTAssertFalse(layout.usesExpandedPortrait)
         XCTAssertFalse(layout.usesExpandedLandscape)
 
         layout.windowSize = CGSize(width: 475, height: 320)
+        XCTAssertTrue(layout.usesCompactLayout)
         XCTAssertFalse(layout.usesExpandedPortrait)
         XCTAssertFalse(layout.usesExpandedLandscape)
 
         layout.windowSize = CGSize(width: 669, height: 951)
+        XCTAssertFalse(layout.usesCompactLayout)
         XCTAssertTrue(layout.usesExpandedPortrait)
         XCTAssertFalse(layout.usesExpandedLandscape)
 
         layout.windowSize = CGSize(width: 951, height: 669)
+        XCTAssertFalse(layout.usesCompactLayout)
         XCTAssertFalse(layout.usesExpandedPortrait)
         XCTAssertTrue(layout.usesExpandedLandscape)
 
+        layout.windowSize = CGSize(width: 475, height: 669)
         layout.isExpanded = false
+        XCTAssertTrue(layout.usesCompactLayout)
         XCTAssertFalse(layout.usesExpandedLandscape)
 
         layout.isExpanded = true
         layout.isDuoDevice = false
+        XCTAssertFalse(layout.usesCompactLayout)
         XCTAssertFalse(layout.usesExpandedLandscape)
     }
 

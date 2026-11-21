@@ -15,6 +15,10 @@ final class MiloomDuoLayoutState {
         isDuoDevice && isExpanded && windowSize.width >= 600
     }
 
+    var usesCompactLayout: Bool {
+        isDuoDevice && !hasRoomForExpandedLayout
+    }
+
     var usesExpandedPortrait: Bool {
         hasRoomForExpandedLayout && windowSize.height > windowSize.width
     }
@@ -26,10 +30,10 @@ final class MiloomDuoLayoutState {
 
 struct RootView: View {
     @Environment(AppState.self) private var appState
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     @State private var vm: AppViewModel
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var compactColumn: NavigationSplitViewColumn = .detail
-    @State private var duoLayout = MiloomDuoLayoutState()
 
     init(vm: AppViewModel = AppViewModel()) {
         _vm = State(initialValue: vm)
@@ -49,10 +53,6 @@ struct RootView: View {
 
     var body: some View {
         rootSurface
-            .environment(duoLayout)
-            .background {
-                Color.clear.modifier(MiloomDuoLayoutObserver(layout: duoLayout))
-            }
     }
 
     @ViewBuilder
@@ -189,14 +189,24 @@ struct RootView: View {
 }
 
 /// Observe the whole window, not an entity's potentially narrow detail column.
-struct MiloomDuoLayoutObserver: ViewModifier {
-    let layout: MiloomDuoLayoutState
+struct MiloomDuoWindow: ViewModifier {
+    @State private var layout = MiloomDuoLayoutState()
+
+    func body(content: Content) -> some View {
+        let isDuoDevice = layout.isDuoDevice
+        content
+            .environment(layout)
+            .transformEnvironment(\.verticalScrollIndicatorVisibility) { visibility in
+                if isDuoDevice { visibility = .never }
+            }
+            .background { layoutObservation }
+    }
 
     @ViewBuilder
-    func body(content: Content) -> some View {
+    private var layoutObservation: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
-            content
+            Color.clear
                 .onHingeChange { _, context in
                     let isDuo = context.hinge != nil
                     let expanded = context.hinge.map { $0.status != .closed } ?? false
@@ -208,11 +218,7 @@ struct MiloomDuoLayoutObserver: ViewModifier {
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
                     if layout.windowSize != size { layout.windowSize = size }
                 }
-        } else {
-            content
         }
-        #else
-        content
         #endif
     }
 }
@@ -411,6 +417,7 @@ struct MiloomDuoLayoutObserver: ViewModifier {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
                     RootView(vm: vm)
+                        .modifier(MiloomDuoWindow())
                 }
                     .background(Color.zifrBG)
                     .preferredColorScheme(.dark)

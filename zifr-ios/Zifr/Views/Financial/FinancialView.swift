@@ -13,6 +13,7 @@ struct FinancialView: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authVM
     @Environment(OnboardingStateManager.self) private var onboardingState
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
 
     private func canEditResource(_ type: String, _ id: UUID) -> Bool {
         AppViewModel.resourceAllowsEdit(
@@ -284,6 +285,7 @@ struct FinancialView: View {
                                 editableCardIDs: editableCardIDs,
                                 editableLoanIDs: editableLoanIDs,
                                 canAccessCredentials: canAccessCredentials,
+                                fitsCompactWidth: duoLayout.usesCompactLayout,
                                 onEditInst: { if canEditResource("institution", $0.id) { editingInst = $0 } },
                                 onEditCard: { if canEditResource("card", $0.id) { editingCard = $0 } },
                                 onEditLoan: { if canEditResource("loan", $0.id) { editingLoan = $0 } }
@@ -329,6 +331,10 @@ struct FinancialView: View {
                         Spacer().frame(height: 120)
                     }
                 }
+                .frame(
+                    minWidth: duoLayout.usesCompactLayout ? 0 : nil,
+                    maxWidth: duoLayout.usesCompactLayout ? .infinity : nil
+                )
                 .padding(.horizontal, 20)
             }
         }

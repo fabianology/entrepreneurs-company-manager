@@ -17,6 +17,7 @@ struct StackedInstitutionDeckView: View {
     var editableCardIDs: Set<UUID> = []
     var editableLoanIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
+    var fitsCompactWidth = false
     let onEditInst: (Institution) -> Void
     let onEditCard: (FinancialCard) -> Void
     let onEditLoan: (Loan) -> Void
@@ -286,40 +287,19 @@ struct StackedInstitutionDeckView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 
-                // Counts with pipe separators — exact match
-                HStack(spacing: 6) {
-                    HStack(spacing: 3) {
-                        Text("\(inst.accounts.count)").foregroundStyle(.white)
-                        Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
-                    }
-                    .font(.system(size: 12, weight: .medium))
-                    .fixedSize(horizontal: true, vertical: false)
-                    
-                    Text("|").font(.system(size: 10)).foregroundStyle(Color.white.opacity(0.2))
-                    
-                    HStack(spacing: 3) {
-                        Text("\(instCards.count)").foregroundStyle(.white)
-                        Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
-                    }
-                    .font(.system(size: 12, weight: .medium))
-                    .fixedSize(horizontal: true, vertical: false)
-                    
-                    Text("|").font(.system(size: 10)).foregroundStyle(Color.white.opacity(0.2))
-                    
-                    HStack(spacing: 3) {
-                        Text("\(instLoans.count)").foregroundStyle(.white)
-                        Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
-                    }
-                    .font(.system(size: 12, weight: .medium))
-                    .fixedSize(horizontal: true, vertical: false)
-                }
+                InstitutionCardCounts(
+                    accounts: inst.accounts.count,
+                    cards: instCards.count,
+                    loans: instLoans.count,
+                    fitsCompactWidth: fitsCompactWidth
+                )
             }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 10)
         .frame(height: collapsedHeight, alignment: .center)
-        .frame(maxWidth: .infinity)
+        .frame(minWidth: fitsCompactWidth ? 0 : nil, maxWidth: .infinity)
         .overlay(alignment: .bottom) {
             StackCardDragZone(
                 onChanged: { value in
@@ -385,6 +365,7 @@ struct StackedInstitutionDeckView: View {
             canEdit: editableInstitutionIDs.contains(inst.id),
             editableLoanIDs: editableLoanIDs,
             canAccessCredentials: canAccessCredentials,
+            fitsCompactWidth: fitsCompactWidth,
             isExpanded: isExpanded,
             onCollapse: {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {

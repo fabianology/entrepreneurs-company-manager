@@ -371,7 +371,8 @@ struct CompanyDetailView: View {
                 primaryAction: duoShareControl,
                 add: duoAddControl,
                 entities: entitiesControlMenu,
-                portraitActionsTopInset: tutFrameHeader.height
+                portraitActionsTopInset: tutFrameHeader.height,
+                reservesCompactContentWidth: true
             ))
                 .allowsHitTesting(duoPortraitSheet == nil || !usesDuoPortraitLayout)
                 .accessibilityHidden(duoPortraitSheet != nil && usesDuoPortraitLayout)

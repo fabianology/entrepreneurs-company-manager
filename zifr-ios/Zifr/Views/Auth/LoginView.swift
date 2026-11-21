@@ -4,8 +4,8 @@ import LocalAuthentication
 
 struct LoginView: View {
     @Bindable var authViewModel: AuthViewModel
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     
-    @State private var duoLayout = MiloomDuoLayoutState()
     @State private var email = ""
     @State private var password = ""
     @State private var isSignUp = false
@@ -284,7 +284,6 @@ struct LoginView: View {
             }
             .padding(.top, usesCompactLoginLayout ? 20 : 0)
         }
-        .modifier(MiloomDuoLayoutObserver(layout: duoLayout))
         .sheet(isPresented: $showForgotPassword) {
             ForgotPasswordSheet(authViewModel: authViewModel, initialEmail: email)
         }

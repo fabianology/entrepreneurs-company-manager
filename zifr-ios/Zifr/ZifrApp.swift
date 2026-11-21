@@ -203,6 +203,7 @@ struct ZifrApp: App {
             } message: {
                 Text(appState.error ?? "An unknown error occurred.")
             }
+            .modifier(MiloomDuoWindow())
         }
     }
 }

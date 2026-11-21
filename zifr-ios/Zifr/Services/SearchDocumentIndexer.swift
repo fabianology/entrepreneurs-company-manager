@@ -144,14 +144,22 @@ struct SearchDocumentViewer: View {
 private struct SearchDocumentContent: UIViewRepresentable {
     let data: Data
     let page: Int
+    @Environment(\.verticalScrollIndicatorVisibility) private var verticalIndicatorVisibility
+
     func makeUIView(context: Context) -> UIView {
         if let document = PDFDocument(data: data) {
-            let view = PDFView(); view.autoScales = true; view.document = document
+            let view = MiloomPDFView()
+            view.autoScales = true
+            view.document = document
             if let destination = document.page(at: max(0, min(page - 1, document.pageCount - 1))) { view.go(to: destination) }
             return view
         }
         let view = UIImageView(image: UIImage(data: data)); view.contentMode = .scaleAspectFit
         return view
     }
-    func updateUIView(_ uiView: UIView, context: Context) {}
+    func updateUIView(_ uiView: UIView, context: Context) {
+        if let pdfView = uiView as? MiloomPDFView {
+            pdfView.hidesVerticalScrollIndicator = verticalIndicatorVisibility == .never
+        }
+    }
 }

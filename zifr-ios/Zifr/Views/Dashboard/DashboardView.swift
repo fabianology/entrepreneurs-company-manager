@@ -1407,40 +1407,40 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     let entities: Entities
     var showsPrimaryActions = true
     var portraitActionsTopInset: CGFloat = 16
+    var reservesCompactContentWidth = false
+
+    private let toolbarWidth: CGFloat = 52
+    private let toolbarTrailingPadding: CGFloat = 22
 
     private var hasNativeSideToolbar: Bool { layout.usesExpandedLandscape }
     private var hasTrailingToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar }
 
     func body(content: Content) -> some View {
-        let usesClosedRail = hasTrailingToolbar && !layout.usesExpandedPortrait && isActive
+        let usesClosedRail = layout.usesCompactLayout && isActive
+        let usesFixedWidthRail = reservesCompactContentWidth && usesClosedRail
+        let closedRailEdges: Edge.Set = usesFixedWidthRail && layout.isExpanded ? .horizontal : .trailing
         // The closed screen leaves space above the rail for the camera and status indicators.
         let topInset = layout.usesExpandedPortrait
             ? portraitActionsTopInset
             : min(164, max(16, layout.windowSize.height - 300))
         content
-            .safeAreaInset(edge: .trailing, spacing: usesClosedRail ? 22 : 8) {
-                if hasTrailingToolbar && isActive {
-                    VStack(spacing: 16) {
-                        if showsPrimaryActions {
-                            primaryAction.padding(.bottom, 4)
-                            add
-                        }
-                        Spacer(minLength: 24)
-                        entities
-                        measuredAdmin
-                    }
-                    .frame(width: 52)
-                    .padding(.top, showsPrimaryActions ? topInset : 12)
-                    .padding(.bottom, usesClosedRail ? 0 : 12)
-                    .padding(.trailing, 22)
-                    .frame(maxHeight: .infinity)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier(layout.usesExpandedPortrait ? "duo.portraitToolbar" : "duo.closedToolbar")
+            // Take the rail out of the content's width before the financial deck is measured.
+            .padding(.trailing, usesFixedWidthRail ? toolbarWidth + toolbarTrailingPadding : 0)
+            .background {
+                if usesFixedWidthRail { Color.zifrBG.ignoresSafeArea() }
+            }
+            .overlay(alignment: .trailing) {
+                if usesFixedWidthRail {
+                    trailingToolbar(topInset: topInset, isClosed: true)
                 }
             }
-            // Measure the rail from the window edge, then let the inset reserve
-            // space for it once. The system's own trailing strip varies in Split View.
-            .ignoresSafeArea(.container, edges: usesClosedRail ? .trailing : [])
+            .safeAreaInset(edge: .trailing, spacing: usesFixedWidthRail ? 0 : (usesClosedRail ? 22 : 8)) {
+                if hasTrailingToolbar && isActive && !usesFixedWidthRail {
+                    trailingToolbar(topInset: topInset, isClosed: usesClosedRail)
+                }
+            }
+            // The operating system reserves different side strips in the left and right panes.
+            .ignoresSafeArea(.container, edges: usesClosedRail ? closedRailEdges : [])
             .toolbar(hasTrailingToolbar && isActive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if hasNativeSideToolbar && isActive {
@@ -1468,6 +1468,25 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                 if reportsDuoDevice != next { reportsDuoDevice = next }
                 if usesSideToolbar != next { usesSideToolbar = next }
             }
+    }
+
+    private func trailingToolbar(topInset: CGFloat, isClosed: Bool) -> some View {
+        VStack(spacing: 16) {
+            if showsPrimaryActions {
+                primaryAction.padding(.bottom, 4)
+                add
+            }
+            Spacer(minLength: 24)
+            entities
+            measuredAdmin
+        }
+        .frame(width: toolbarWidth)
+        .padding(.top, showsPrimaryActions ? topInset : 12)
+        .padding(.bottom, isClosed ? 0 : 12)
+        .padding(.trailing, toolbarTrailingPadding)
+        .frame(maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(isClosed ? "duo.closedToolbar" : "duo.portraitToolbar")
     }
 
     private var measuredAdmin: some View {

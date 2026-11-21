@@ -1660,16 +1660,41 @@ struct DocumentViewerView: View {
 
 struct PDFKitView: UIViewRepresentable {
     let url: URL
+    @Environment(\.verticalScrollIndicatorVisibility) private var verticalIndicatorVisibility
     
-    func makeUIView(context: Context) -> PDFView {
-        let pdfView = PDFView()
+    func makeUIView(context: Context) -> MiloomPDFView {
+        let pdfView = MiloomPDFView()
         pdfView.document = PDFDocument(url: url)
         pdfView.autoScales = true
         pdfView.backgroundColor = UIColor(red: 0.09, green: 0.09, blue: 0.09, alpha: 1.0)
         return pdfView
     }
     
-    func updateUIView(_ uiView: PDFView, context: Context) {}
+    func updateUIView(_ uiView: MiloomPDFView, context: Context) {
+        uiView.hidesVerticalScrollIndicator = verticalIndicatorVisibility == .never
+    }
+}
+
+// PDFKit manages its own UIKit scroll view outside SwiftUI's scroll settings.
+final class MiloomPDFView: PDFView {
+    var hidesVerticalScrollIndicator = false {
+        didSet {
+            if hidesVerticalScrollIndicator != oldValue { setNeedsLayout() }
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard hidesVerticalScrollIndicator else { return }
+
+        var ancestor = documentView?.superview
+        while let view = ancestor, view !== self {
+            if let scrollView = view as? UIScrollView {
+                scrollView.showsVerticalScrollIndicator = false
+            }
+            ancestor = view.superview
+        }
+    }
 }
 
 // MARK: - Safari View
