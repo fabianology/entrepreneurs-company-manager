@@ -84,6 +84,7 @@ struct DashboardView: View {
     private var dashboardWithToolbar: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
+            let portraitToolbarTopInset: CGFloat = 62
             dashboardSurface.modifier(DuoSideToolbar(
                 usesSideToolbar: $usesDuoSideToolbar,
                 bottomControlCenterY: $duoBottomToolbarCenterY,
@@ -91,15 +92,16 @@ struct DashboardView: View {
                 reportsDuoDevice: $isDuoDevice,
                 isActive: vm.path.isEmpty,
                 admin: dashboardAdminButton,
-                primaryAction: dashboardShareControl.frame(width: 52, height: 52),
+                primaryAction: dashboardShareControl,
                 add: plusCommandMenu,
-                entities: EmptyView()
+                entities: EmptyView(),
+                portraitActionsTopInset: portraitToolbarTopInset
             ))
             .allowsHitTesting(!showPortraitBriefing || !usesDuoPortraitDashboard || !vm.path.isEmpty)
             .accessibilityHidden(showPortraitBriefing && usesDuoPortraitDashboard && vm.path.isEmpty)
             .overlay {
                 if usesDuoPortraitDashboard && vm.path.isEmpty {
-                    MiloomDuoBriefingFile(isPresented: $showPortraitBriefing, tabTopInset: 62,
+                    MiloomDuoBriefingFile(isPresented: $showPortraitBriefing, tabTopInset: portraitToolbarTopInset,
                         additionalControls: AnyView(notificationInboxButton)) {
                         inlineBriefingPanel
                     }
@@ -1404,6 +1406,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     let add: Add
     let entities: Entities
     var showsPrimaryActions = true
+    var portraitActionsTopInset: CGFloat = 16
 
     // Do not gate native toolbar creation on its own emitted edge: the edge
     // can briefly disappear during a fold and prevent the items returning.
@@ -1417,7 +1420,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                 if hasPortraitToolbar && isActive {
                     VStack(spacing: 16) {
                         if showsPrimaryActions {
-                            primaryAction
+                            primaryAction.padding(.bottom, 4)
                             add
                         }
                         Spacer(minLength: 24)
@@ -1425,7 +1428,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                         measuredAdmin
                     }
                     .frame(width: 52)
-                    .padding(.top, 12)
+                    .padding(.top, showsPrimaryActions ? portraitActionsTopInset : 12)
                     .padding(.bottom, 12)
                     // Match the expanded-portrait Wi-Fi indicator center on every page.
                     .padding(.trailing, 22)
@@ -1439,7 +1442,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                     if showsPrimaryActions {
                         ToolbarItem(placement: .topBarLeading) {
                             VStack(spacing: 16) {
-                                primaryAction
+                                primaryAction.frame(width: 52, height: 52)
                                 add
                             }
                         }

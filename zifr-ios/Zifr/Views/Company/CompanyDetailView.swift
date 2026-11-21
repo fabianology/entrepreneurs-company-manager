@@ -369,9 +369,10 @@ struct CompanyDetailView: View {
                 reportsDuoDevice: $isDuoDevice,
                 isActive: true,
                 admin: profileControlButton,
-                primaryAction: duoShareControl.frame(width: 52, height: 52),
+                primaryAction: duoShareControl,
                 add: duoAddControl,
-                entities: entitiesControlMenu
+                entities: entitiesControlMenu,
+                portraitActionsTopInset: tutFrameHeader.height
             ))
                 .allowsHitTesting(duoPortraitSheet == nil || !usesDuoPortraitLayout)
                 .accessibilityHidden(duoPortraitSheet != nil && usesDuoPortraitLayout)
