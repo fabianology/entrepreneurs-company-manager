@@ -1409,8 +1409,11 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     var portraitActionsTopInset: CGFloat = 16
     var reservesCompactContentWidth = false
 
+    @State private var compactStatusAreaBottom: CGFloat?
+
     private let toolbarWidth: CGFloat = 52
     private let toolbarTrailingPadding: CGFloat = 22
+    private let compactStatusAreaGap: CGFloat = 12
 
     private var hasNativeSideToolbar: Bool { layout.usesExpandedLandscape }
     private var hasTrailingToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar }
@@ -1419,11 +1422,6 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
         let usesClosedRail = layout.usesCompactLayout && isActive
         let usesFixedWidthRail = reservesCompactContentWidth && usesClosedRail
         let closedRailEdges: Edge.Set = usesFixedWidthRail && layout.isExpanded ? .horizontal : .trailing
-        // The closed display needs extra clearance below its status indicators.
-        let compactActionsTopInset: CGFloat = layout.isExpanded ? 164 : 188
-        let topInset = layout.usesExpandedPortrait
-            ? portraitActionsTopInset
-            : min(compactActionsTopInset, max(16, layout.windowSize.height - 300))
         content
             // Take the rail out of the content's width before the financial deck is measured.
             .padding(.trailing, usesFixedWidthRail ? toolbarWidth + toolbarTrailingPadding : 0)
@@ -1432,16 +1430,35 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
             }
             .overlay(alignment: .trailing) {
                 if usesFixedWidthRail {
-                    trailingToolbar(topInset: topInset, isClosed: true)
+                    trailingToolbar(isClosed: true)
                 }
             }
             .safeAreaInset(edge: .trailing, spacing: usesFixedWidthRail ? 0 : (usesClosedRail ? 22 : 8)) {
                 if hasTrailingToolbar && isActive && !usesFixedWidthRail {
-                    trailingToolbar(topInset: topInset, isClosed: usesClosedRail)
+                    trailingToolbar(isClosed: usesClosedRail)
                 }
             }
             // The operating system reserves different side strips in the left and right panes.
             .ignoresSafeArea(.container, edges: usesClosedRail ? closedRailEdges : [])
+            .background {
+                if usesClosedRail && showsPrimaryActions {
+                    Color.clear
+                        .onGeometryChange(for: CGFloat?.self) { geometry in
+                            let width = geometry.size.width
+                            let top = geometry.frame(in: .global).minY
+                            // The status area is a top occlusion on either side of the window.
+                            return geometry.reservedRegions(kind: .occlusion)
+                                .map(\.frame)
+                                .filter {
+                                    $0.minY <= 1 && $0.maxY > 0 && $0.width < width / 2
+                                        && ($0.minX <= 1 || $0.maxX >= width - 1)
+                                }
+                                .map { top + $0.maxY }
+                                .max()
+                        } action: { compactStatusAreaBottom = $0 }
+                        .ignoresSafeArea(.container, edges: [.top, .leading, .trailing])
+                }
+            }
             .toolbar(hasTrailingToolbar && isActive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if hasNativeSideToolbar && isActive {
@@ -1471,7 +1488,21 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
             }
     }
 
-    private func trailingToolbar(topInset: CGFloat, isClosed: Bool) -> some View {
+    @ViewBuilder
+    private func trailingToolbar(isClosed: Bool) -> some View {
+        if isClosed && showsPrimaryActions {
+            GeometryReader { geometry in
+                let toolbarTop = geometry.frame(in: .global).minY
+                let clearance = max(0, (compactStatusAreaBottom ?? toolbarTop) - toolbarTop)
+                toolbarContents(topInset: clearance + compactStatusAreaGap, isClosed: true)
+            }
+            .frame(width: toolbarWidth + toolbarTrailingPadding)
+        } else {
+            toolbarContents(topInset: portraitActionsTopInset, isClosed: isClosed)
+        }
+    }
+
+    private func toolbarContents(topInset: CGFloat, isClosed: Bool) -> some View {
         VStack(spacing: 16) {
             if showsPrimaryActions {
                 primaryAction.padding(.bottom, 4)
