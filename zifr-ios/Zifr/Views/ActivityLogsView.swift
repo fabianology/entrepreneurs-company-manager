@@ -289,9 +289,41 @@ private struct MessageFeedback: Identifiable {
 struct MessageRowView: View {
     let log: ActivityLog
     let vm: AppViewModel
+    var usesReportRowStyle = false
     @Environment(AppState.self) private var appState
-    
+
+    @ViewBuilder
     var body: some View {
+        if usesReportRowStyle {
+            row.padding(.vertical, 12)
+        } else {
+            row
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color.black.opacity(0.70))
+                )
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+        }
+    }
+
+    private var row: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(titleForAction(log.actionType))
@@ -344,30 +376,8 @@ struct MessageRowView: View {
                 .padding(.top, 4)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.black.opacity(0.70))
-        )
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#918457"),
-                            Color(hex: "#918457").opacity(0.3)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-        )
     }
-    
+
     private func titleForAction(_ type: String) -> String {
         switch type {
         case "shared": return "New Share"
@@ -386,16 +396,89 @@ struct MessageRowView: View {
     }
 }
 
-private enum InboxSection: String, CaseIterable, Identifiable {
+private enum InboxSection: String, CaseIterable {
     case alerts = "Alerts"
     case invitations = "Invites"
     case activity = "Activity"
+}
 
-    var id: String { rawValue }
+private struct InboxSectionPicker: UIViewRepresentable {
+    @Binding var selection: InboxSection
+
+    final class PickerContainer: UIView {
+        let control = UISegmentedControl(items: InboxSection.allCases.map(\.rawValue))
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+
+            // The app's segmented-control appearance also applies to UIKit views hosted by SwiftUI.
+            let appearance = UISegmentedControl.appearance(whenContainedInInstancesOf: [PickerContainer.self])
+            appearance.selectedSegmentTintColor = nil
+            appearance.backgroundColor = nil
+            appearance.setTitleTextAttributes(nil, for: .normal)
+            appearance.setTitleTextAttributes(nil, for: .selected)
+
+            control.accessibilityLabel = "Inbox section"
+            control.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(control)
+            NSLayoutConstraint.activate([
+                control.leadingAnchor.constraint(equalTo: leadingAnchor),
+                control.trailingAnchor.constraint(equalTo: trailingAnchor),
+                control.topAnchor.constraint(equalTo: topAnchor),
+                control.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
+        }
+
+        required init?(coder: NSCoder) { nil }
+    }
+
+    final class Coordinator: NSObject {
+        var selection: Binding<InboxSection>
+
+        init(selection: Binding<InboxSection>) {
+            self.selection = selection
+        }
+
+        @objc func selectSection(_ control: UISegmentedControl) {
+            let sections = InboxSection.allCases
+            guard sections.indices.contains(control.selectedSegmentIndex) else { return }
+            selection.wrappedValue = sections[control.selectedSegmentIndex]
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selection: $selection)
+    }
+
+    func makeUIView(context: Context) -> PickerContainer {
+        let container = PickerContainer(frame: .zero)
+        container.control.addTarget(
+            context.coordinator, action: #selector(Coordinator.selectSection(_:)), for: .valueChanged
+        )
+        return container
+    }
+
+    func updateUIView(_ view: PickerContainer, context: Context) {
+        context.coordinator.selection = $selection
+        let index = InboxSection.allCases.firstIndex(of: selection) ?? 0
+        if view.control.selectedSegmentIndex != index {
+            view.control.selectedSegmentIndex = index
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: PickerContainer, context: Context) -> CGSize? {
+        let intrinsicSize = uiView.control.intrinsicContentSize
+        return CGSize(width: proposal.width ?? intrinsicSize.width, height: max(44, intrinsicSize.height))
+    }
 }
 
 struct NotificationInboxView: View {
+    enum Presentation {
+        case sheet, duoDrawer
+    }
+
     @Bindable var vm: AppViewModel
+    var presentation: Presentation = .sheet
     let onOpenRoute: (NotificationRoute) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -405,6 +488,7 @@ struct NotificationInboxView: View {
     @State private var incomingInvitations: [IncomingResourceInvitation] = []
     @State private var invitationInProgress: UUID?
     @State private var decliningInvitation: IncomingResourceInvitation?
+    @AccessibilityFocusState private var headingFocused: Bool
 
     private var unreadCount: Int {
         switch section {
@@ -415,30 +499,25 @@ struct NotificationInboxView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.zifrCard.ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                header
-
-                Picker("Inbox section", selection: $section) {
-                    ForEach(InboxSection.allCases) { item in
-                        Text(item.rawValue).tag(item)
+        Group {
+            switch presentation {
+            case .sheet:
+                reportInbox
+                    .frame(maxWidth: 580, maxHeight: .infinity, alignment: .top)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 24)
+                    .frame(maxWidth: .infinity)
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground {
+                        DuoGlassReportStyle.tile
+                            .opacity(0.86)
+                            .background(.regularMaterial)
                     }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-
-                Group {
-                    switch section {
-                    case .alerts: alertList
-                    case .invitations: invitationList
-                    case .activity: activityList
-                    }
-                }
+            case .duoDrawer:
+                reportInbox
             }
         }
+        .onAppear { headingFocused = true }
         .task {
             try? await DataRepository.shared.refreshNotifications(appState: appState)
             await refreshInvitations()
@@ -469,162 +548,187 @@ struct NotificationInboxView: View {
         }
     }
 
-    private var header: some View {
-        HStack {
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.9))
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Color.black.opacity(0.70)))
-                    .background(.regularMaterial, in: Circle())
-                    .overlay(Circle().stroke(.vaultOutline, lineWidth: 1.5))
-            }
-
-            Spacer()
-
-            VStack(spacing: 3) {
-                Text("INBOX")
-                    .font(.system(size: 10, weight: .black))
-                    .tracking(2)
-                    .foregroundStyle(Color.white.opacity(0.65))
-                Text(inboxCountLabel)
-                    .font(.system(size: 8, weight: .bold))
-                    .tracking(1)
-                    .foregroundStyle(Color.zifrGold)
-            }
-
-            Spacer()
-
-            Menu {
-                if section != .invitations {
-                    Button {
-                        Task { await markAllRead() }
-                    } label: {
-                        Label("Mark All as Read", systemImage: "envelope.open")
-                    }
-                    .disabled(unreadCount == 0)
-                }
-
-                if section != .activity {
-                    Button {
-                        Task {
-                            if section == .alerts {
-                                do {
-                                    try await DataRepository.shared.refreshNotifications(appState: appState)
-                                } catch {
-                                    errorMessage = error.localizedDescription
-                                }
-                            } else {
-                                await refreshInvitations()
-                            }
-                        }
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
+    private var reportInbox: some View {
+        refreshableList {
+            DuoGlassReportBody {
+                HStack(alignment: .top, spacing: 8) {
+                    DuoGlassReportHeading(title: "Inbox", subtitle: inboxCountLabel)
+                        .accessibilityFocused($headingFocused)
+                    Spacer(minLength: 0)
+                    inboxActions
+                        .accessibilityLabel("Inbox actions")
+                    if presentation == .sheet {
+                        closeButton
                     }
                 }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.9))
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Color.black.opacity(0.70)))
-                    .background(.regularMaterial, in: Circle())
-                    .overlay(Circle().stroke(.vaultOutline, lineWidth: 1.5))
+
+                InboxSectionPicker(selection: $section)
+
+                if let empty {
+                    VStack(spacing: 10) {
+                        Image(systemName: empty.icon)
+                            .font(.title2.weight(.light))
+                            .foregroundStyle(Color.zifrGold)
+                            .accessibilityHidden(true)
+                        Text(empty.message)
+                            .font(.subheadline)
+                            .foregroundStyle(DuoGlassReportStyle.muted)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                } else {
+                    inboxRows
+                }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            let icon = Image(systemName: "xmark")
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 44, height: 44)
+
+            if #available(iOS 26, *) {
+                icon.glassEffect(.regular.interactive(), in: .circle)
+            } else {
+                icon.background(.thinMaterial, in: Circle())
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close Inbox")
+    }
+
+    private var empty: (icon: String, message: String)? {
+        switch section {
+        case .alerts:
+            appState.notifications.isEmpty ? ("bell.slash", "No alerts yet") : nil
+        case .invitations:
+            incomingInvitations.isEmpty ? ("person.crop.circle.badge.checkmark", "No pending invitations") : nil
+        case .activity:
+            appState.activityLogs.isEmpty ? ("clock.arrow.circlepath", "No activity yet") : nil
+        }
+    }
+
+    @ViewBuilder
+    private func refreshableList<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        switch section {
+        case .alerts:
+            content().refreshable {
+                try? await DataRepository.shared.refreshNotifications(appState: appState)
+            }
+        case .invitations:
+            content().refreshable { await refreshInvitations() }
+        case .activity:
+            content()
+        }
+    }
+
+    private var inboxActions: some View {
+        Menu {
+            if section != .invitations {
+                Button {
+                    Task { await markAllRead() }
+                } label: {
+                    Label("Mark All as Read", systemImage: "envelope.open")
+                }
+                .disabled(unreadCount == 0)
+            }
+
+            if section != .activity {
+                Button {
+                    Task {
+                        if section == .alerts {
+                            do {
+                                try await DataRepository.shared.refreshNotifications(appState: appState)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        } else {
+                            await refreshInvitations()
+                        }
+                    }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.zifrGold)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
     }
 
     private var inboxCountLabel: String {
         if section == .invitations {
-            return unreadCount == 1 ? "1 PENDING" : "\(unreadCount) PENDING"
+            return "\(unreadCount) pending"
         }
-        return unreadCount == 1 ? "1 UNREAD" : "\(unreadCount) UNREAD"
+        return "\(unreadCount) unread"
     }
 
-    @ViewBuilder
-    private var alertList: some View {
-        if appState.notifications.isEmpty {
-            emptyState(icon: "bell.slash", message: "No alerts yet")
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(appState.notifications) { notification in
-                        notificationRow(notification)
-                    }
+    private var inboxRows: some View {
+        LazyVStack(spacing: 0) {
+            switch section {
+            case .alerts:
+                ForEach(appState.notifications) { notification in
+                    notificationRow(notification)
+                    reportDivider(beforeNext: notification.id != appState.notifications.last?.id)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .padding(.bottom, 32)
-            }
-            .refreshable {
-                try? await DataRepository.shared.refreshNotifications(appState: appState)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var activityList: some View {
-        if appState.activityLogs.isEmpty {
-            emptyState(icon: "clock.arrow.circlepath", message: "No activity yet")
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(appState.activityLogs) { log in
-                        MessageRowView(log: log, vm: vm)
-                            .contextMenu {
-                                Button {
-                                    Task { await toggleActivityRead(log) }
-                                } label: {
-                                    Label(log.isRead ? "Mark Unread" : "Mark Read",
-                                          systemImage: log.isRead ? "envelope.badge" : "envelope.open")
-                                }
+            case .invitations:
+                ForEach(incomingInvitations) { invitation in
+                    invitationRow(invitation)
+                    reportDivider(beforeNext: invitation.id != incomingInvitations.last?.id)
+                }
+            case .activity:
+                ForEach(appState.activityLogs) { log in
+                    MessageRowView(log: log, vm: vm, usesReportRowStyle: true)
+                        .contextMenu {
+                            Button {
+                                Task { await toggleActivityRead(log) }
+                            } label: {
+                                Label(log.isRead ? "Mark Unread" : "Mark Read",
+                                      systemImage: log.isRead ? "envelope.badge" : "envelope.open")
                             }
-                    }
+                        }
+                    reportDivider(beforeNext: log.id != appState.activityLogs.last?.id)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .padding(.bottom, 32)
             }
         }
     }
 
     @ViewBuilder
-    private var invitationList: some View {
-        if incomingInvitations.isEmpty {
-            emptyState(icon: "person.crop.circle.badge.checkmark", message: "No pending invitations")
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(incomingInvitations) { invitation in
-                        invitationRow(invitation)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .padding(.bottom, 32)
-            }
-            .refreshable { await refreshInvitations() }
+    private func reportDivider(beforeNext: Bool) -> some View {
+        if beforeNext {
+            Rectangle().fill(DuoGlassReportStyle.border).frame(height: 1)
+                .accessibilityHidden(true)
         }
+    }
+
+    private func rowChrome<Content: View>(_ content: Content) -> some View {
+        content
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+    }
+
+    private func rowIcon(_ symbol: String, tint: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 26)
+            .padding(.top, 2)
+            .accessibilityHidden(true)
     }
 
     private func invitationRow(_ invitation: IncomingResourceInvitation) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let row = VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.zifrGold.opacity(0.14))
-                        .frame(width: 42, height: 42)
-                    Image(systemName: "person.2.badge.gearshape")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.zifrGold)
-                }
+                rowIcon("person.2.badge.gearshape", tint: .zifrGold)
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(invitation.resourceTitle)
@@ -674,29 +778,15 @@ struct NotificationInboxView: View {
                 .disabled(invitationInProgress != nil)
             }
         }
-        .padding(16)
-        .background(Color.black.opacity(0.70))
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(.vaultOutline, lineWidth: 1.25)
-        )
+        return rowChrome(row)
     }
 
     private func notificationRow(_ notification: AppNotification) -> some View {
         Button {
             Task { await open(notification) }
         } label: {
-            HStack(alignment: .top, spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(notificationTint(notification).opacity(0.16))
-                        .frame(width: 42, height: 42)
-                    Image(systemName: notificationIcon(notification))
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(notificationTint(notification))
-                }
+            let row = HStack(alignment: .top, spacing: 14) {
+                rowIcon(notificationIcon(notification), tint: notificationTint(notification))
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 7) {
@@ -726,14 +816,7 @@ struct NotificationInboxView: View {
                     }
                 }
             }
-            .padding(16)
-            .background(Color.black.opacity(0.70))
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(.vaultOutline, lineWidth: 1.25)
-            )
+            rowChrome(row)
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -746,18 +829,6 @@ struct NotificationInboxView: View {
         }
     }
 
-    private func emptyState(icon: String, message: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 46, weight: .light))
-                .foregroundStyle(Color.zifrGold.opacity(0.7))
-            Text(message)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.6))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
     @MainActor
     private func open(_ notification: AppNotification) async {
         if !notification.isRead {
@@ -765,7 +836,7 @@ struct NotificationInboxView: View {
         }
         guard let route = notification.route else { return }
         onOpenRoute(route)
-        dismiss()
+        if presentation == .sheet { dismiss() }
     }
 
     @MainActor

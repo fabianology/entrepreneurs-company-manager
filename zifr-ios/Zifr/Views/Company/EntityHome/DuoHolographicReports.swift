@@ -414,7 +414,7 @@ struct MiloomDuoPortraitSheet<Content: View>: View {
                 .frame(width: 44, height: 80).contentShape(Rectangle())
                 .padding(.trailing, 2)
                 .accessibilityLabel("Close \(title)")
-                .accessibilityHint("Pull firmly right, drag left, or double tap to close the report")
+                .accessibilityHint("Pull firmly right, drag left, or double tap to close")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction { onClose() }
                 .gesture(DragGesture(minimumDistance: 8, coordinateSpace: .global)

@@ -41,6 +41,8 @@ struct DashboardView: View {
     @State private var showBriefing = false
     @State private var showPortraitBriefing = false
     @State private var showNotificationInbox = false
+    @State private var showPortraitInbox = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showTransactionCenter = false
     @State private var taxReviewCompany: Company?
     @State private var initialTransactionID: UUID?
@@ -98,21 +100,30 @@ struct DashboardView: View {
                 entities: EmptyView(),
                 portraitActionsTopInset: portraitToolbarTopInset
             ))
-            .allowsHitTesting(!showPortraitBriefing || !usesDuoPortraitDashboard || !vm.path.isEmpty)
-            .accessibilityHidden(showPortraitBriefing && usesDuoPortraitDashboard && vm.path.isEmpty)
+            .allowsHitTesting(!isPortraitDrawerOpen)
+            .accessibilityHidden(isPortraitDrawerOpen)
             .overlay {
                 if usesDuoPortraitDashboard && vm.path.isEmpty {
                     MiloomDuoBriefingFile(isPresented: $showPortraitBriefing, tabTopInset: portraitToolbarTopInset,
                         additionalControls: AnyView(notificationInboxButton)) {
                         inlineBriefingPanel
                     }
+                    .allowsHitTesting(!showPortraitInbox)
+                    .accessibilityHidden(showPortraitInbox)
                 }
             }
+            .overlay { portraitInboxOverlay }
             .onChange(of: usesDuoPortraitDashboard) { _, portrait in
-                if !portrait { showPortraitBriefing = false }
+                if !portrait {
+                    showPortraitBriefing = false
+                    dismissPortraitInbox()
+                }
             }
             .onChange(of: vm.path.isEmpty) { _, dashboard in
-                if !dashboard { showPortraitBriefing = false }
+                if !dashboard {
+                    showPortraitBriefing = false
+                    dismissPortraitInbox()
+                }
             }
         } else {
             dashboardSurface
@@ -124,6 +135,58 @@ struct DashboardView: View {
 
     private var usesDuoPortraitDashboard: Bool {
         duoLayout.usesExpandedPortrait
+    }
+
+    private var isPortraitDrawerOpen: Bool {
+        usesDuoPortraitDashboard && vm.path.isEmpty && (showPortraitBriefing || showPortraitInbox)
+    }
+
+    private var portraitInboxAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.32)
+    }
+
+    @ViewBuilder
+    private var portraitInboxOverlay: some View {
+        if usesDuoPortraitDashboard && vm.path.isEmpty {
+            GeometryReader { geometry in
+                let frames = DuoBinderDrawerFrames.resolve(size: geometry.size, progress: 1, tabIndex: 0)
+                ZStack(alignment: .topLeading) {
+                    if showPortraitInbox {
+                        Color.clear.contentShape(Rectangle())
+                            .onTapGesture { dismissPortraitInbox() }
+                            .accessibilityHidden(true)
+
+                        MiloomDuoPortraitSheet(title: "Inbox", onClose: { dismissPortraitInbox() }, showsCard: false) {
+                            NotificationInboxView(vm: vm, presentation: .duoDrawer) { route in
+                                dismissPortraitInbox { notificationRouter.enqueue(route) }
+                            }
+                        }
+                        .frame(width: frames.sheet.width, height: frames.sheet.height)
+                        .transition(.move(edge: .leading))
+                        .zIndex(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .clipped()
+            }
+            .allowsHitTesting(showPortraitInbox)
+            .accessibilityHidden(!showPortraitInbox)
+            .accessibilityElement(children: .contain)
+            .accessibilityAddTraits(showPortraitInbox ? .isModal : [])
+        }
+    }
+
+    private func dismissPortraitInbox(then completion: (() -> Void)? = nil) {
+        guard showPortraitInbox else {
+            completion?()
+            return
+        }
+        withAnimation(portraitInboxAnimation, completionCriteria: .logicallyComplete) {
+            showPortraitInbox = false
+        } completion: {
+            completion?()
+            openPendingNotificationRouteIfReady()
+        }
     }
 
     private var usesDuoLandscapeDashboard: Bool {
@@ -1094,7 +1157,7 @@ struct DashboardView: View {
     private func openPendingNotificationRouteIfReady() {
         guard authViewModel.isAuthenticated,
               appState.hasLoadedPortfolio,
-              !showNotificationInbox,
+              !showNotificationInbox, !showPortraitInbox,
               let route = notificationRouter.takePendingRoute() else { return }
         openNotificationRoute(route)
     }
@@ -1189,7 +1252,13 @@ struct DashboardView: View {
     private var notificationInboxButton: some View {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showNotificationInbox = true
+                    if usesDuoPortraitDashboard && vm.path.isEmpty {
+                        withAnimation(portraitInboxAnimation) {
+                            showPortraitInbox = true
+                        }
+                    } else {
+                        showNotificationInbox = true
+                    }
                 } label: {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: appState.unreadNotificationCount > 0 ? "bell.fill" : "bell")

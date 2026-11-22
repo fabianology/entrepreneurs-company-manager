@@ -317,7 +317,7 @@ struct DuoGlassSubscriptionSummary: View {
     }
 }
 
-private struct DuoGlassReportHeading: View {
+struct DuoGlassReportHeading: View {
     let title: String
     let subtitle: String
 
