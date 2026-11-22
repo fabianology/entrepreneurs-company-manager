@@ -1,0 +1,40 @@
+{
+  "fill": {
+    "solid": "extended-srgb:0.07843,0.41961,0.30980,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "Gold.svg",
+          "name": "Gold"
+        },
+        {
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.00000,0.00000,0.00000,1.00000"
+              }
+            }
+          ],
+          "image-name": "Emerald.svg",
+          "name": "Emerald"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.22
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.2
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "iOS"
+    ]
+  }
+}

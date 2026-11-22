@@ -1419,10 +1419,11 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
         let usesClosedRail = layout.usesCompactLayout && isActive
         let usesFixedWidthRail = reservesCompactContentWidth && usesClosedRail
         let closedRailEdges: Edge.Set = usesFixedWidthRail && layout.isExpanded ? .horizontal : .trailing
-        // The closed screen leaves space above the rail for the camera and status indicators.
+        // The closed display needs extra clearance below its status indicators.
+        let compactActionsTopInset: CGFloat = layout.isExpanded ? 164 : 188
         let topInset = layout.usesExpandedPortrait
             ? portraitActionsTopInset
-            : min(164, max(16, layout.windowSize.height - 300))
+            : min(compactActionsTopInset, max(16, layout.windowSize.height - 300))
         content
             // Take the rail out of the content's width before the financial deck is measured.
             .padding(.trailing, usesFixedWidthRail ? toolbarWidth + toolbarTrailingPadding : 0)
