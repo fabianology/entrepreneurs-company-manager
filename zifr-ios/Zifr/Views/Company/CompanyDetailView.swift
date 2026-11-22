@@ -229,6 +229,7 @@ struct CompanyDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Environment(MiloomDuoLayoutState.self) private var duoLayout
+    @Environment(\.layoutDirection) private var layoutDirection
 
     private var allCompanies: [Company] { appState.companies.sorted { $0.name < $1.name } }
     private var allSubscriptions: [Subscription] { appState.subscriptions }
@@ -822,7 +823,8 @@ struct CompanyDetailView: View {
     #if compiler(>=6.4)
     private var duoGestureLayout: DuoSideSwipe.Layout {
         if usesInlineEntityPanel { return .split }
-        return usesDuoPortraitLayout ? .portrait : .compact
+        if usesDuoPortraitLayout { return .portrait }
+        return duoLayout.usesLeftSplitToolbar ? .leftSplitPane : .compact
     }
 
     private func duoToolbarControl<Control: View>(_ control: Control, anchor: DuoSideGestures.Control) -> some View {
@@ -1027,9 +1029,11 @@ struct CompanyDetailView: View {
     }
 
     private var bottomBarRow: some View {
-        HStack(alignment: .bottom, spacing: 10) {
+        let geminiFirst = duoLayout.placesSplitControlsOnLeadingEdge(in: layoutDirection)
+        return HStack(alignment: .bottom, spacing: 10) {
             // 1. Profile / Admin Button (far left)
             if !usesDuoSideToolbar { profileControlButton }
+            if isDuoDevice && geminiFirst { geminiControlButton }
 
             // 2. Search Button (center pill)
             Button {
@@ -1069,7 +1073,7 @@ struct CompanyDetailView: View {
             }
             .buttonStyle(.plain)
 
-            if isDuoDevice { geminiControlButton }
+            if isDuoDevice && !geminiFirst { geminiControlButton }
 
             // 3. Entities Button (instead of Apple Intelligence)
             if !usesDuoSideToolbar { entitiesControlMenu }

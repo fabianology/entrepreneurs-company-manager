@@ -4,7 +4,7 @@ import UIKit
 #if compiler(>=6.4)
 enum DuoSideSwipe {
     enum Layout {
-        case portrait, compact, split
+        case portrait, compact, leftSplitPane, split
 
         // The compact page and landscape pane already inset their visible content.
         private static let outerContentMargin: CGFloat = 16
@@ -18,6 +18,8 @@ enum DuoSideSwipe {
                 return x < page.minX
             case .compact:
                 return x < page.minX + Self.outerContentMargin
+            case .leftSplitPane:
+                return x < page.minX + Self.outerContentMargin || x >= page.maxX - Self.outerContentMargin
             case .split:
                 guard let leftPanel, leftPanel.width > 0 else { return false }
                 return x < leftPanel.minX + Self.outerContentMargin

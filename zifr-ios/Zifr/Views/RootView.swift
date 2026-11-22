@@ -7,6 +7,24 @@ final class MiloomDuoLayoutState {
     var isPartiallyOpen = false
     var dashboardRequest = 0
     var windowSize: CGSize = .zero
+    var isInLeftSplitPane = false
+
+    var usesLeftSplitToolbar: Bool {
+        isDuoDevice && isExpanded && isInLeftSplitPane
+    }
+
+    func placesSplitControlsOnLeadingEdge(in direction: LayoutDirection) -> Bool {
+        usesLeftSplitToolbar && direction == .leftToRight
+    }
+
+    static func occupiesLeftSplitPane(window: CGRect, display: CGRect) -> Bool {
+        let tolerance: CGFloat = 2
+        return !window.isEmpty && !display.isEmpty
+            && abs(window.minX - display.minX) <= tolerance
+            && abs(window.minY - display.minY) <= tolerance
+            && abs(window.maxY - display.maxY) <= tolerance
+            && window.maxX < display.maxX - tolerance
+    }
 
     private var hasRoomForExpandedLayout: Bool {
         // Full Duo layouts keep space for two panes or the portrait filing
@@ -214,6 +232,16 @@ struct MiloomDuoWindow: ViewModifier {
                     if layout.isDuoDevice != isDuo { layout.isDuoDevice = isDuo }
                     if layout.isExpanded != expanded { layout.isExpanded = expanded }
                     if layout.isPartiallyOpen != partial { layout.isPartiallyOpen = partial }
+                    if !expanded && layout.isInLeftSplitPane { layout.isInLeftSplitPane = false }
+                }
+                .background {
+                    if layout.isDuoDevice && layout.isExpanded {
+                        DuoSplitPaneReader { isLeft in
+                            if layout.isExpanded && layout.isInLeftSplitPane != isLeft {
+                                layout.isInLeftSplitPane = isLeft
+                            }
+                        }
+                    }
                 }
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
                     if layout.windowSize != size { layout.windowSize = size }
@@ -222,6 +250,63 @@ struct MiloomDuoWindow: ViewModifier {
         #endif
     }
 }
+
+#if compiler(>=6.4)
+@available(iOS 27.1, *)
+private struct DuoSplitPaneReader: UIViewRepresentable {
+    @Environment(\.toolbarVerticalEdge) private var toolbarEdge
+    @Environment(\.layoutDirection) private var layoutDirection
+    let onChange: (Bool) -> Void
+
+    func makeUIView(context: Context) -> SceneView {
+        let view = SceneView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: SceneView, context: Context) {
+        let left: HorizontalEdge = layoutDirection == .leftToRight ? .leading : .trailing
+        view.prefersLeftBar = toolbarEdge == left
+        view.onChange = onChange
+        view.scheduleReport()
+    }
+
+    final class SceneView: UIView {
+        var prefersLeftBar = false
+        var onChange: (Bool) -> Void = { _ in }
+        private var reportedValue: Bool?
+        private var reportQueued = false
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            scheduleReport()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            scheduleReport()
+        }
+
+        func scheduleReport() {
+            guard !reportQueued else { return }
+            reportQueued = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                reportQueued = false
+                guard let window, let screen = window.windowScene?.screen else { return }
+                let displaySpace = screen.coordinateSpace
+                let frame = window.convert(window.bounds, to: displaySpace)
+                let isLeft = prefersLeftBar && MiloomDuoLayoutState.occupiesLeftSplitPane(
+                    window: frame, display: displaySpace.bounds
+                )
+                guard reportedValue != isLeft else { return }
+                reportedValue = isLeft
+                onChange(isLeft)
+            }
+        }
+    }
+}
+#endif
 
 #if DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW
     import UIKit

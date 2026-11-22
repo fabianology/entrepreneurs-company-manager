@@ -3,6 +3,7 @@ struct DashboardView: View {
     @Environment(AppState.self) private var appState
     @Environment(MiloomDuoLayoutState.self) private var duoLayout
     @Environment(AuthViewModel.self) private var authViewModel
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Environment(AccessController.self) private var accessController
     @Environment(NotificationRouteCoordinator.self) private var notificationRouter
@@ -287,12 +288,17 @@ struct DashboardView: View {
     }
 
     private var dashboardBottomControlsRow: some View {
-        HStack(spacing: 10) {
+        let assistantFirst = duoLayout.placesSplitControlsOnLeadingEdge(in: layoutDirection)
+        return HStack(spacing: 10) {
             if !usesDuoSideToolbar { dashboardAdminButton }
+            if assistantFirst {
+                dashboardAssistantButton.offset(y: closedDuoSearchOffset)
+            }
             dashboardSearchButton
                 .offset(y: closedDuoSearchOffset)
-            dashboardAssistantButton
-                .offset(y: closedDuoSearchOffset)
+            if !assistantFirst {
+                dashboardAssistantButton.offset(y: closedDuoSearchOffset)
+            }
             if !usesDuoSideToolbar {
                 plusCommandMenu
             }
@@ -1396,6 +1402,7 @@ import SwiftUI
 @available(iOS 27.1, *)
 struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: View>: ViewModifier {
     @Environment(MiloomDuoLayoutState.self) private var layout
+    @Environment(\.layoutDirection) private var layoutDirection
     @Binding var usesSideToolbar: Bool
     @Binding var bottomControlCenterY: CGFloat?
     @Binding var bottomControlWindowCenterY: CGFloat?
@@ -1416,26 +1423,29 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     private let compactStatusAreaGap: CGFloat = 12
 
     private var hasNativeSideToolbar: Bool { layout.usesExpandedLandscape }
-    private var hasTrailingToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar }
+    private var hasCustomSideToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar }
+    private var railOnLeadingEdge: Bool { layout.placesSplitControlsOnLeadingEdge(in: layoutDirection) }
+    private var railPaddingEdge: Edge.Set { railOnLeadingEdge ? .leading : .trailing }
 
     func body(content: Content) -> some View {
         let usesClosedRail = layout.usesCompactLayout && isActive
         let usesFixedWidthRail = reservesCompactContentWidth && usesClosedRail
-        let closedRailEdges: Edge.Set = usesFixedWidthRail && layout.isExpanded ? .horizontal : .trailing
+        let closedRailEdges: Edge.Set = usesFixedWidthRail && layout.isExpanded ? .horizontal : railPaddingEdge
         content
             // Take the rail out of the content's width before the financial deck is measured.
-            .padding(.trailing, usesFixedWidthRail ? toolbarWidth + toolbarTrailingPadding : 0)
+            .padding(railPaddingEdge, usesFixedWidthRail ? toolbarWidth + toolbarTrailingPadding : 0)
             .background {
                 if usesFixedWidthRail { Color.zifrBG.ignoresSafeArea() }
             }
-            .overlay(alignment: .trailing) {
+            .overlay(alignment: railOnLeadingEdge ? .leading : .trailing) {
                 if usesFixedWidthRail {
-                    trailingToolbar(isClosed: true)
+                    sideToolbar(isClosed: true)
                 }
             }
-            .safeAreaInset(edge: .trailing, spacing: usesFixedWidthRail ? 0 : (usesClosedRail ? 22 : 8)) {
-                if hasTrailingToolbar && isActive && !usesFixedWidthRail {
-                    trailingToolbar(isClosed: usesClosedRail)
+            .safeAreaInset(edge: railOnLeadingEdge ? .leading : .trailing,
+                           spacing: usesFixedWidthRail ? 0 : (usesClosedRail ? 22 : 8)) {
+                if hasCustomSideToolbar && isActive && !usesFixedWidthRail {
+                    sideToolbar(isClosed: usesClosedRail)
                 }
             }
             // The operating system reserves different side strips in the left and right panes.
@@ -1459,7 +1469,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                         .ignoresSafeArea(.container, edges: [.top, .leading, .trailing])
                 }
             }
-            .toolbar(hasTrailingToolbar && isActive ? .hidden : .automatic, for: .navigationBar)
+            .toolbar(hasCustomSideToolbar && isActive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if hasNativeSideToolbar && isActive {
                     if showsPrimaryActions {
@@ -1489,7 +1499,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     }
 
     @ViewBuilder
-    private func trailingToolbar(isClosed: Bool) -> some View {
+    private func sideToolbar(isClosed: Bool) -> some View {
         if isClosed && showsPrimaryActions {
             GeometryReader { geometry in
                 let toolbarTop = geometry.frame(in: .global).minY
@@ -1515,7 +1525,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
         .frame(width: toolbarWidth)
         .padding(.top, showsPrimaryActions ? topInset : 12)
         .padding(.bottom, isClosed ? 0 : 12)
-        .padding(.trailing, toolbarTrailingPadding)
+        .padding(railPaddingEdge, toolbarTrailingPadding)
         .frame(maxHeight: .infinity)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(isClosed ? "duo.closedToolbar" : "duo.portraitToolbar")

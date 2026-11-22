@@ -13,6 +13,9 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertTrue(DuoSideSwipe.Layout.portrait.acceptsStart(x: 630, page: portraitPage, leftPanel: nil))
         XCTAssertTrue(DuoSideSwipe.Layout.compact.acceptsStart(x: 12, page: compactPage, leftPanel: nil))
         XCTAssertFalse(DuoSideSwipe.Layout.compact.acceptsStart(x: 22, page: compactPage, leftPanel: nil))
+        let mirroredPage = CGRect(x: 74, y: 0, width: 392, height: 678)
+        XCTAssertTrue(DuoSideSwipe.Layout.leftSplitPane.acceptsStart(x: 455, page: mirroredPage, leftPanel: nil))
+        XCTAssertFalse(DuoSideSwipe.Layout.leftSplitPane.acceptsStart(x: 443, page: mirroredPage, leftPanel: nil))
     }
 
     func testDuoSideSwipeRespectsTheLandscapePaneAndDivider() {
@@ -101,6 +104,28 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertEqual(DuoTabSliderMotion.targetIndex(
             from: 2, tabCount: 3, tabWidth: 135, translation: 200, predictedEndTranslation: 500
         ), 2)
+    }
+
+    func testDuoMirrorsControlsOnlyInTheLeftSplitPane() {
+        let display = CGRect(x: 0, y: 0, width: 951, height: 669)
+        let left = CGRect(x: 0, y: 0, width: 468, height: 669)
+        let right = CGRect(x: 483, y: 0, width: 468, height: 669)
+
+        XCTAssertTrue(MiloomDuoLayoutState.occupiesLeftSplitPane(window: left, display: display))
+        XCTAssertFalse(MiloomDuoLayoutState.occupiesLeftSplitPane(window: right, display: display))
+        XCTAssertFalse(MiloomDuoLayoutState.occupiesLeftSplitPane(window: display, display: display))
+        XCTAssertFalse(MiloomDuoLayoutState.occupiesLeftSplitPane(
+            window: CGRect(x: 0, y: 10, width: 468, height: 640), display: display
+        ))
+
+        let layout = MiloomDuoLayoutState()
+        layout.isInLeftSplitPane = true
+        XCTAssertFalse(layout.usesLeftSplitToolbar)
+        layout.isDuoDevice = true
+        XCTAssertFalse(layout.usesLeftSplitToolbar)
+        layout.isExpanded = true
+        XCTAssertTrue(layout.placesSplitControlsOnLeadingEdge(in: .leftToRight))
+        XCTAssertFalse(layout.placesSplitControlsOnLeadingEdge(in: .rightToLeft))
     }
 
     func testDuoExpandedLayoutsRequireRoomInTheAppWindow() {
