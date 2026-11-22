@@ -94,6 +94,7 @@
 		9B00DF7E0D111A0B13F45A72 /* LoanPaymentHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51709EB17732D39C82A99011 /* LoanPaymentHUD.swift */; };
 		9CF951F61C4C358EBDF65909 /* PremiumModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF70FB9809DC283BDC256668 /* PremiumModels.swift */; };
 		9E040A6F88CC7D7A62E89E4D /* EditCompanySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */; };
+		5E48DE3D67AE4F71BF837F6C /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2B253768890842BDB65FE656 /* AppIcon.icon */; };
 		9F8AB0B20BB460B7A553892B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 71651E9BD50563BBC43440CD /* Assets.xcassets */; };
 		A0B2A5A9ED1C02486EF9C924 /* InstitutionCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8420D6DD0A4EDC3376B8642A /* InstitutionCardView.swift */; };
 		A11DE0D539BEB2F0016966BF /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82874C2FA810A11EFA0AFE8B /* ActivityLog.swift */; };
@@ -219,6 +220,7 @@
 		6270511A82E324E0EC29FE87 /* FinancialCardVisual.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialCardVisual.swift; sourceTree = "<group>"; };
 		6F29FF244DB0C2D92B11E49D /* TaxOpportunitiesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TaxOpportunitiesView.swift; path = Zifr/Views/TaxOpportunities/TaxOpportunitiesView.swift; sourceTree = "<group>"; };
 		708E295DDABD085515D80626 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
+		2B253768890842BDB65FE656 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		71651E9BD50563BBC43440CD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		73663491A43CB99703F9853B /* CompanyCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyCardView.swift; sourceTree = "<group>"; };
 		75FA7DD2F2423504DA06F6D9 /* Company.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Company.swift; sourceTree = "<group>"; };
@@ -601,6 +603,7 @@
 			isa = PBXGroup;
 			children = (
 				AC3CC8DCAA09EB5F037AA043 /* .svg */,
+				2B253768890842BDB65FE656 /* AppIcon.icon */,
 				71651E9BD50563BBC43440CD /* Assets.xcassets */,
 				DCADE3750A4CFA0353D88977 /* Info.plist */,
 				A17092700000000000000002 /* AppShortcuts.xcstrings */,
@@ -746,6 +749,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5E48DE3D67AE4F71BF837F6C /* AppIcon.icon in Resources */,
 				9F8AB0B20BB460B7A553892B /* Assets.xcassets in Resources */,
 				A30C0D3A0000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 				A17092700000000000000001 /* AppShortcuts.xcstrings in Resources */,
