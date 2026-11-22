@@ -50,7 +50,7 @@ struct RootView: View {
     @Environment(AppState.self) private var appState
     @Environment(MiloomDuoLayoutState.self) private var duoLayout
     @State private var vm: AppViewModel
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
     @State private var compactColumn: NavigationSplitViewColumn = .detail
 
     init(vm: AppViewModel = AppViewModel()) {
@@ -59,7 +59,9 @@ struct RootView: View {
 
     private var splitViewVisibility: Binding<NavigationSplitViewVisibility> {
         Binding(
-            get: { columnVisibility },
+            // The first layout can run before SwiftUI delivers the hinge
+            // context or calls onChange. Keep the dashboard full-width immediately.
+            get: { vm.path.isEmpty ? .detailOnly : columnVisibility },
             set: { visibility in
                 // The portfolio already lists every entity. Do not let a sidebar
                 // toggle or reveal gesture replace it with the same list again.
@@ -101,7 +103,7 @@ struct RootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .tint(.white)
-        .onChange(of: vm.path.isEmpty, initial: true) { _, isDashboard in
+        .onChange(of: vm.path.isEmpty) { _, isDashboard in
             compactColumn = .detail
             columnVisibility = isDashboard ? .detailOnly : .all
         }
@@ -226,10 +228,13 @@ struct MiloomDuoWindow: ViewModifier {
         if #available(iOS 27.1, *) {
             Color.clear
                 .onHingeChange { _, context in
-                    let isDuo = context.hinge != nil
-                    let expanded = context.hinge.map { $0.status != .closed } ?? false
-                    let partial = context.hinge?.status == .partiallyOpen
-                    if layout.isDuoDevice != isDuo { layout.isDuoDevice = isDuo }
+                    // A missing hinge context can be temporary during a scene
+                    // transition. Keep the detected device and its last known pose.
+                    guard let hinge = context.hinge else { return }
+
+                    let expanded = hinge.status != .closed
+                    let partial = hinge.status == .partiallyOpen
+                    if !layout.isDuoDevice { layout.isDuoDevice = true }
                     if layout.isExpanded != expanded { layout.isExpanded = expanded }
                     if layout.isPartiallyOpen != partial { layout.isPartiallyOpen = partial }
                     if !expanded && layout.isInLeftSplitPane { layout.isInLeftSplitPane = false }
