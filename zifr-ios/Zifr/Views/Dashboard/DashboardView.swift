@@ -1423,12 +1423,17 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     private var hasSideToolbar: Bool { hasNativeSideToolbar || hasPortraitToolbar }
     private var hasLandscapeDashboard: Bool { layout.isDuoDevice && layout.isExpanded && layout.isLandscape }
 
+    private var usesCompactActions: Bool {
+        layout.isDuoDevice && isActive && showsPrimaryActions
+            && (!layout.isExpanded || (layout.windowSize.width > 0 && layout.windowSize.width < 600))
+    }
+
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .trailing, spacing: 8) {
                 if hasPortraitToolbar && isActive {
                     VStack(spacing: 16) {
-                        if showsPrimaryActions {
+                        if showsPrimaryActions && !usesCompactActions {
                             primaryAction
                             add
                         }
@@ -1446,9 +1451,12 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                     .accessibilityIdentifier("duo.portraitToolbar")
                 }
             }
+            .overlay {
+                if usesCompactActions { compactActions }
+            }
             .toolbar {
                 if hasNativeSideToolbar && isActive {
-                    if showsPrimaryActions {
+                    if showsPrimaryActions && !usesCompactActions {
                         ToolbarItem(placement: .topBarLeading) {
                             VStack(spacing: 16) {
                                 primaryAction
@@ -1485,6 +1493,34 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
             .onChange(of: hasSideToolbar, initial: true) { _, value in
                 usesSideToolbar = value
             }
+    }
+
+    private var compactActions: some View {
+        GeometryReader { geometry in
+            let topInset = statusAreaBottom(in: geometry) + 12
+            VStack(spacing: 20) {
+                primaryAction
+                add
+            }
+            .frame(width: 52)
+            .padding(.top, topInset)
+            .padding(.trailing, 22)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .ignoresSafeArea(.container, edges: [.top, .leading, .trailing])
+    }
+
+    private func statusAreaBottom(in geometry: GeometryProxy) -> CGFloat {
+        let width = geometry.size.width
+        // The Duo's status area is a top occlusion at a window edge.
+        return geometry.reservedRegions(kind: .occlusion).reduce(0) { bottom, region in
+            let frame = region.frame
+            let isAtEdge = frame.minX <= 1 || frame.maxX >= width - 1
+            guard isAtEdge, frame.minY <= 1, frame.maxY > 0, frame.width < width / 2 else {
+                return bottom
+            }
+            return max(bottom, frame.maxY)
+        }
     }
 
     private var measuredAdmin: some View {
