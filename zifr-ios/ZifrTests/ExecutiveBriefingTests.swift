@@ -30,17 +30,18 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertTrue(layout.acceptsStart(x: 902, page: page, leftPanel: panel))
     }
 
-    func testDuoSideSwipeMovesOneTabAndStopsAtEitherEnd() {
-        XCTAssertEqual(DuoSideSwipe.tab(from: 0, count: 3, distance: -180, velocity: -900), 1)
-        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: -60, velocity: -100), 2)
-        XCTAssertEqual(DuoSideSwipe.tab(from: 2, count: 3, distance: 60, velocity: 100), 1)
-        XCTAssertNil(DuoSideSwipe.tab(from: 0, count: 3, distance: 60, velocity: 100))
-        XCTAssertNil(DuoSideSwipe.tab(from: 2, count: 3, distance: -60, velocity: -100))
+    func testDuoSideSwipeFollowsTheFingerOneTabAtATime() {
+        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: -60, velocity: -100), 0)
+        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: 60, velocity: 100), 2)
+        XCTAssertEqual(DuoSideSwipe.tab(from: 0, count: 3, distance: 180, velocity: 900), 1)
+        XCTAssertEqual(DuoSideSwipe.tab(from: 2, count: 3, distance: -180, velocity: -900), 1)
+        XCTAssertNil(DuoSideSwipe.tab(from: 0, count: 3, distance: -60, velocity: -100))
+        XCTAssertNil(DuoSideSwipe.tab(from: 2, count: 3, distance: 60, velocity: 100))
     }
 
     func testDuoSideSwipeDistinguishesFlicksFromSmallOrReversedDrags() {
-        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: 15, velocity: 400), 0)
-        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: -15, velocity: -400), 2)
+        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: 15, velocity: 400), 2)
+        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: -15, velocity: -400), 0)
         XCTAssertNil(DuoSideSwipe.tab(from: 1, count: 3, distance: 15, velocity: 150))
         XCTAssertNil(DuoSideSwipe.tab(from: 1, count: 3, distance: 15, velocity: -400))
         XCTAssertNil(DuoSideSwipe.tab(from: 1, count: 3, distance: 5, velocity: 600))

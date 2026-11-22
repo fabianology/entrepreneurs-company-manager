@@ -30,7 +30,7 @@ enum DuoSideSwipe {
     static func tab(from index: Int, count: Int, distance: CGFloat, velocity: CGFloat) -> Int? {
         let isFlick = abs(distance) >= 12 && abs(velocity) >= 330 && distance * velocity > 0
         guard abs(distance) >= 32 || isFlick else { return nil }
-        let next = index + (distance < 0 ? 1 : -1)
+        let next = index + (distance < 0 ? -1 : 1)
         return (0..<count).contains(next) ? next : nil
     }
 }
