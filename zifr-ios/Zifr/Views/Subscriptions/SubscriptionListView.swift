@@ -54,6 +54,7 @@ struct SubscriptionListView: View {
                                 Spacer().frame(height: hideActionBar ? 82 : 70)
                                 emptyState
                             }
+                            .duoSideScrollTarget(.subscriptions)
                         }
                     } else {
                         StackedSubscriptionDeckView(
@@ -363,6 +364,7 @@ struct StackedSubscriptionDeckView: View {
                 }
             }
             .padding(.bottom, 120)
+            .duoSideScrollTarget(.subscriptions)
         }
     }
 }

@@ -3,6 +3,47 @@ import SwiftUI
 @testable import Zifr
 
 final class ExecutiveBriefingTests: XCTestCase {
+    #if compiler(>=6.4)
+    func testDuoSideSwipeFollowsTheOpenPortraitAndCompactGutters() {
+        let portraitPage = CGRect(x: 116, y: 0, width: 482, height: 850)
+        let compactPage = CGRect(x: 0, y: 0, width: 392, height: 678)
+
+        XCTAssertTrue(DuoSideSwipe.Layout.portrait.acceptsStart(x: 100, page: portraitPage, leftPanel: nil))
+        XCTAssertFalse(DuoSideSwipe.Layout.portrait.acceptsStart(x: 117, page: portraitPage, leftPanel: nil))
+        XCTAssertTrue(DuoSideSwipe.Layout.portrait.acceptsStart(x: 630, page: portraitPage, leftPanel: nil))
+        XCTAssertTrue(DuoSideSwipe.Layout.compact.acceptsStart(x: 12, page: compactPage, leftPanel: nil))
+        XCTAssertFalse(DuoSideSwipe.Layout.compact.acceptsStart(x: 22, page: compactPage, leftPanel: nil))
+    }
+
+    func testDuoSideSwipeRespectsTheLandscapePaneAndDivider() {
+        let page = CGRect(x: 450, y: 0, width: 410, height: 650)
+        let panel = CGRect(x: 0, y: 0, width: 430, height: 650)
+        let layout = DuoSideSwipe.Layout.split
+
+        XCTAssertTrue(layout.acceptsStart(x: 12, page: page, leftPanel: panel))
+        XCTAssertFalse(layout.acceptsStart(x: 25, page: page, leftPanel: panel))
+        XCTAssertFalse(layout.acceptsStart(x: 440, page: page, leftPanel: panel))
+        XCTAssertFalse(layout.acceptsStart(x: 12, page: page, leftPanel: nil))
+        XCTAssertTrue(layout.acceptsStart(x: 902, page: page, leftPanel: panel))
+    }
+
+    func testDuoSideSwipeMovesOneTabAndStopsAtEitherEnd() {
+        XCTAssertEqual(DuoSideSwipe.tab(from: 0, count: 3, distance: -180, velocity: -900), 1)
+        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: -60, velocity: -100), 2)
+        XCTAssertEqual(DuoSideSwipe.tab(from: 2, count: 3, distance: 60, velocity: 100), 1)
+        XCTAssertNil(DuoSideSwipe.tab(from: 0, count: 3, distance: 60, velocity: 100))
+        XCTAssertNil(DuoSideSwipe.tab(from: 2, count: 3, distance: -60, velocity: -100))
+    }
+
+    func testDuoSideSwipeDistinguishesFlicksFromSmallOrReversedDrags() {
+        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: 15, velocity: 400), 0)
+        XCTAssertEqual(DuoSideSwipe.tab(from: 1, count: 3, distance: -15, velocity: -400), 2)
+        XCTAssertNil(DuoSideSwipe.tab(from: 1, count: 3, distance: 15, velocity: 150))
+        XCTAssertNil(DuoSideSwipe.tab(from: 1, count: 3, distance: 15, velocity: -400))
+        XCTAssertNil(DuoSideSwipe.tab(from: 1, count: 3, distance: 5, velocity: 600))
+    }
+    #endif
+
     func testDuoTabSliderGentleFlickMovesOneTabInEitherDirection() {
         XCTAssertEqual(DuoTabSliderMotion.targetIndex(
             from: 0, tabCount: 3, tabWidth: 135, translation: 18, predictedEndTranslation: 65

@@ -95,7 +95,7 @@ struct DocumentListView: View {
                 combinedContent
             case .categories:
                 ScrollView {
-                    categoryControls
+                    categoryControls.duoSideScrollTarget(.documents)
                 }
                 .padding(.top, contentTopInset)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -225,6 +225,7 @@ struct DocumentListView: View {
                     Spacer().frame(height: documentRowsTopInset)
                     documentResults.padding(.bottom, 120)
                 }
+                .duoSideScrollTarget(.documents)
             }
             .scrollIndicators(.hidden)
             .mask(alignment: .top) {

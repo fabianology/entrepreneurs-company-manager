@@ -329,6 +329,7 @@ struct FinancialView: View {
                         
                         // Match Services: keep the final item fully above the floating search/action controls.
                         Spacer().frame(height: 120)
+                            .duoSideScrollTarget(.financial)
                     }
                 }
                 .frame(

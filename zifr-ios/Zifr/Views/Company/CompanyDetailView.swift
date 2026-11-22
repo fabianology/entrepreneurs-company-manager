@@ -315,6 +315,9 @@ struct CompanyDetailView: View {
     @State private var showEditCompany = false
     @State private var sharingScope: EntitySharingScope?
     @State private var swipeHandled = false
+    #if compiler(>=6.4)
+    @State private var duoSideGestures = DuoSideGestures()
+    #endif
     @State private var tabBounces: [EntityHomeTab: Int] = [:]
     @State private var searchBounce: Int = 0
 
@@ -367,10 +370,10 @@ struct CompanyDetailView: View {
                 bottomControlWindowCenterY: $duoAdminWindowCenterY,
                 reportsDuoDevice: $isDuoDevice,
                 isActive: true,
-                admin: profileControlButton,
-                primaryAction: duoShareControl,
-                add: duoAddControl,
-                entities: entitiesControlMenu,
+                admin: duoToolbarControl(profileControlButton, anchor: .admin),
+                primaryAction: duoToolbarControl(duoShareControl, anchor: .share),
+                add: duoToolbarControl(duoAddControl, anchor: .add),
+                entities: duoToolbarControl(entitiesControlMenu, anchor: .entities),
                 portraitActionsTopInset: tutFrameHeader.height,
                 reservesCompactContentWidth: true
             ))
@@ -405,7 +408,11 @@ struct CompanyDetailView: View {
             DuoEntityPanels(isSplit: usesInlineEntityPanel, isPortrait: usesDuoPortraitLayout) {
                 companySurface
             } panel: {
-                duoLeftPanel
+                duoLeftPanel.background {
+                    if usesInlineEntityPanel {
+                        DuoSideGestureMarker(gestures: duoSideGestures, anchor: .leftPanel)
+                    }
+                }
             }
         } else {
             companySurface
@@ -533,18 +540,29 @@ struct CompanyDetailView: View {
     private var portraitReportBar: some View {
         MiloomDuoReportIconBar {
             ForEach(DuoPortraitSheet.files) { sheet in
-                Button { togglePortraitFile(sheet) } label: {
-                    Image(systemName: sheet.icon)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.zifrGold)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(sheet.title)
+                portraitReportButton(sheet)
             }
         }
 
         .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func portraitReportButton(_ sheet: DuoPortraitSheet) -> some View {
+        let button = Button { togglePortraitFile(sheet) } label: {
+            Image(systemName: sheet.icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.zifrGold)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(sheet.title)
+
+        #if compiler(>=6.4)
+        duoToolbarControl(button, anchor: .report(sheet.id))
+        #else
+        button
+        #endif
     }
 
     private func togglePortraitFile(_ sheet: DuoPortraitSheet) {
@@ -775,19 +793,61 @@ struct CompanyDetailView: View {
         .overlay {
             tutorialOverlaySection
         }
-        .gesture(edgeSwipeGesture(width: geometry.size.width))
+        .gesture(edgeSwipeGesture(width: geometry.size.width),
+                 including: duoLayout.isDuoDevice ? .subviews : .all)
         .navigationBarBackButtonHidden(true)
         }
         .safeAreaInset(edge: .bottom) {
             bottomBarInset
         }
+        .background {
+            #if compiler(>=6.4)
+            if #available(iOS 27.1, *), duoLayout.isDuoDevice {
+                DuoSideGestureMarker(
+                    gestures: duoSideGestures,
+                    anchor: .page,
+                    layout: duoGestureLayout,
+                    isActive: duoPortraitSheet == nil && !onboardingState.isTutorialActive,
+                    onSwipe: selectDuoTab
+                )
+                .onChange(of: vm.activeTab, initial: true) { _, tab in
+                    duoSideGestures.tab = tab
+                }
+            }
+            #endif
+        }
         }
     }
+
+    #if compiler(>=6.4)
+    private var duoGestureLayout: DuoSideSwipe.Layout {
+        if usesInlineEntityPanel { return .split }
+        return usesDuoPortraitLayout ? .portrait : .compact
+    }
+
+    private func duoToolbarControl<Control: View>(_ control: Control, anchor: DuoSideGestures.Control) -> some View {
+        control.background {
+            if duoLayout.isDuoDevice {
+                DuoSideGestureMarker(gestures: duoSideGestures, anchor: .control(anchor))
+            }
+        }
+    }
+
+    private func selectDuoTab(distance: CGFloat, velocity: CGFloat) {
+        let tabs = EntityHomeTab.allCases
+        guard let index = DuoSideSwipe.tab(from: currentTabIndex, count: tabs.count,
+                                          distance: distance, velocity: velocity) else { return }
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(reducePortraitMotion ? nil : .interpolatingSpring(stiffness: 240, damping: 32)) {
+            vm.activeTab = tabs[index]
+        }
+    }
+    #endif
 
     // MARK: - Body Sub-expressions
     @ViewBuilder
     private var mainContentSection: some View {
-        EntityHomeView(
+        let content = EntityHomeView(
             company: company,
             subscriptions: subscriptions,
             cards: cards,
@@ -808,6 +868,16 @@ struct CompanyDetailView: View {
             vaultPresentation: usesDuoVaultSplit ? .categories : .combined,
             vaultCategorySelection: duoLayout.isDuoDevice ? $duoVaultCategory : nil
         )
+
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *), duoLayout.isDuoDevice {
+            content.duoSideScrollTargets(duoSideGestures)
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 
     @ViewBuilder
