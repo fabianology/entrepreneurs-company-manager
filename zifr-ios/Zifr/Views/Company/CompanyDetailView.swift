@@ -337,6 +337,7 @@ struct CompanyDetailView: View {
     @State private var showFinancialReport = false
     @State private var showSubscriptionReport = false
     @State private var showTransactionCenter = false
+    @State private var showEntityCashFlow = false
     @State private var duoReport: DuoEntityReport?
     @State private var duoSection: DuoEntitySection = .cashFlow
     @State private var duoVaultCategory = "All"
@@ -732,6 +733,20 @@ struct CompanyDetailView: View {
                 duoPortraitSheet = nil
             }
         }
+        .sheet(isPresented: $showEntityCashFlow) {
+            NavigationStack {
+                PortfolioTransactionCenterView(vm: vm, embeddedCompanyID: company.id,
+                    embeddedSection: .all, usesGlassSummaryStyle: true)
+                    .navigationTitle("Cash Flow & Transactions")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showEntityCashFlow = false }
+                        }
+                    }
+            }
+            .presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $showTransactionCenter) {
             PortfolioTransactionCenterView(vm: vm)
                 .environment(appState)
@@ -864,10 +879,11 @@ struct CompanyDetailView: View {
             canAccessCredentials: canAccessCompanyCredentials,
             vm: vm,
             activeInternalTab: $vm.activeTab,
+            reservesTabRow: duoLayout.usesStackedLayout,
             compactTopSpacing: false,
             tabSelectorHeaderHeight: duoLayout.isDuoDevice ? max(0, tutFrameHeader.height - companyHeaderTopInset) : nil,
             tabSelectorBottomInset: duoLayout.isDuoDevice ? companyHeaderVerticalPadding : nil,
-            vaultPresentation: usesDuoVaultSplit ? .categories : .combined,
+            vaultPresentation: usesDuoVaultSplit ? .categories : (duoLayout.usesStackedLayout ? .scrolling : .combined),
             vaultCategorySelection: duoLayout.isDuoDevice ? $duoVaultCategory : nil
         )
 
@@ -1130,7 +1146,7 @@ struct CompanyDetailView: View {
     }
 
     // MARK: - Entity Command Plate
-    private let companyHeaderVerticalPadding: CGFloat = 12
+    private var companyHeaderVerticalPadding: CGFloat { duoLayout.usesStackedLayout ? 4 : 12 }
 
     private var companyHeaderTopInset: CGFloat {
         usesDuoPortraitLayout ? 0 : 8
@@ -1161,7 +1177,7 @@ struct CompanyDetailView: View {
                     Spacer(minLength: 8)
 
                     if !usesDuoPortraitLayout {
-                        if vm.activeTab == .financial && !usesInlineEntityPanel {
+                        if vm.activeTab == .financial && !usesInlineEntityPanel && !duoLayout.usesStackedLayout {
                             transactionHeaderButton
                         }
                         // Keep Share reachable in any layout without a side toolbar.
@@ -1226,6 +1242,13 @@ struct CompanyDetailView: View {
     private var headerActionMenu: some View {
         Menu {
             if !isDuoDevice { sharingMenuItems }
+            if duoLayout.usesStackedLayout {
+                Button {
+                    showEntityCashFlow = true
+                } label: {
+                    Label("Cash Flow & Transactions", systemImage: "list.bullet.rectangle.portrait")
+                }
+            }
             Section("Reports") {
                 Button {
                     presentReport(.financial)

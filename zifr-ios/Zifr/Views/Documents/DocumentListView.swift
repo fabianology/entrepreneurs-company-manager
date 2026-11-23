@@ -6,6 +6,7 @@ import PDFKit
 struct DocumentListView: View {
     enum Presentation {
         case combined
+        case scrolling
         case categories
         case attachments
     }
@@ -93,6 +94,16 @@ struct DocumentListView: View {
             switch presentation {
             case .combined:
                 combinedContent
+            case .scrolling:
+                ScrollView {
+                    VStack(spacing: 16) {
+                        categoryControls
+                        if canEdit { scanButton }
+                        documentResults
+                    }
+                    .padding(.vertical, 12)
+                    .duoSideScrollTarget(.documents)
+                }
             case .categories:
                 ScrollView {
                     categoryControls.duoSideScrollTarget(.documents)

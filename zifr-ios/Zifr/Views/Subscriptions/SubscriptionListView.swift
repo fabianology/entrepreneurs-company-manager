@@ -7,6 +7,7 @@ struct SubscriptionListView: View {
     let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
     var hideActionBar: Bool = false
+    var topContentInset: CGFloat?
     var canEdit: Bool = true
     var canAccessCredentials: Bool = true
     @Environment(AppState.self) private var appState
@@ -51,7 +52,7 @@ struct SubscriptionListView: View {
                     if subscriptions.isEmpty {
                         ScrollView {
                             VStack(spacing: 0) {
-                                Spacer().frame(height: hideActionBar ? 82 : 70)
+                                Spacer().frame(height: topContentInset ?? (hideActionBar ? 82 : 70))
                                 emptyState
                             }
                             .duoSideScrollTarget(.subscriptions)
@@ -75,6 +76,7 @@ struct SubscriptionListView: View {
                             },
                             selectedServiceFilter: $selectedServiceFilter,
                             hideActionBar: hideActionBar,
+                            topContentInset: topContentInset,
                             editableSubscriptionIDs: editableSubscriptionIDs,
                             canAccessCredentials: canAccessCredentials
                         )
@@ -313,13 +315,14 @@ struct StackedSubscriptionDeckView: View {
     let onSave: (Subscription) -> Void
     @Binding var selectedServiceFilter: String
     var hideActionBar: Bool = false
+    var topContentInset: CGFloat?
     var editableSubscriptionIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Spacer().frame(height: hideActionBar ? 82 : 70) // 20pt gap below action bar (50->70) or slider tabs (62->82)
+                Spacer().frame(height: topContentInset ?? (hideActionBar ? 82 : 70))
 
                 CustomSegmentedControl(
                     options: ["All", "Bills", "Subscriptions"],

@@ -7,10 +7,15 @@ final class MiloomDuoLayoutState {
     var isPartiallyOpen = false
     var dashboardRequest = 0
     var windowSize: CGSize = .zero
-    var isInLeftSplitPane = false
+    enum SplitPane { case other, left, stacked }
+    var splitPane: SplitPane = .other
+
+    var usesStackedLayout: Bool {
+        isDuoDevice && isExpanded && splitPane == .stacked
+    }
 
     var usesLeftSplitToolbar: Bool {
-        isDuoDevice && isExpanded && isInLeftSplitPane
+        isDuoDevice && isExpanded && splitPane == .left
     }
 
     func placesSplitControlsOnLeadingEdge(in direction: LayoutDirection) -> Bool {
@@ -26,11 +31,25 @@ final class MiloomDuoLayoutState {
             && window.maxX < display.maxX - tolerance
     }
 
+    static func splitPane(window: CGRect, display: CGRect, prefersLeftBar: Bool) -> SplitPane {
+        // Use scene bounds, so keyboard and toolbar safe areas cannot turn a
+        // full-screen window into a stacked pane. Allow the divider on either edge.
+        let tolerance: CGFloat = 2
+        if !window.isEmpty && !display.isEmpty,
+           abs(window.minX - display.minX) <= tolerance,
+           abs(window.maxX - display.maxX) <= tolerance,
+           window.height < display.height - tolerance,
+           abs(window.minY - display.minY) <= tolerance || abs(window.maxY - display.maxY) <= tolerance {
+            return .stacked
+        }
+        return prefersLeftBar && occupiesLeftSplitPane(window: window, display: display) ? .left : .other
+    }
+
     private var hasRoomForExpandedLayout: Bool {
         // Full Duo layouts keep space for two panes or the portrait filing
         // controls. Measure the app window so either side of Split View can
         // use the closed layout even while the hinge is open.
-        isDuoDevice && isExpanded && windowSize.width >= 600
+        isDuoDevice && isExpanded && !usesStackedLayout && windowSize.width >= 600
     }
 
     var usesCompactLayout: Bool {
@@ -237,13 +256,13 @@ struct MiloomDuoWindow: ViewModifier {
                     if !layout.isDuoDevice { layout.isDuoDevice = true }
                     if layout.isExpanded != expanded { layout.isExpanded = expanded }
                     if layout.isPartiallyOpen != partial { layout.isPartiallyOpen = partial }
-                    if !expanded && layout.isInLeftSplitPane { layout.isInLeftSplitPane = false }
+                    if !expanded { layout.splitPane = .other }
                 }
                 .background {
                     if layout.isDuoDevice && layout.isExpanded {
-                        DuoSplitPaneReader { isLeft in
-                            if layout.isExpanded && layout.isInLeftSplitPane != isLeft {
-                                layout.isInLeftSplitPane = isLeft
+                        DuoSplitPaneReader { pane in
+                            if layout.isExpanded && layout.splitPane != pane {
+                                layout.splitPane = pane
                             }
                         }
                     }
@@ -261,7 +280,7 @@ struct MiloomDuoWindow: ViewModifier {
 private struct DuoSplitPaneReader: UIViewRepresentable {
     @Environment(\.toolbarVerticalEdge) private var toolbarEdge
     @Environment(\.layoutDirection) private var layoutDirection
-    let onChange: (Bool) -> Void
+    let onChange: (MiloomDuoLayoutState.SplitPane) -> Void
 
     func makeUIView(context: Context) -> SceneView {
         let view = SceneView()
@@ -278,8 +297,8 @@ private struct DuoSplitPaneReader: UIViewRepresentable {
 
     final class SceneView: UIView {
         var prefersLeftBar = false
-        var onChange: (Bool) -> Void = { _ in }
-        private var reportedValue: Bool?
+        var onChange: (MiloomDuoLayoutState.SplitPane) -> Void = { _ in }
+        private var reportedValue: MiloomDuoLayoutState.SplitPane?
         private var reportQueued = false
 
         override func didMoveToWindow() {
@@ -301,12 +320,12 @@ private struct DuoSplitPaneReader: UIViewRepresentable {
                 guard let window, let screen = window.windowScene?.screen else { return }
                 let displaySpace = screen.coordinateSpace
                 let frame = window.convert(window.bounds, to: displaySpace)
-                let isLeft = prefersLeftBar && MiloomDuoLayoutState.occupiesLeftSplitPane(
-                    window: frame, display: displaySpace.bounds
+                let pane = MiloomDuoLayoutState.splitPane(
+                    window: frame, display: displaySpace.bounds, prefersLeftBar: prefersLeftBar
                 )
-                guard reportedValue != isLeft else { return }
-                reportedValue = isLeft
-                onChange(isLeft)
+                guard reportedValue != pane else { return }
+                reportedValue = pane
+                onChange(pane)
             }
         }
     }

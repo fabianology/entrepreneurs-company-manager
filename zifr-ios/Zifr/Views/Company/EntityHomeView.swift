@@ -32,6 +32,7 @@ struct EntityHomeView: View {
     @State private var expandedCategories: Set<String> = []
     
     @Binding var activeInternalTab: EntityHomeTab
+    var reservesTabRow = false
     var compactTopSpacing = false
     var tabSelectorHeaderHeight: CGFloat?
     var tabSelectorBottomInset: CGFloat?
@@ -69,8 +70,27 @@ struct EntityHomeView: View {
     // MARK: - Body
     var body: some View {
         let tabSelectorTopPadding: CGFloat = 6
-        ZStack(alignment: .top) {
-            // ACTIVE TAB CONTENT (scrolls behind tabs)
+        let layout = reservesTabRow
+            ? AnyLayout(VStackLayout(spacing: 0))
+            : AnyLayout(ZStackLayout(alignment: .top))
+        layout {
+            ControlCenterTabSelector(
+                activeTab: $activeInternalTab,
+                isStandalone: tabSelectorHeaderHeight != nil,
+                backgroundTopExtension: reservesTabRow ? 0 : (tabSelectorHeaderHeight.map { $0 + tabSelectorTopPadding } ?? 0),
+                contentBottomInset: tabSelectorBottomInset,
+                usesDuoMotion: tabSelectorHeaderHeight != nil,
+                institutions: institutions,
+                loans: loans,
+                subscriptions: subscriptions,
+                activeSubscriptions: model.activeSubscriptions,
+                documents: documents,
+                totalDebt: model.totalDebt
+            )
+            .padding(.top, tabSelectorTopPadding)
+            .padding(.bottom, reservesTabRow ? 0 : 10)
+            .zIndex(1)
+
             Group {
                 switch activeInternalTab {
                 case .financial:
@@ -81,6 +101,7 @@ struct EntityHomeView: View {
                         loans: loans,
                         vm: vm,
                         hideActionBar: true,
+                        topContentInset: reservesTabRow ? 12 : nil,
                         canEdit: canEdit,
                         canAccessCredentials: canAccessCredentials
                     )
@@ -94,6 +115,7 @@ struct EntityHomeView: View {
                         cards: cards,
                         vm: vm,
                         hideActionBar: true,
+                        topContentInset: reservesTabRow ? 12 : nil,
                         canEdit: canEdit,
                         canAccessCredentials: canAccessCredentials
                     )
@@ -115,43 +137,19 @@ struct EntityHomeView: View {
             // Expanded Duo portrait reclaims the excess gap beneath its main
             // selector. Keep the selector and fade mask fixed in place.
             .padding(.top, compactTopSpacing ? -16 : 0)
-            .mask(
-                VStack(spacing: 0) {
-                    // Fully disappeared (clear) at and above the top 1/3 of the tab bar
-                    Color.clear
-                        .frame(height: 25)
-                    
-                    // Smooth gradient fade across the lower 2/3 of the tab bar
-                    LinearGradient(
-                        colors: [.clear, .black],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 37)
-                    
-                    // Fully visible below the tab bar to the bottom of the display
-                    Color.black
-                        .frame(maxHeight: .infinity)
+            .mask {
+                if reservesTabRow {
+                    Rectangle()
+                } else {
+                    VStack(spacing: 0) {
+                        Color.clear.frame(height: 25)
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 37)
+                        Color.black.frame(maxHeight: .infinity)
+                    }
+                    .ignoresSafeArea(edges: .bottom)
                 }
-                .ignoresSafeArea(edges: .bottom)
-            )
-            
-            // TAB SELECTOR (floating on top)
-            ControlCenterTabSelector(
-                activeTab: $activeInternalTab,
-                isStandalone: tabSelectorHeaderHeight != nil,
-                backgroundTopExtension: tabSelectorHeaderHeight.map { $0 + tabSelectorTopPadding } ?? 0,
-                contentBottomInset: tabSelectorBottomInset,
-                usesDuoMotion: tabSelectorHeaderHeight != nil,
-                institutions: institutions,
-                loans: loans,
-                subscriptions: subscriptions,
-                activeSubscriptions: model.activeSubscriptions,
-                documents: documents,
-                totalDebt: model.totalDebt
-            )
-            .padding(.top, tabSelectorTopPadding)
-            .padding(.bottom, 10)
+            }
         }
         .frame(maxWidth: .infinity)
         .background(Color.clear)

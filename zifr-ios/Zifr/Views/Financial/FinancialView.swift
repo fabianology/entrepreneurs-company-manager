@@ -7,6 +7,7 @@ struct FinancialView: View {
     let loans: [Loan]
     @Bindable var vm: AppViewModel
     var hideActionBar: Bool = false
+    var topContentInset: CGFloat?
     var canEdit: Bool = true
     var canAccessCredentials: Bool = true
     
@@ -90,7 +91,7 @@ struct FinancialView: View {
                     VStack(spacing: 0) {
                         // ── Main Wallet Stack ──
                         VStack(spacing: 0) {
-                            Spacer().frame(height: hideActionBar ? 82 : 70) // Offset for tabs (82) or action bar (70) to maintain consistent 20pt card gap
+                            Spacer().frame(height: topContentInset ?? (hideActionBar ? 82 : 70))
                             if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy wallet
                         let dummyAmexId = UUID()

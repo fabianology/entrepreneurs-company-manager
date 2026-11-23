@@ -120,13 +120,42 @@ final class ExecutiveBriefingTests: XCTestCase {
         ))
 
         let layout = MiloomDuoLayoutState()
-        layout.isInLeftSplitPane = true
+        layout.splitPane = .left
         XCTAssertFalse(layout.usesLeftSplitToolbar)
         layout.isDuoDevice = true
         XCTAssertFalse(layout.usesLeftSplitToolbar)
         layout.isExpanded = true
         XCTAssertTrue(layout.placesSplitControlsOnLeadingEdge(in: .leftToRight))
         XCTAssertFalse(layout.placesSplitControlsOnLeadingEdge(in: .rightToLeft))
+    }
+
+    func testDuoStackedWindowUsesOnePageAndRestoresExpandedLayouts() {
+        let display = CGRect(x: 0, y: 0, width: 669, height: 951)
+        let layout = MiloomDuoLayoutState()
+        layout.isDuoDevice = true
+        layout.isExpanded = true
+        for frame in [CGRect(x: 0, y: 387, width: 669, height: 564),
+                      CGRect(x: 0, y: 0, width: 669, height: 377)] {
+            layout.windowSize = frame.size
+            layout.splitPane = MiloomDuoLayoutState.splitPane(window: frame, display: display, prefersLeftBar: false)
+            XCTAssertTrue(layout.usesStackedLayout)
+            XCTAssertTrue(layout.usesCompactLayout)
+            XCTAssertFalse(layout.usesExpandedLandscape)
+            XCTAssertFalse(layout.usesExpandedPortrait)
+            XCTAssertFalse(layout.usesLeftSplitToolbar)
+        }
+        layout.isDuoDevice = false
+        XCTAssertFalse(layout.usesStackedLayout)
+        layout.isDuoDevice = true
+        layout.isExpanded = false
+        XCTAssertFalse(layout.usesStackedLayout)
+        layout.isExpanded = true
+        layout.splitPane = MiloomDuoLayoutState.splitPane(window: display, display: display, prefersLeftBar: false)
+        layout.windowSize = display.size
+        XCTAssertFalse(layout.usesStackedLayout)
+        XCTAssertTrue(layout.usesExpandedPortrait)
+        layout.windowSize = CGSize(width: 951, height: 669)
+        XCTAssertTrue(layout.usesExpandedLandscape)
     }
 
     func testDuoExpandedLayoutsRequireRoomInTheAppWindow() {

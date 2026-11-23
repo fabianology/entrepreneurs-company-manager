@@ -1492,12 +1492,12 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     private let compactStatusAreaGap: CGFloat = 12
 
     private var hasNativeSideToolbar: Bool { layout.usesExpandedLandscape }
-    private var hasCustomSideToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar }
+    private var hasCustomSideToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar && (!layout.usesStackedLayout || !showsPrimaryActions) }
     private var railOnLeadingEdge: Bool { layout.placesSplitControlsOnLeadingEdge(in: layoutDirection) }
     private var railPaddingEdge: Edge.Set { railOnLeadingEdge ? .leading : .trailing }
 
     func body(content: Content) -> some View {
-        let usesClosedRail = layout.usesCompactLayout && isActive
+        let usesClosedRail = hasCustomSideToolbar && layout.usesCompactLayout && isActive
         let usesFixedWidthRail = reservesCompactContentWidth && usesClosedRail
         let closedRailEdges: Edge.Set = usesFixedWidthRail && layout.isExpanded ? .horizontal : railPaddingEdge
         content
@@ -1512,13 +1512,14 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                 }
             }
             .safeAreaInset(edge: railOnLeadingEdge ? .leading : .trailing,
-                           spacing: usesFixedWidthRail ? 0 : (usesClosedRail ? 22 : 8)) {
+                           spacing: usesFixedWidthRail || layout.usesStackedLayout ? 0 : (usesClosedRail ? 22 : 8)) {
                 if hasCustomSideToolbar && isActive && !usesFixedWidthRail {
                     sideToolbar(isClosed: usesClosedRail)
                 }
             }
-            // The operating system reserves different side strips in the left and right panes.
-            .ignoresSafeArea(.container, edges: usesClosedRail ? closedRailEdges : [])
+            // Release the system side-toolbar strip when stacked controls move
+            // into the page. Keep the vertical safe areas at the divider and home indicator.
+            .ignoresSafeArea(.container, edges: usesClosedRail ? closedRailEdges : (layout.usesStackedLayout ? .horizontal : []))
             .background {
                 if usesClosedRail && showsPrimaryActions {
                     Color.clear
@@ -1538,7 +1539,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                         .ignoresSafeArea(.container, edges: [.top, .leading, .trailing])
                 }
             }
-            .toolbar(hasCustomSideToolbar && isActive ? .hidden : .automatic, for: .navigationBar)
+            .toolbar((hasCustomSideToolbar || layout.usesStackedLayout) && isActive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if hasNativeSideToolbar && isActive {
                     if showsPrimaryActions {
@@ -1563,6 +1564,8 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
             }
             .onChange(of: layout.isDuoDevice, initial: true) { _, next in
                 if reportsDuoDevice != next { reportsDuoDevice = next }
+            }
+            .onChange(of: hasCustomSideToolbar || hasNativeSideToolbar, initial: true) { _, next in
                 if usesSideToolbar != next { usesSideToolbar = next }
             }
     }
