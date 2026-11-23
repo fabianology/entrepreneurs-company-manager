@@ -1598,6 +1598,7 @@ struct ShareEntitySheet: View {
     
     @State private var email: String = ""
     @State private var role: String = "Viewer"
+    @State private var excludeCredentials = false
     @State private var isSending = false
     @State private var successMessage: String?
     @State private var warningMessage: String?
@@ -1693,6 +1694,19 @@ struct ShareEntitySheet: View {
                             }
 
                             Spacer(minLength: 0)
+                        }
+                    }
+
+                    if sharesCredentialScope {
+                        ZifrSheetCard(title: "CREDENTIALS", icon: "key") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Toggle("Exclude credentials", isOn: $excludeCredentials)
+                                if !excludeCredentials {
+                                    Text("Includes saved login details and passwords.")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
                     }
 
@@ -1799,16 +1813,18 @@ struct ShareEntitySheet: View {
             && !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var sharesCredentialScope: Bool {
+        ["company", "subscription", "all_subscriptions", "institution", "all_institutions", "all_financials", "card"].contains(resourceType)
+    }
+
     private var roleDescription: String {
         switch role {
         case "Admin":
-            return "Entity-wide editing and Viewer management. Only the owner can manage Editors and Admins, block people, or grant password access."
+            return "Can edit this company and its saved credentials, and manage Viewers. The owner manages Editors, Admins, and blocks."
         case "Editor":
-            return "Can edit this resource’s business details. Passwords remain owner-only for now."
+            return "Can edit this resource and its saved credentials when included."
         default:
-            return isDelegatedAdmin
-                ? "Viewer access only. The owner manages Editors, Admins, blocks, and passwords."
-                : "Can view this resource’s non-secret details without making changes."
+            return "Can view this resource and copy included credentials. Changes inside Miloom are unavailable to Viewers."
         }
     }
 
@@ -1849,6 +1865,7 @@ struct ShareEntitySheet: View {
         errorMessage = nil
         successMessage = nil
         warningMessage = nil
+        let includesCredentials = sharesCredentialScope && !excludeCredentials
         
         Task {
             do {
@@ -1857,14 +1874,16 @@ struct ShareEntitySheet: View {
                     result = try await DataRepository.shared.inviteViewerAsEntityAdmin(
                         email: cleanedEmail,
                         resourceId: resourceId,
-                        resourceType: resourceType
+                        resourceType: resourceType,
+                        includeCredentials: includesCredentials
                     )
                 } else {
                     result = try await DataRepository.shared.inviteUser(
                         email: cleanedEmail,
                         role: role,
                         resourceId: resourceId,
-                        resourceType: resourceType
+                        resourceType: resourceType,
+                        includeCredentials: includesCredentials
                     )
                 }
 
@@ -1892,7 +1911,9 @@ struct ShareEntitySheet: View {
 
                     switch result {
                     case .sharedDirectly:
-                        successMessage = "Access granted successfully."
+                        successMessage = includesCredentials
+                            ? "Access granted. Saved credentials appear once approved devices connect."
+                            : "Access granted successfully."
                         generator.notificationOccurred(.success)
                     case .invitationEmailSent:
                         successMessage = "Invitation sent successfully."
@@ -1910,7 +1931,11 @@ struct ShareEntitySheet: View {
             } catch {
                 await MainActor.run {
                     isSending = false
-                    errorMessage = error.localizedDescription
+                    if (error as? PostgrestError)?.message == "CREDENTIAL_SHARING_NOT_AUTHORIZED" {
+                        errorMessage = "The owner excluded credentials from your access. Turn on Exclude credentials to share this item."
+                    } else {
+                        errorMessage = error.localizedDescription
+                    }
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.error)
                 }

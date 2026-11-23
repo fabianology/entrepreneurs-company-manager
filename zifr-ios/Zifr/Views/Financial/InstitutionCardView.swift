@@ -144,7 +144,7 @@ struct InstitutionCardView: View {
                         .padding(.top, 16)
                         .padding(.bottom, institution.isDisconnected ? 16 : 24)
                     } else {
-                        ownerOnlyCredentials
+                        sharedCredentialSummary
                             .padding(.horizontal, 24)
                             .padding(.vertical, 18)
                     }
@@ -309,6 +309,7 @@ struct InstitutionCardView: View {
                 institutionName: institution.name.isEmpty ? "Bank" : institution.name,
                 institutionId: institution.id,
                 availableCards: appState.cards.filter { $0.companyId == institution.companyId },
+                canEnterProtectedDetails: false,
                 companyId: institution.companyId,
                 vm: vm,
                 onSave: {
@@ -413,16 +414,16 @@ struct InstitutionCardView: View {
         }
     }
 
-    private var ownerOnlyCredentials: some View {
+    private var sharedCredentialSummary: some View {
         HStack(spacing: 10) {
             Image(systemName: "lock.shield")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color(hex: "#C1AA78"))
             VStack(alignment: .leading, spacing: 2) {
-                Text("Credentials are owner-only")
+                Text(institution.hasScopedCredentials == true ? "Shared credentials" : "Credential access")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
-                Text("Sharing this account does not share its login or password.")
+                Text("Open bank details to check Secure Credentials.")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.5))
             }

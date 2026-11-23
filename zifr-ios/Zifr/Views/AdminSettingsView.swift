@@ -773,27 +773,15 @@ private enum VaultPresenceError: LocalizedError {
 @Observable
 private final class VaultSecurityController {
     var overview: VaultOverview?
-    var pendingSecretRequests: [ResourceSecretAccessRequest] = []
-    var secretRequestLoadFailed = false
-    var scopedSecretServiceAvailable = false
-    var lockedResourceSecrets: [LockedResourceSecret] = []
-    var lockedResourceLoadFailed = false
     var isLoading = false
     var hasLoaded = false
     var activeOperation: String?
     var errorMessage: String?
-    var recoveryCode: String?
     var recoveryInput = ""
-    var migrationReport: VaultMigrationReport?
-    var preparationReport: ResourceSecretPreparationReport?
 
     var isInitialized: Bool { overview?.metadata != nil }
     var isUnlocked: Bool { overview?.isUnlocked == true }
     var currentDevice: VaultDeviceRecord? { overview?.currentDevice }
-    var pendingDevices: [VaultDeviceRecord] {
-        overview?.devices.filter { $0.status == "pending" && $0.id != currentDevice?.id } ?? []
-    }
-
     func load() async {
         isLoading = true
         errorMessage = nil
@@ -803,57 +791,28 @@ private final class VaultSecurityController {
         }
         do {
             overview = try await VaultService.shared.overview()
-            if overview?.isUnlocked == true {
-                do {
-                    pendingSecretRequests = try await VaultService.shared.listPendingResourceSecretRequests()
-                    secretRequestLoadFailed = false
-                    scopedSecretServiceAvailable = true
-                } catch let error as PostgrestError where error.code == "PGRST202" {
-                    // The scoped-secret migration has not been deployed yet.
-                    pendingSecretRequests = []
-                    secretRequestLoadFailed = false
-                    scopedSecretServiceAvailable = false
-                } catch {
-                    pendingSecretRequests = []
-                    secretRequestLoadFailed = true
-                    scopedSecretServiceAvailable = false
-                    AppDiagnostics.failure("vault", "load_credential_requests", error: error)
-                }
-                do {
-                    lockedResourceSecrets = try await VaultService.shared.listLockedResourceSecrets()
-                    lockedResourceLoadFailed = false
-                } catch let error as PostgrestError where error.code == "PGRST202" {
-                    // The resource-key rotation migration is not deployed.
-                    lockedResourceSecrets = []
-                    lockedResourceLoadFailed = false
-                } catch {
-                    lockedResourceSecrets = []
-                    lockedResourceLoadFailed = true
-                    AppDiagnostics.failure("vault", "load_locked_resource_secrets", error: error)
-                }
-            } else {
-                pendingSecretRequests = []
-                secretRequestLoadFailed = false
-                scopedSecretServiceAvailable = false
-                lockedResourceSecrets = []
-                lockedResourceLoadFailed = false
-            }
         } catch {
-            pendingSecretRequests = []
-            secretRequestLoadFailed = false
-            scopedSecretServiceAvailable = false
-            lockedResourceSecrets = []
-            lockedResourceLoadFailed = false
             AppDiagnostics.failure("vault", "load_settings", error: error)
             errorMessage = "Vault security couldn’t be loaded. Check your connection and try again."
         }
     }
 
-    func setup() async {
-        await perform("Setting Up Vault…", reason: "Set up encrypted password syncing for your Miloom account.") {
-            let code = try await VaultService.shared.bootstrap()
-            self.recoveryCode = code
+    func setRecovery(_ method: VaultRecoveryMethod, setup: Bool) async {
+        await perform(
+            setup ? "Setting Up Vault…" : "Updating Recovery…",
+            reason: setup ? "Set up Password Vault on this device." : "Replace your vault recovery method."
+        ) {
+            if setup {
+                try await VaultService.shared.bootstrap(recovery: method)
+            } else {
+                try await VaultService.shared.replaceRecoveryMethod(method)
+            }
             self.overview = try await VaultService.shared.overview()
+        }
+        if setup && errorMessage != nil {
+            let message = errorMessage
+            await load()
+            errorMessage = message
         }
     }
 
@@ -866,10 +825,10 @@ private final class VaultSecurityController {
 
     func recover() async {
         guard !recoveryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Enter the recovery code you saved when the vault was created."
+            errorMessage = "Enter your vault recovery password or key."
             return
         }
-        await perform("Recovering Vault…", reason: "Use your recovery code to unlock encrypted passwords on this device.") {
+        await perform("Recovering Vault…", reason: "Recover Password Vault on this device.") {
             try await VaultService.shared.recoverCurrentDevice(code: self.recoveryInput)
             self.recoveryInput = ""
             self.overview = try await VaultService.shared.overview()
@@ -883,110 +842,37 @@ private final class VaultSecurityController {
         }
     }
 
-    func revoke(_ device: VaultDeviceRecord) async {
+    func revoke(_ device: VaultDeviceRecord, recovery: String = "") async {
+        let isPending = device.status == "pending"
         await perform(
-            device.status == "pending" ? "Canceling Request…" : "Revoking Device & Rotating Key…",
-            reason: device.status == "pending"
-                ? "Cancel the vault access request from \(device.label)."
-                : "Revoke \(device.label) and rotate encryption for your remaining trusted devices."
+            isPending ? "Canceling Request…" : "Revoking Device…",
+            reason: isPending ? "Cancel the device access request." : "Remove this device from Password Vault."
         ) {
-            if device.status == "pending" {
+            if isPending {
                 try await VaultService.shared.cancelPendingDevice(device)
             } else {
-                let result = try await VaultService.shared.revokeAndRotate(device: device)
-                self.recoveryCode = result.recoveryCode
-                self.migrationReport = result.report
+                _ = try await VaultService.shared.revokeAndRotate(device: device, recoveryInput: recovery)
             }
-            self.overview = try await VaultService.shared.overview()
-        }
-    }
-
-    func rotateRecoveryCode() async {
-        await perform("Rotating Recovery Code…", reason: "Replace your Miloom vault recovery code.") {
-            self.recoveryCode = try await VaultService.shared.rotateRecoveryCode()
             self.overview = try await VaultService.shared.overview()
         }
     }
 
     func resumeRotation() async {
-        await perform("Finishing Key Rotation…", reason: "Finish re-encrypting records after device revocation.") {
-            self.migrationReport = try await VaultService.shared.resumeRotation()
+        await perform("Updating Vault Security…", reason: "Finish securing your vault after removing a device.") {
+            _ = try await VaultService.shared.resumeRotation()
             self.overview = try await VaultService.shared.overview()
         }
     }
 
-    func approveSecretRequest(_ request: ResourceSecretAccessRequest) async {
-        await perform(
-            "Granting Credential Access…",
-            reason: "Approve credential access for one collaborator device.",
-            requiresPresence: false
-        ) {
-            // VaultService authenticates locally and re-fetches the exact
-            // request before wrapping any key for the recipient device.
-            try await VaultService.shared.approveResourceSecretRequest(request)
-            self.pendingSecretRequests.removeAll { $0.id == request.id }
-            do {
-                self.pendingSecretRequests = try await VaultService.shared.listPendingResourceSecretRequests()
-                self.secretRequestLoadFailed = false
-            } catch {
-                // An already-accepted grant must not be reported as failed
-                // merely because the follow-up refresh is unavailable.
-                self.secretRequestLoadFailed = true
-                AppDiagnostics.failure("vault", "refresh_credential_requests", error: error)
-            }
-        }
-    }
-
-    func prepareResourceSecrets() async {
-        await perform(
-            "Preparing Encrypted Copies…",
-            reason: "Prepare encrypted copies of your credentials for future resource-specific access.",
-            requiresPresence: false
-        ) {
-            // The vault service authenticates locally before reading or staging
-            // any credentials, then verifies each encrypted server readback.
-            self.preparationReport = try await VaultService.shared.prepareOwnedResourceSecrets()
-        }
-    }
-
-    func rotateLockedResourceSecret(_ secret: LockedResourceSecret) async {
-        await perform(
-            "Replacing Resource Key…",
-            reason: "Replace a locked resource credential key.",
-            requiresPresence: false
-        ) {
-            try await VaultService.shared.rotateLockedResourceSecret(secret)
-            do {
-                self.lockedResourceSecrets = try await VaultService.shared.listLockedResourceSecrets()
-                self.lockedResourceLoadFailed = false
-            } catch {
-                // The verified rotation completed. A failed list refresh does
-                // not undo it or turn this action into a false failure.
-                self.lockedResourceLoadFailed = true
-                AppDiagnostics.failure("vault", "refresh_locked_resource_secrets", error: error)
-            }
-        }
-    }
-
-    @discardableResult
-    func migrate() async -> Bool {
-        var completed = false
-        await perform("Encrypting Existing Passwords…", reason: "Encrypt existing passwords with your synced Miloom vault key.") {
-            self.migrationReport = try await VaultService.shared.migrateLegacySecrets()
-            completed = true
-        }
-        return completed
-    }
-
     private func perform(
         _ operation: String, reason: String,
-        requiresPresence: Bool = true, work: () async throws -> Void
+        work: () async throws -> Void
     ) async {
         activeOperation = operation
         errorMessage = nil
         defer { activeOperation = nil }
         do {
-            if requiresPresence { try await confirmUserPresence(reason: reason) }
+            try await confirmUserPresence(reason: reason)
             try await work()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch let error as VaultPresenceError {
@@ -1045,47 +931,38 @@ private final class VaultSecurityController {
             }
         }
         if case VaultCryptographyError.invalidRecoveryCode = error {
-            return "That recovery code isn’t valid. Check the complete code and try again."
+            return "That recovery key isn’t valid. Check the complete key and try again."
         }
         if case VaultCryptographyError.authenticationFailed = error {
-            return "The vault couldn’t verify that key. No passwords were changed."
+            return "Check your recovery password or key and try again."
         }
         return "The vault change couldn’t be completed. Check your connection and try again."
     }
 }
 
-private struct VaultSecuritySheet: View {
+struct VaultSecuritySheet: View {
+    var onReady: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
     @State private var controller = VaultSecurityController()
-    @State private var showingMigrationConfirmation = false
-    @State private var showingPreparationConfirmation = false
-    private enum VaultAlert: Identifiable {
-        case revoke(VaultDeviceRecord)
-        case approve(ResourceSecretAccessRequest)
-        case rotate(LockedResourceSecret)
-        case error(String)
+    @State private var choosingRecovery = false
+    @State private var useGeneratedKey = false
+    @State private var recoveryPassword = ""
+    @State private var confirmPassword = ""
+    @State private var generatedKey: String?
+    @State private var savedGeneratedKey = false
+    @State private var revokeDevice: VaultDeviceRecord?
+    @State private var revokeRecovery = ""
 
-        var id: String {
-            switch self {
-            case .revoke(let device): return "revoke-\(device.id)"
-            case .approve(let request): return "approve-\(request.id)"
-            case .rotate(let secret): return "rotate-\(secret.id)"
-            case .error(let message): return "error-\(message)"
-            }
-        }
+    private var canSaveRecovery: Bool {
+        if useGeneratedKey { return generatedKey != nil && savedGeneratedKey }
+        return VaultRecoveryMethod.acceptsPassword(recoveryPassword) && recoveryPassword == confirmPassword
     }
-    @State private var pendingAlert: VaultAlert?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     statusCard
-
-                    if let recoveryCode = controller.recoveryCode {
-                        recoveryCodeCard(recoveryCode)
-                    }
 
                     if controller.isInitialized && !controller.isUnlocked {
                         deviceAccessCard
@@ -1094,26 +971,23 @@ private struct VaultSecuritySheet: View {
 
                     if controller.isUnlocked {
                         trustedDevicesCard
-                        if !controller.pendingSecretRequests.isEmpty || controller.secretRequestLoadFailed {
-                            credentialRequestsCard
+                        ZifrSheetCard(title: "RECOVERY", icon: "lifepreserver") {
+                            Button("Replace Recovery Password or Key") { choosingRecovery = true }
+                                .buttonStyle(.bordered)
+                                .tint(Color.zifrGold)
                         }
-                        if !controller.lockedResourceSecrets.isEmpty || controller.lockedResourceLoadFailed {
-                            lockedResourceSecretsCard
-                        }
-                        migrationCard
-                        if controller.scopedSecretServiceAvailable {
-                            resourcePreparationCard
+                        if controller.overview?.metadata?.rotationStatus == "migrating" {
+                            Button("Finish Securing Vault") { Task { await controller.resumeRotation() } }
+                                .buttonStyle(.bordered)
+                                .tint(Color.zifrGold)
                         }
                         auditCard
-                        secretSharingBoundaryCard
                     }
 
-                    ZifrSheetCard(title: "ZERO-KNOWLEDGE SECURITY", icon: "lock.shield.fill") {
-                        Text("Miloom stores encrypted vault-key wraps and public device keys. Your recovery code and plaintext vault key stay off the server.")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.58))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text("Keep a trusted device or your recovery password or key. If you lose all of them, resetting your Miloom sign-in password can’t restore your vault.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -1131,8 +1005,12 @@ private struct VaultSecuritySheet: View {
                         .foregroundStyle(Color.zifrGold)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
+                    Button(controller.isUnlocked && onReady != nil ? "Continue" : "Close") {
+                        if controller.isUnlocked { onReady?() }
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(controller.activeOperation != nil)
                 }
             }
             .overlay {
@@ -1156,65 +1034,38 @@ private struct VaultSecuritySheet: View {
         }
         .task { await controller.load() }
         .refreshable { await controller.load() }
-        .confirmationDialog("Encrypt Existing Passwords?", isPresented: $showingMigrationConfirmation, titleVisibility: .visible) {
-            Button("Encrypt Existing Passwords") {
-                Task {
-                    if await controller.migrate() {
-                        await DataRepository.shared.fetchAllData(appState: appState)
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) { }
+        .sheet(isPresented: $choosingRecovery, onDismiss: clearRecoveryDraft) {
+            recoveryChoice
+        }
+        .alert("Password Vault", isPresented: Binding(
+            get: { controller.errorMessage != nil && !choosingRecovery },
+            set: { if !$0 { controller.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { controller.errorMessage = nil }
         } message: {
-            Text("Miloom will migrate passwords this device can read. Locked legacy values will be skipped and never overwritten.")
+            Text(controller.errorMessage ?? "")
         }
-        .confirmationDialog("Prepare Encrypted Copies?", isPresented: $showingPreparationConfirmation, titleVisibility: .visible) {
-            Button("Prepare Encrypted Copies") {
-                Task { await controller.prepareResourceSecrets() }
+        .alert("Remove Trusted Device?", isPresented: Binding(
+            get: { revokeDevice != nil },
+            set: { if !$0 { revokeDevice = nil; revokeRecovery = "" } }
+        )) {
+            if revokeDevice?.status == "approved" {
+                SecureField("Recovery password or key", text: $revokeRecovery)
             }
-            Button("Cancel", role: .cancel) { }
+            Button("Remove Device", role: .destructive) {
+                guard let device = revokeDevice else { return }
+                let recovery = revokeRecovery
+                revokeDevice = nil
+                revokeRecovery = ""
+                Task { await controller.revoke(device, recovery: recovery) }
+            }
+            Button("Cancel", role: .cancel) { revokeDevice = nil; revokeRecovery = "" }
         } message: {
-            Text("Miloom will encrypt readable credentials under separate resource keys and verify them. Your existing records stay unchanged, and this step grants no new access.")
+            Text(revokeDevice?.status == "pending"
+                 ? "This device will need to request access again."
+                 : "Enter your current vault recovery password or key to keep it in use after removing this device.")
         }
-        // One presenter prevents sibling alerts from masking approval/revocation.
-        .alert(item: Binding<VaultAlert?>(
-            get: { controller.errorMessage.map(VaultAlert.error) ?? pendingAlert },
-            set: { pendingAlert = $0; if $0 == nil { controller.errorMessage = nil } }
-        )) { alert in
-            switch alert {
-            case .error(let message):
-                return Alert(title: Text("Vault Security"), message: Text(message), dismissButton: .default(Text("OK")))
-            case .revoke(let device):
-                return Alert(
-                title: Text(device.status == "pending" ? "Cancel Device Request?" : "Revoke \(device.label)?"),
-                message: Text(device.status == "pending"
-                    ? "This pending device will need to request access again."
-                    : "Miloom will revoke this device, end its linked sign-in session, rotate the account vault key, rewrap it for remaining devices, and re-encrypt protected records. Existing access tokens may remain valid briefly, and this cannot erase passwords the device already viewed."),
-                primaryButton: .destructive(Text(device.status == "pending" ? "Cancel Request" : "Revoke & Rotate")) {
-                    Task { await controller.revoke(device) }
-                },
-                secondaryButton: .cancel()
-            )
-            case .approve(let request):
-                return Alert(
-                title: Text("Grant Credential Access?"),
-                message: Text("\(request.recipientEmail) on \(request.recipientDeviceLabel) will be able to reveal credentials for \(request.resourceTitle ?? request.resourceType.capitalized) in \(request.companyName). Previously viewed passwords cannot be taken back."),
-                primaryButton: .default(Text("Grant Access")) {
-                    Task { await controller.approveSecretRequest(request) }
-                },
-                secondaryButton: .cancel()
-            )
-            case .rotate(let secret):
-                return Alert(
-                title: Text("Replace Locked Credential Key?"),
-                message: Text("Miloom will re-encrypt \(secret.resourceTitle ?? secret.resourceType.capitalized) in \(secret.companyName) under a new resource key. Previous collaborator device grants will not carry over. Passwords already viewed outside Miloom cannot be recalled; change them at the provider if needed."),
-                primaryButton: .default(Text("Replace Key")) {
-                    Task { await controller.rotateLockedResourceSecret(secret) }
-                },
-                secondaryButton: .cancel()
-            )
-        }
-        }
+        .interactiveDismissDisabled(controller.activeOperation != nil)
         .presentationDetents([.fraction(0.9), .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
@@ -1247,10 +1098,10 @@ private struct VaultSecuritySheet: View {
                     Label("Not set up", systemImage: "lock.open")
                         .font(.headline)
                         .foregroundStyle(Color.zifrGold)
-                    Text("Create an account vault to sync encrypted passwords across devices without sending the plaintext key to Miloom.")
+                    Text("Set up Password Vault to save protected details and use them on your trusted devices.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Button("Set Up Synced Vault") { Task { await controller.setup() } }
+                    Button("Set Up Password Vault") { choosingRecovery = true }
                         .buttonStyle(.borderedProminent)
                         .tint(Color.zifrGold)
                         .foregroundStyle(Color.black)
@@ -1267,7 +1118,7 @@ private struct VaultSecuritySheet: View {
                         Text(controller.isUnlocked ? "Vault Unlocked" : "This Device Needs Access")
                             .font(.headline)
                             .foregroundStyle(.white)
-                        Text(controller.isUnlocked ? "Passwords use your synced account key" : "Approve this device or use recovery")
+                        Text(controller.isUnlocked ? "This device can use saved credentials" : "Approve this device or use recovery")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -1277,35 +1128,89 @@ private struct VaultSecuritySheet: View {
         }
     }
 
-    private func recoveryCodeCard(_ code: String) -> some View {
-        ZifrSheetCard(title: "SAVE YOUR RECOVERY CODE", icon: "exclamationmark.shield.fill") {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("This code is shown once. Store it in a trusted password manager before continuing.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(code)
-                    .font(.system(.footnote, design: .monospaced, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .textSelection(.enabled)
-                    .privacySensitive()
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                Button {
-                    UIPasteboard.general.string = code
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                } label: {
-                    Label("Copy Recovery Code", systemImage: "doc.on.doc")
-                        .frame(maxWidth: .infinity, minHeight: 44)
+    private var recoveryChoice: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Toggle("Use a generated recovery key", isOn: $useGeneratedKey)
+                    if useGeneratedKey {
+                        if let generatedKey {
+                            Text(generatedKey)
+                                .font(.system(.footnote, design: .monospaced))
+                                .textSelection(.enabled)
+                                .privacySensitive()
+                            Button("Copy Recovery Key") { SearchCredentialAccess.copy(generatedKey) }
+                            Toggle("I saved this key somewhere safe", isOn: $savedGeneratedKey)
+                        }
+                    } else {
+                        SecureField("Recovery password", text: $recoveryPassword)
+                            .textContentType(.newPassword)
+                            .privacySensitive()
+                        SecureField("Confirm recovery password", text: $confirmPassword)
+                            .textContentType(.newPassword)
+                            .privacySensitive()
+                        if !confirmPassword.isEmpty && recoveryPassword != confirmPassword {
+                            Text("The passwords don’t match.").foregroundStyle(.orange)
+                        }
+                    }
+                } footer: {
+                    Text(useGeneratedKey
+                         ? "Save this key now. You’ll need it if you lose access to your trusted devices."
+                         : "Choose at least 16 characters or a few unrelated words. Spaces are welcome. Avoid common passwords, quotations, and familiar sayings. Use a different password from your Miloom sign-in.")
                 }
-                .buttonStyle(.bordered)
-                .tint(Color.zifrGold)
-                Button("I Saved This Code") { controller.recoveryCode = nil }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color.zifrGold)
-                    .foregroundStyle(Color.black)
-                    .frame(maxWidth: .infinity)
+                if let message = controller.errorMessage {
+                    Text(message).foregroundStyle(.orange)
+                }
+                if let operation = controller.activeOperation {
+                    ProgressView(operation)
+                }
             }
+            .navigationTitle(controller.isInitialized ? "Replace Recovery" : "Set Up Recovery")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { choosingRecovery = false }
+                        .disabled(controller.activeOperation != nil)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let method: VaultRecoveryMethod
+                        if useGeneratedKey {
+                            guard let generatedKey else { return }
+                            method = .generatedKey(generatedKey)
+                        } else {
+                            method = .password(recoveryPassword)
+                        }
+                        let setup = !controller.isInitialized
+                        Task {
+                            await controller.setRecovery(method, setup: setup)
+                            if controller.errorMessage == nil || (setup && controller.isUnlocked) {
+                                choosingRecovery = false
+                            }
+                        }
+                    }
+                    .disabled(!canSaveRecovery || controller.activeOperation != nil)
+                }
+            }
+        }
+        .onChange(of: useGeneratedKey) { _, enabled in
+            if enabled && generatedKey == nil {
+                do { generatedKey = try VaultCryptography.generateRecoveryCode() }
+                catch { controller.errorMessage = "The recovery key couldn’t be generated. Try again." }
+            }
+        }
+        .interactiveDismissDisabled(controller.activeOperation != nil)
+    }
+
+    private func clearRecoveryDraft() {
+        recoveryPassword = ""
+        confirmPassword = ""
+        generatedKey = nil
+        savedGeneratedKey = false
+        useGeneratedKey = false
+        if controller.isUnlocked, let onReady {
+            onReady()
+            dismiss()
         }
     }
 
@@ -1317,7 +1222,7 @@ private struct VaultSecuritySheet: View {
                         Label("Access revoked", systemImage: "xmark.shield.fill")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Color.orange)
-                        Text("This device no longer has a vault key. Request access again for approval, or use your replacement recovery code.")
+                        Text("This device no longer has a vault key. Request access again for approval, or use your recovery password or key.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Button("Request Access Again") { Task { await controller.requestAccess() } }
@@ -1329,9 +1234,20 @@ private struct VaultSecuritySheet: View {
                         Label("Approval requested", systemImage: "clock.badge.exclamationmark")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Color.orange)
-                        Text("Approve \(device.label) from an already trusted device, or use your recovery code below.")
+                        Text("Approve \(device.label) from an already trusted device, or use recovery below.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        Button("Check Device Access") {
+                            Task {
+                                await controller.load()
+                                if controller.isUnlocked, let onReady {
+                                    onReady()
+                                    dismiss()
+                                }
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Color.zifrGold)
                     }
                 } else {
                     Text("Register this iPhone so a trusted device can approve it.")
@@ -1350,16 +1266,23 @@ private struct VaultSecuritySheet: View {
     private var recoveryCard: some View {
         ZifrSheetCard(title: "RECOVER ACCESS", icon: "lifepreserver.fill") {
             VStack(spacing: 12) {
-                TextField("Recovery code", text: $controller.recoveryInput)
+                SecureField("Recovery password or key", text: $controller.recoveryInput)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .font(.system(.body, design: .monospaced))
-                    .textContentType(.oneTimeCode)
                     .padding(.horizontal, 14)
                     .frame(minHeight: 48)
                     .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .privacySensitive()
-                Button("Recover This Device") { Task { await controller.recover() } }
+                Button("Recover This Device") {
+                    Task {
+                        await controller.recover()
+                        if controller.isUnlocked, let onReady {
+                            onReady()
+                            dismiss()
+                        }
+                    }
+                }
                     .buttonStyle(.bordered)
                     .tint(Color.zifrGold)
                     .controlSize(.large)
@@ -1391,7 +1314,7 @@ private struct VaultSecuritySheet: View {
                                     .buttonStyle(.bordered)
                                     .tint(Color.zifrGold)
                                     .controlSize(.small)
-                                Button(role: .destructive) { pendingAlert = .revoke(device) } label: {
+                                Button(role: .destructive) { revokeDevice = device } label: {
                                     Image(systemName: "xmark")
                                         .frame(width: 30, height: 30)
                                 }
@@ -1399,7 +1322,7 @@ private struct VaultSecuritySheet: View {
                                 .accessibilityLabel("Cancel access request for \(device.label)")
                             }
                         } else if device.status == "approved" && device.id != controller.currentDevice?.id {
-                            Button(role: .destructive) { pendingAlert = .revoke(device) } label: {
+                            Button(role: .destructive) { revokeDevice = device } label: {
                                 Image(systemName: "trash")
                                     .frame(width: 32, height: 32)
                             }
@@ -1420,190 +1343,6 @@ private struct VaultSecuritySheet: View {
                         Divider().background(Color.white.opacity(0.1)).padding(.leading, 42)
                     }
                 }
-            }
-        }
-    }
-
-    private var credentialRequestsCard: some View {
-        ZifrSheetCard(title: "CREDENTIAL ACCESS REQUESTS", icon: "key.horizontal.fill") {
-            if controller.secretRequestLoadFailed {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Credential requests couldn’t be checked. Your existing vault access was not changed.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Button("Try Again") { Task { await controller.load() } }
-                        .buttonStyle(.bordered)
-                        .tint(Color.zifrGold)
-                }
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(controller.pendingSecretRequests) { request in
-                        Button {
-                            pendingAlert = .approve(request)
-                        } label: {
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "person.crop.circle.badge.checkmark")
-                                    .foregroundStyle(Color.zifrGold)
-                                    .frame(width: 28)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(request.resourceTitle ?? request.resourceType.capitalized)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.white)
-                                    Text(request.companyName)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text("\(request.recipientEmail) · \(request.recipientDeviceLabel)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Review credential access for \(request.recipientEmail), \(request.resourceTitle ?? request.resourceType), \(request.companyName)")
-                        if request.id != controller.pendingSecretRequests.last?.id {
-                            Divider().background(Color.white.opacity(0.1))
-                        }
-                    }
-                }
-            }
-        }
-        .privacySensitive()
-    }
-
-    private var lockedResourceSecretsCard: some View {
-        ZifrSheetCard(title: "LOCKED RESOURCE CREDENTIALS", icon: "lock.shield") {
-            if controller.lockedResourceLoadFailed {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Locked credentials couldn't be checked. Existing access was not changed.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Button("Try Again") { Task { await controller.load() } }
-                        .buttonStyle(.bordered)
-                        .tint(Color.zifrGold)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Access stays locked until each credential is re-encrypted with a fresh key. Previous device approvals will not be reused.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    ForEach(controller.lockedResourceSecrets) { secret in
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(secret.resourceTitle ?? secret.resourceType.capitalized)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                Text(secret.companyName)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 8)
-                            Button("Replace Key") { pendingAlert = .rotate(secret) }
-                                .buttonStyle(.bordered)
-                                .tint(Color.zifrGold)
-                                .disabled(controller.activeOperation != nil)
-                        }
-                        .frame(minHeight: 52)
-                    }
-                }
-            }
-        }
-        .privacySensitive()
-    }
-
-    private var migrationCard: some View {
-        ZifrSheetCard(title: "ENCRYPTION MIGRATION", icon: "arrow.triangle.2.circlepath") {
-            VStack(alignment: .leading, spacing: 12) {
-                if let report = controller.migrationReport {
-                    Label("\(report.migratedFields) field\(report.migratedFields == 1 ? "" : "s") encrypted", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(Color.green)
-                    if report.skippedLockedFields > 0 {
-                        Text("\(report.skippedLockedFields) locked legacy field\(report.skippedLockedFields == 1 ? " was" : "s were") left unchanged.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if report.failedRecords > 0 {
-                        Text("\(report.failedRecords) record\(report.failedRecords == 1 ? "" : "s") couldn’t be updated. You can safely retry.")
-                            .font(.caption)
-                            .foregroundStyle(Color.orange)
-                    }
-                } else {
-                    Text("Move readable legacy passwords and account numbers to record-bound account encryption. Values locked to another device are preserved.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Button("Encrypt Existing Passwords") { showingMigrationConfirmation = true }
-                    .buttonStyle(.bordered)
-                    .tint(Color.zifrGold)
-                    .controlSize(.large)
-                if controller.overview?.metadata?.rotationStatus == "migrating" {
-                    Button("Resume Key Rotation") { Task { await controller.resumeRotation() } }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color.orange)
-                        .controlSize(.large)
-                    Text("The previous key remains encrypted under the current key until every old-version vault field has migrated.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Button("Replace Recovery Code") { Task { await controller.rotateRecoveryCode() } }
-                    .buttonStyle(.bordered)
-                    .tint(Color.zifrGold)
-                    .controlSize(.large)
-            }
-        }
-    }
-
-    private var resourcePreparationCard: some View {
-        ZifrSheetCard(title: "RESOURCE CREDENTIALS", icon: "key.horizontal.fill") {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Prepare separate encrypted copies of credentials for future, precisely scoped sharing. This step grants no new access and leaves your existing passwords unchanged.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if let report = controller.preparationReport {
-                    if report.preparedRecords > 0 {
-                        Label("\(report.preparedRecords) resource\(report.preparedRecords == 1 ? "" : "s") prepared and verified", systemImage: "checkmark.shield.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.green)
-                    }
-                    if report.preparedRecords == 0 && report.alreadyPreparedRecords == 0 && report.failedRecords == 0 && report.skippedLockedRecords == 0 {
-                        Text("No readable credentials needed preparation.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if report.alreadyPreparedRecords > 0 {
-                        Text("\(report.alreadyPreparedRecords) already prepared.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if report.skippedLockedRecords > 0 {
-                        Text("\(report.skippedLockedRecords) locked resource\(report.skippedLockedRecords == 1 ? " was" : "s were") left unchanged.")
-                            .font(.caption)
-                            .foregroundStyle(Color.orange)
-                    }
-                    if report.failedRecords > 0 {
-                        Text("\(report.failedRecords) resource\(report.failedRecords == 1 ? "" : "s") couldn’t be verified. You can retry safely.")
-                            .font(.caption)
-                            .foregroundStyle(Color.orange)
-                    }
-                    if report.deferredRecords > 0 {
-                        Text("\(report.deferredRecords) more to prepare. Run again to continue.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Button("Prepare Encrypted Copies") {
-                    showingPreparationConfirmation = true
-                }
-                .buttonStyle(.bordered)
-                .tint(Color.zifrGold)
-                .controlSize(.large)
-                .disabled(controller.activeOperation != nil)
             }
         }
     }
@@ -1638,20 +1377,6 @@ private struct VaultSecuritySheet: View {
         }
     }
 
-    private var secretSharingBoundaryCard: some View {
-        ZifrSheetCard(title: "COLLABORATOR SECRET ACCESS", icon: "person.2.fill") {
-            Label {
-                Text("Company and resource sharing never includes passwords or account numbers. A future secret grant must be separate, resource-specific, and explicitly confirmed.")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.58))
-                    .fixedSize(horizontal: false, vertical: true)
-            } icon: {
-                Image(systemName: "hand.raised.fill")
-                    .foregroundStyle(Color.zifrGold)
-            }
-        }
-    }
-
     private func auditTitle(_ type: String) -> String {
         switch type {
         case "vault_bootstrapped": return "Vault created"
@@ -1659,7 +1384,7 @@ private struct VaultSecuritySheet: View {
         case "device_approved": return "Device approved"
         case "device_revoked": return "Device revoked"
         case "recovery_device_approved": return "Device recovered"
-        case "recovery_rotated": return "Recovery code replaced"
+        case "recovery_rotated": return "Recovery method replaced"
         case "vault_key_rotated": return "Vault key rotated"
         case "vault_rotation_completed": return "Key rotation completed"
         default: return "Vault security updated"
@@ -1673,6 +1398,22 @@ private struct VaultSecuritySheet: View {
         case "vault_key_rotated", "vault_rotation_completed": return "arrow.triangle.2.circlepath"
         case "device_approved", "recovery_device_approved": return "checkmark.shield.fill"
         default: return "lock.shield.fill"
+        }
+    }
+}
+
+struct VaultAccessPrompt: ViewModifier {
+    @Binding var isPresented: Bool
+    var onReady: () -> Void
+    @State private var ready = false
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: $isPresented, onDismiss: {
+            guard ready else { return }
+            ready = false
+            onReady()
+        }) {
+            VaultSecuritySheet(onReady: { ready = true })
         }
     }
 }

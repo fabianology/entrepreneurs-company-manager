@@ -32,10 +32,10 @@ struct AddFinancialWizard: View {
     @State private var loanDraftIndex: Int? = nil
     @State private var isNewLoan = false
 
-    @State private var hasManuallyEditedWebsite = false
     @State private var isNewInstitution: Bool = true
     @State private var linkedPlaidItemId: String? = nil
     @State private var isSaving = false
+    @State private var showingVaultAccess = false
 
     var body: some View {
         NavigationStack {
@@ -219,6 +219,7 @@ struct AddFinancialWizard: View {
                 .presentationCornerRadius(24)
             }
         }
+        .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: saveAllAndDismiss))
     }
 
     // MARK: - Navigation Logic
@@ -288,10 +289,15 @@ struct AddFinancialWizard: View {
                     isSaving = false
                     dismiss()
                 }
+            } catch ProtectedResourceSaveError.vaultAccessRequired {
+                await MainActor.run {
+                    isSaving = false
+                    showingVaultAccess = true
+                }
             } catch {
                 await MainActor.run {
                     isSaving = false
-                    appState.error = "The Plaid data could not be saved. Your connection is still available—tap Save to retry."
+                    appState.error = ResourceSaveFailure.message(for: error, resource: "financial details")
                 }
             }
         }
@@ -598,7 +604,6 @@ struct AddFinancialWizard: View {
                             Button(inst.name.isEmpty ? "Unnamed" : inst.name) {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 institution = inst
-                                hasManuallyEditedWebsite = true
                             }
                         }
                     } label: {
@@ -625,26 +630,14 @@ struct AddFinancialWizard: View {
                         
                         self.linkedPlaidItemId = plaidItemId
                         
-                        // Auto-fill institution details
-                        let cleanName = instName.lowercased()
-                            .replacingOccurrences(of: " ", with: "")
-                            .replacingOccurrences(of: ",", with: "")
-                            .replacingOccurrences(of: ".", with: "")
-                            .replacingOccurrences(of: "&", with: "and")
-                        
                         if let existing = existingInstitution(named: instName) {
-                            institution = existing
+                            institution = ResourceSecretPreparation.metadata(for: existing)
                             isNewInstitution = false
                             institution.isDisconnected = false
-                            if institution.loginUrl?.isEmpty != false {
-                                institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
-                            }
                         } else {
                             institution.name = instName
-                            institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
                         }
-                        hasManuallyEditedWebsite = true
-                        
+
                         // Convert Plaid accounts to our domain models
                         for pa in plaidAccounts {
                             let balance = pa.balances.current ?? pa.balances.available ?? 0.0
@@ -654,6 +647,7 @@ struct AddFinancialWizard: View {
                             
                             if pa.type == "credit" {
                                 var newCard = matchingCard(for: pa, institutionName: instName)
+                                    .map { ResourceSecretPreparation.metadata(for: $0) }
                                     ?? FinancialCard(userId: institution.userId, companyId: institution.companyId)
                                 newCard.userId = institution.userId
                                 newCard.companyId = institution.companyId
@@ -745,10 +739,6 @@ struct AddFinancialWizard: View {
                             institution.name
                         }, set: { newName in
                             institution.name = newName
-                            if !hasManuallyEditedWebsite {
-                                let cleanName = newName.lowercased().replacingOccurrences(of: " ", with: "")
-                                institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
-                            }
                         }))
                         ZifrField(
                             label: "WEBSITE URL",
@@ -757,7 +747,6 @@ struct AddFinancialWizard: View {
                                 institution.loginUrl ?? ""
                             }, set: { newUrl in
                                 institution.loginUrl = newUrl
-                                hasManuallyEditedWebsite = true
                             }),
                             keyboardType: .URL
                         )

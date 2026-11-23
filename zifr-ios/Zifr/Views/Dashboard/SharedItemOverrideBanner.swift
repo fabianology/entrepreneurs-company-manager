@@ -88,11 +88,13 @@ struct ResourceCredentialAccessCard: View {
     let ownerUserID: UUID
     var onStatusChange: ((String) -> Void)? = nil
 
-    @Environment(AuthViewModel.self) private var authVM
     @Environment(AppState.self) private var appState
     @Environment(\.scenePhase) private var scenePhase
     @State private var status: String?
-    @State private var plaintextFields: [String: String] = [:]
+    @State private var revealed: RevealedResourceCredentials?
+    @State private var canEdit = false
+    @State private var showingVaultAccess = false
+    private var plaintextFields: [String: String] { revealed?.fields ?? [:] }
     @State private var draftFields: [String: String] = [:]
     @State private var draftAccounts: [AccountCredentials] = []
     @State private var isEditing = false
@@ -101,7 +103,6 @@ struct ResourceCredentialAccessCard: View {
     @State private var revealGate = ResourceCredentialRevealGate()
     private var operationID: UUID { revealGate.operationID }
     @State private var isRevealing = false
-    @State private var showActivationConfirmation = false
 
     private struct AccountCredentials: Codable, Identifiable {
         let id: String
@@ -114,6 +115,14 @@ struct ResourceCredentialAccessCard: View {
         guard let value = plaintextFields["accounts_data"],
               let data = value.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode([AccountCredentials].self, from: data)
+    }
+
+    private var accountsForEditing: [AccountCredentials] {
+        let saved = accounts ?? []
+        guard resourceType == "institution",
+              let bank = appState.institutions.first(where: { $0.id == resourceID }) else { return saved }
+        let missing = bank.accounts.filter { account in !saved.contains { $0.id == account.id } }
+        return saved + missing.map { AccountCredentials(id: $0.id) }
     }
 
     private var fields: [(String, String)] {
@@ -155,7 +164,7 @@ struct ResourceCredentialAccessCard: View {
                     switch status {
                     case "ready":
                         if isEditing {
-                            Text("Changes are encrypted for this resource only. Clearing a field removes it from the shared credential.")
+                            Text("These edits update the credentials saved in Miloom. To change your password at the service, visit the service directly.")
                                 .foregroundStyle(.secondary)
                             ForEach(editableFields, id: \.0) { field in
                                 VStack(alignment: .leading, spacing: 5) {
@@ -188,7 +197,7 @@ struct ResourceCredentialAccessCard: View {
                                 actionButton("Save", symbol: "checkmark", action: save)
                             }
                             .disabled(isWorking)
-                        } else if plaintextFields.isEmpty {
+                        } else if revealed == nil {
                             Text("Credentials are available for this resource only. Face ID or your passcode is required to reveal them.")
                                 .foregroundStyle(.secondary)
                             actionButton("Reveal Credentials", symbol: "eye", action: reveal)
@@ -212,11 +221,15 @@ struct ResourceCredentialAccessCard: View {
                                 Text("Account details could not be displayed.")
                                     .foregroundStyle(.orange)
                             }
+                            if !canEdit {
+                                Text("You can view and copy these details in Miloom. The service controls what a person can do with its password.")
+                                    .foregroundStyle(.secondary)
+                            }
                             HStack {
-                                if plaintextFields["accounts_data"] == nil || accounts != nil {
+                                if canEdit && (plaintextFields["accounts_data"] == nil || accounts != nil) {
                                     actionButton("Edit", symbol: "pencil") {
                                         draftFields = plaintextFields
-                                        draftAccounts = accounts ?? []
+                                        draftAccounts = accountsForEditing
                                         isEditing = true
                                     }
                                 }
@@ -225,20 +238,18 @@ struct ResourceCredentialAccessCard: View {
                                 }
                             }
                         }
-                    case "request":
-                        Text("Ask the owner to approve this device for this resource's credentials. Other resources stay private.")
-                            .foregroundStyle(.secondary)
-                        actionButton("Request Access", symbol: "person.badge.key", action: request)
                     case "pending":
-                        Label("Waiting for owner approval on this device", systemImage: "clock")
+                        Text("Waiting for an approved device belonging to the owner to share credentials. Miloom will finish automatically when it connects.")
                             .foregroundStyle(.secondary)
                         actionButton("Check Again", symbol: "arrow.clockwise", action: refresh)
                     case "device_needed":
-                        Label("Approve this device in Password Vault first.", systemImage: "iphone")
+                        Text("Set up Password Vault or approve this device to see the saved credentials.")
                             .foregroundStyle(.secondary)
+                        actionButton("Open Password Vault", symbol: "iphone") { showingVaultAccess = true }
                     case "locked":
-                        Label("The owner must replace this resource's key in Password Vault before access can resume.", systemImage: "lock.trianglebadge.exclamationmark")
-                            .foregroundStyle(.orange)
+                        Text("Miloom is updating access to these credentials. Check again after an approved device belonging to the owner connects.")
+                            .foregroundStyle(.secondary)
+                        actionButton("Check Again", symbol: "arrow.clockwise", action: refresh)
                     default:
                         EmptyView()
                     }
@@ -252,34 +263,16 @@ struct ResourceCredentialAccessCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .font(.subheadline)
             }
-        } else if status == "not_ready", authVM.currentUser?.id == ownerUserID {
+        } else if status == "not_ready",
+                  let actorID = appState.portfolioUserID, actorID != ownerUserID {
             ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Activate encrypted credentials for this resource only. You need a trusted, unlocked Password Vault and readable existing credentials.")
+                    Text("There are no saved credentials available for this item yet.")
                         .foregroundStyle(.secondary)
-                    Text("Activation replaces this resource's legacy credential fields. An Editor or Admin still needs to request access from an approved device, and you must approve that request separately.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    actionButton("Activate for This Resource", symbol: "lock.shield", action: {
-                        showActivationConfirmation = true
-                    })
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.orange)
-                    }
+                    actionButton("Check Again", symbol: "arrow.clockwise", action: refresh)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .confirmationDialog(
-                "Activate this resource's encrypted credentials?",
-                isPresented: $showActivationConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Activate This Resource") { activate() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Miloom will verify the encrypted copy before replacing legacy credential fields. This does not automatically share a password with anyone.")
+                .font(.subheadline)
             }
         } else if errorMessage != nil {
             ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
@@ -291,10 +284,16 @@ struct ResourceCredentialAccessCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        // Keep the whole card absent on older backends and for unactivated
-        // collaborator keys. Only the owner sees the activation action.
         Color.clear.frame(height: 0)
+            .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: refresh))
             .task(id: resourceID) { await loadStatus() }
+            .task(id: status == "pending" || status == "locked") {
+                while !Task.isCancelled && (status == "pending" || status == "locked") {
+                    do { try await Task.sleep(for: .seconds(10)) }
+                    catch { break }
+                    if scenePhase == .active { await loadStatus() }
+                }
+            }
             .onDisappear { clearPlaintext() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
@@ -311,10 +310,20 @@ struct ResourceCredentialAccessCard: View {
             Text(title.uppercased())
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(Color(hex: "#C1AA78"))
-            Text(value)
-                .font(.body.monospaced())
-                .foregroundStyle(.primary)
-                .privacySensitive()
+            HStack {
+                Text(value)
+                    .font(.body.monospaced())
+                    .foregroundStyle(.primary)
+                Spacer()
+                Button {
+                    SearchCredentialAccess.copy(value)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Copy \(title)")
+            }
+            .privacySensitive()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -332,7 +341,7 @@ struct ResourceCredentialAccessCard: View {
 
     private func clearPlaintext(invalidateOperation: Bool = true) {
         if invalidateOperation { revealGate.invalidate() }
-        plaintextFields.removeAll()
+        revealed = nil
         draftFields.removeAll()
         draftAccounts.removeAll()
         isEditing = false
@@ -358,7 +367,7 @@ struct ResourceCredentialAccessCard: View {
     }
 
     private func save() {
-        guard !isWorking else { return }
+        guard !isWorking, canEdit, let revealed else { return }
         let token = operationID
         var updated = draftFields.filter { !$0.value.isEmpty && $0.key != "accounts_data" }
         if !draftAccounts.isEmpty,
@@ -380,7 +389,7 @@ struct ResourceCredentialAccessCard: View {
                 try await VaultService.shared.updateResourceSecret(
                     type: resourceType, id: resourceID,
                     expectedOwnerUserID: ownerUserID,
-                    plaintextFields: updated
+                    plaintextFields: updated, previous: revealed
                 )
                 if token == operationID { clearPlaintext() }
             } catch {
@@ -397,20 +406,17 @@ struct ResourceCredentialAccessCard: View {
                 type: resourceType, id: resourceID
             )
             guard !Task.isCancelled, token == operationID else { return }
-            status = result
-            onStatusChange?(result)
+            status = result.status
+            canEdit = result.canEdit
+            onStatusChange?(result.status)
             errorMessage = nil
-            if result != "ready" { plaintextFields.removeAll() }
+            if result.status != "ready" { clearPlaintext() }
         } catch {
             guard !Task.isCancelled, token == operationID else { return }
-            // A missing RPC means this build is talking to an older backend.
             status = "unavailable"
-            if error.localizedDescription.contains("PGRST202") {
-                onStatusChange?("legacy")
-            } else {
-                onStatusChange?("check_failed")
-                errorMessage = error.localizedDescription
-            }
+            canEdit = false
+            onStatusChange?("check_failed")
+            errorMessage = "Credential access couldn’t be checked. Try again when connected."
         }
     }
 
@@ -419,43 +425,6 @@ struct ResourceCredentialAccessCard: View {
         isWorking = true
         Task {
             await loadStatus()
-            isWorking = false
-        }
-    }
-
-    private func activate() {
-        guard !isWorking, authVM.currentUser?.id == ownerUserID else { return }
-        isWorking = true
-        errorMessage = nil
-        Task {
-            do {
-                try await VaultService.shared.activateOwnedResourceSecret(
-                    type: resourceType, id: resourceID,
-                    expectedOwnerUserID: ownerUserID
-                )
-                await loadStatus()
-                await DataRepository.shared.fetchAllData(appState: appState, force: true)
-            } catch {
-                await loadStatus()
-                errorMessage = error.localizedDescription
-            }
-            isWorking = false
-        }
-    }
-
-    private func request() {
-        guard !isWorking else { return }
-        isWorking = true
-        errorMessage = nil
-        Task {
-            do {
-                try await VaultService.shared.requestResourceSecretAccess(
-                    type: resourceType, id: resourceID
-                )
-                await loadStatus()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
             isWorking = false
         }
     }
@@ -469,15 +438,15 @@ struct ResourceCredentialAccessCard: View {
         Task {
             defer { isRevealing = false; isWorking = false }
             do {
-                let fields = try await VaultService.shared.revealResourceSecret(
+                let credentials = try await VaultService.shared.revealResourceSecret(
                     type: resourceType, id: resourceID,
                     expectedOwnerUserID: ownerUserID
                 )
-                guard let acceptedFields = revealGate.accept(fields, for: token, isActive: scenePhase == .active) else {
+                guard revealGate.accept(credentials.fields, for: token, isActive: scenePhase == .active) != nil else {
                     isWorking = false
                     return
                 }
-                plaintextFields = acceptedFields
+                revealed = credentials
             } catch {
                 guard token == operationID else {
                     isWorking = false

@@ -13,6 +13,7 @@ struct AddSubscriptionWizard: View {
     @State private var completedSteps: Set<Int> = []
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var showingVaultAccess = false
     
     // HUD states
     @State private var showSubServiceHUD = false
@@ -36,6 +37,8 @@ struct AddSubscriptionWizard: View {
             do {
                 sub = try await vm.saveSubscriptionConfirmed(sub, appState: appState)
                 dismiss()
+            } catch ProtectedResourceSaveError.vaultAccessRequired {
+                showingVaultAccess = true
             } catch {
                 saveError = ResourceSaveFailure.message(for: error, resource: "service")
             }
@@ -117,6 +120,7 @@ struct AddSubscriptionWizard: View {
                 }
             }
             .interactiveDismissDisabled(isSaving)
+            .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: save))
             .alert("Service Not Saved", isPresented: Binding(
                 get: { saveError != nil }, set: { if !$0 { saveError = nil } }
             )) {

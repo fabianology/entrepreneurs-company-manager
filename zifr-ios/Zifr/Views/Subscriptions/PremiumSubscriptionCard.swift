@@ -337,7 +337,7 @@ struct PremiumSubscriptionCard: View {
                             .padding(.top, 16)
                             .padding(.bottom, 24)
                         } else {
-                            ownerOnlyCredentials
+                            sharedCredentialSummary
                                 .padding(.horizontal, 24)
                                 .padding(.vertical, 18)
                         }
@@ -724,16 +724,16 @@ struct PremiumSubscriptionCard: View {
         }
     }
 
-    private var ownerOnlyCredentials: some View {
+    private var sharedCredentialSummary: some View {
         HStack(spacing: 10) {
             Image(systemName: "lock.shield")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color(hex: "#C1AA78"))
             VStack(alignment: .leading, spacing: 2) {
-                Text("Credentials are owner-only")
+                Text(sub.hasScopedCredentials == true ? "Shared credentials" : "Credential access")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
-                Text("Sharing this service does not share its login or password.")
+                Text("Open service details to check Secure Credentials.")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.5))
             }

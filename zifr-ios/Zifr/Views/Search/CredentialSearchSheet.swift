@@ -91,10 +91,37 @@ struct SearchCredentialBoxes: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var state = SearchCredentialBoxState()
+    @State private var showingScopedCredentials = false
+
+    private var scopedResource: (type: String, owner: UUID)? {
+        switch record.kind {
+        case .subscription:
+            return appState.subscriptions.first { $0.id == record.modelID }.map { ("subscription", $0.userId) }
+        case .card:
+            return appState.cards.first { $0.id == record.modelID }.map { ("card", $0.userId) }
+        case .institution, .account:
+            return appState.institutions.first { $0.id == record.modelID }.map { ("institution", $0.userId) }
+        default:
+            return nil
+        }
+    }
 
     private var visiblePassword: String? { scenePhase == .active && auth.isAuthenticated ? state.revealed : nil }
     var body: some View {
-        if !record.login.isEmpty || record.credential != .none {
+        if record.credential == .vault, let resource = scopedResource, auth.isAuthenticated {
+            if showingScopedCredentials {
+                ResourceCredentialAccessCard(
+                    resourceType: resource.type, resourceID: record.modelID, ownerUserID: resource.owner
+                )
+            } else {
+                Button {
+                    showingScopedCredentials = true
+                } label: {
+                    Label("Open Saved Credentials", systemImage: "lock")
+                }
+                .buttonStyle(.bordered)
+            }
+        } else if !record.login.isEmpty || record.credential != .none {
             VStack(alignment: .leading, spacing: 6) {
                 let layout = dynamicTypeSize.isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
