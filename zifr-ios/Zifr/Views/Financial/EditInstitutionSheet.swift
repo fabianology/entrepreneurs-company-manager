@@ -249,14 +249,16 @@ struct EditInstitutionSheet: View {
                                         placeholder: "e.g. Chase",
                                         text: Binding(get: { institution.name }, set: { institution.name = $0 })
                                     )
-                                    ZifrField(
-                                        label: "WEBSITE",
-                                        placeholder: "chase.com",
-                                        text: Binding(get: { institution.loginUrl ?? "" }, set: { institution.loginUrl = $0 }),
-                                        keyboardType: .URL,
-                                        textContentType: .URL
-                                    )
-                                    .textInputAutocapitalization(.never)
+                                    if canAccessCredentials {
+                                        ZifrField(
+                                            label: "WEBSITE",
+                                            placeholder: "chase.com",
+                                            text: Binding(get: { institution.loginUrl ?? "" }, set: { institution.loginUrl = $0 }),
+                                            keyboardType: .URL,
+                                            textContentType: .URL
+                                        )
+                                        .textInputAutocapitalization(.never)
+                                    }
                                 }
 
                                 if canAccessCredentials {
@@ -321,7 +323,7 @@ struct EditInstitutionSheet: View {
                                 }
                                 } else {
                                     Label {
-                                        Text("Use Secure Credentials above when available. Access is specific to this resource and device.")
+                                        Text("Find the website and login details in Secure Credentials when available.")
                                             .font(.system(size: 13, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.6))
                                     } icon: {

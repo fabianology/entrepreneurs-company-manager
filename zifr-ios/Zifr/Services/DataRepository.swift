@@ -3543,16 +3543,14 @@ final class VaultService: @unchecked Sendable {
         }
     }
 
-    /// Reveal only one exact resource after device presence. Callers must keep
-    /// the returned plaintext in ephemeral UI state and clear it on dismissal.
-    func revealResourceSecret(
-        type: String, id: UUID, expectedOwnerUserID: UUID
+    /// Read one resource for the current unlocked presentation. The approved
+    /// device and resource grant are verified by the existing vault endpoints.
+    func readResourceCredentials(
+        type: String, id: UUID, expectedOwnerUserID: UUID, expectedViewerUserID: UUID
     ) async throws -> RevealedResourceCredentials {
-        try await confirmResourceSecretPresence(
-            reason: "Reveal credentials for this Miloom resource."
-        )
         let material = try await loadResourceSecretMaterial(
-            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
+            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID,
+            expectedViewerUserID: expectedViewerUserID
         )
         do {
             return try RevealedResourceCredentials(
@@ -3565,11 +3563,12 @@ final class VaultService: @unchecked Sendable {
     /// The caller sends the complete edited field set; only resource-bound
     /// ciphertext crosses the network. Optimistic compare rejects stale edits.
     func updateResourceSecret(
-        type: String, id: UUID, expectedOwnerUserID: UUID,
+        type: String, id: UUID, expectedOwnerUserID: UUID, expectedViewerUserID: UUID,
         plaintextFields: [String: String], previous: RevealedResourceCredentials
-    ) async throws {
+    ) async throws -> RevealedResourceCredentials {
         let material = try await loadResourceSecretMaterial(
-            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
+            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID,
+            expectedViewerUserID: expectedViewerUserID
         )
         guard previous.keyVersion == material.resource.keyVersion,
               previous.ciphertext == material.encryptedFields else {
@@ -3599,7 +3598,7 @@ final class VaultService: @unchecked Sendable {
         let oldPlaintext: [String: String]
         do { oldPlaintext = try material.plaintextFields() }
         catch { throw ResourceSecretRevealError.invalidSecret }
-        if oldPlaintext == plaintextFields { return }
+        if oldPlaintext == plaintextFields { return previous }
 
         var encrypted: [String: String] = [:]
         for (field, value) in plaintextFields {
@@ -3631,13 +3630,18 @@ final class VaultService: @unchecked Sendable {
         }
         do {
             let readback = try await loadResourceSecretMaterial(
-                type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
+                type: type, id: id, expectedOwnerUserID: expectedOwnerUserID,
+                expectedViewerUserID: expectedViewerUserID
             )
             guard readback.resource.keyVersion == material.resource.keyVersion,
                   readback.encryptedFields == encrypted,
                   try readback.plaintextFields() == plaintextFields else {
                 throw ResourceSecretUpdateError.verificationUnavailable
             }
+            return RevealedResourceCredentials(
+                fields: plaintextFields, keyVersion: readback.resource.keyVersion,
+                ciphertext: readback.encryptedFields
+            )
         } catch {
             throw ResourceSecretUpdateError.verificationUnavailable
         }
@@ -3662,9 +3666,10 @@ final class VaultService: @unchecked Sendable {
     }
 
     private func loadResourceSecretMaterial(
-        type: String, id: UUID, expectedOwnerUserID: UUID
+        type: String, id: UUID, expectedOwnerUserID: UUID, expectedViewerUserID: UUID
     ) async throws -> ResourceSecretMaterial {
         let session = try await client.auth.refreshSession()
+        guard session.user.id == expectedViewerUserID else { throw CancellationError() }
         if session.user.id == expectedOwnerUserID {
             let snapshot = try requireSnapshot(for: session.user.id)
             guard let record = try await ownerResourceSecret(

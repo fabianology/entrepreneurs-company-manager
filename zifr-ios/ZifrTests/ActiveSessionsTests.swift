@@ -5,14 +5,32 @@ import Supabase
 @testable import Zifr
 
 final class ResourceCredentialRevealGateTests: XCTestCase {
+    func testAutomaticReadRequiresUnlockedActivePresentationForSamePortfolio() {
+        let user = UUID()
+        let otherUser = UUID()
+        for (signedIn, portfolio, unlocked, active, expected) in [
+            (user, user, true, true, user),
+            (user, user, false, true, nil),
+            (user, user, true, false, nil),
+            (user, otherUser, true, true, nil),
+            (user, nil, true, true, nil),
+            (nil, nil, true, true, nil)
+        ] as [(UUID?, UUID?, Bool, Bool, UUID?)] {
+            XCTAssertEqual(ResourceCredentialRevealGate.authenticatedViewer(
+                signedInUserID: signedIn, portfolioUserID: portfolio,
+                isUnlocked: unlocked, isActive: active
+            ), expected)
+        }
+    }
+
     func testCurrentActiveRevealAccepted() {
         let gate = ResourceCredentialRevealGate()
-        XCTAssertEqual(gate.accept(["password": "synthetic"], for: gate.operationID, isActive: true), ["password": "synthetic"])
+        XCTAssertTrue(gate.allows(gate.operationID, isActive: true))
     }
 
     func testInactivePresentationRejectsReveal() {
         let gate = ResourceCredentialRevealGate()
-        XCTAssertNil(gate.accept(["password": "synthetic"], for: gate.operationID, isActive: false))
+        XCTAssertFalse(gate.allows(gate.operationID, isActive: false))
     }
 
     @MainActor
@@ -27,7 +45,7 @@ final class ResourceCredentialRevealGateTests: XCTestCase {
                 completion = continuation
                 started.fulfill()
             }
-            if let accepted = gate.accept(response, for: token, isActive: true) { displayed = accepted }
+            if gate.allows(token, isActive: true) { displayed = response }
         }
         await fulfillment(of: [started], timeout: 2)
         // Same invalidation used by the native sheet's onDisappear/background.
@@ -49,11 +67,12 @@ final class ResourceCredentialRevealGateTests: XCTestCase {
                 completion = continuation
                 started.fulfill()
             }
-            if let accepted = gate.accept(response, for: oldToken, isActive: true) { displayed = accepted }
+            if gate.allows(oldToken, isActive: true) { displayed = response }
         }
         await fulfillment(of: [started], timeout: 2)
         gate.invalidate()
-        displayed = gate.accept(["password": "synthetic-new"], for: gate.operationID, isActive: true) ?? [:]
+        XCTAssertTrue(gate.allows(gate.operationID, isActive: true))
+        displayed = ["password": "synthetic-new"]
         completion?.resume(returning: ["password": "synthetic-old"])
         await request.value
         XCTAssertEqual(displayed, ["password": "synthetic-new"])
