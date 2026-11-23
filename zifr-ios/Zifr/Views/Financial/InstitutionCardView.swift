@@ -40,10 +40,7 @@ struct InstitutionCardView: View {
             // ── Tappable header ──────────────────────
             HStack(alignment: .center, spacing: 16) {
                 HStack(alignment: .center, spacing: 16) {
-                    if let loginUrl = institution.loginUrl, !loginUrl.isEmpty {
-                            FaviconImage(website: loginUrl, size: 40)
-                                .frame(width: 56, height: 56)
-                        } else {
+                        InstitutionLogoImage(institution: institution, size: 40) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 16)
                                     .fill(Color.white.opacity(0.06))
@@ -57,6 +54,7 @@ struct InstitutionCardView: View {
                                     .foregroundStyle(Color.white.opacity(0.8))
                             }
                         }
+                        .frame(width: 56, height: 56)
 
                         VStack(alignment: .leading, spacing: 6) {
                             Text(institution.name.isEmpty ? "Bank" : institution.name)

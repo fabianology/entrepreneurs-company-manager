@@ -2134,10 +2134,7 @@ struct LinkedAccountRow: View {
         VStack(spacing: 0) {
             // Top Header (Tappable to expand)
             HStack(spacing: 16) {
-                if let loginUrl = inst.loginUrl, !loginUrl.isEmpty {
-                    FaviconImage(website: loginUrl, size: 36)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
+                InstitutionLogoImage(institution: inst, size: 36) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color(hex: "#1A7077"))
@@ -2147,6 +2144,7 @@ struct LinkedAccountRow: View {
                             .foregroundStyle(.white)
                     }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(inst.name)

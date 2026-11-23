@@ -11,8 +11,12 @@ struct EditInstitutionSheet: View {
     let isNew: Bool
 
     @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var auth
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @State private var resourceCredentialStatus = "checking"
+    @State private var vaultDraft: InstitutionVaultDraft?
+    @State private var savedMetadata: Institution?
     @State private var isSaving = false
     @State private var saveError: String?
     
@@ -49,10 +53,73 @@ struct EditInstitutionSheet: View {
         )
     }
 
-    private var canAccessCredentials: Bool {
+    private var canEditLegacyCredentials: Bool {
         guard let currentUserId = appState.portfolioUserID else { return false }
         return institution.userId == currentUserId &&
             (isNew || resourceCredentialStatus == "not_ready" || resourceCredentialStatus == "legacy")
+    }
+
+    private var usesOwnerVaultForm: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad && appState.portfolioUserID == institution.userId
+    }
+
+    private var activeVaultDraft: InstitutionVaultDraft? {
+        guard usesOwnerVaultForm, !isViewer, let draft = vaultDraft,
+              auth.isAuthenticated, scenePhase == .active,
+              auth.currentUser?.id == draft.viewerUserID,
+              appState.portfolioUserID == draft.viewerUserID else { return nil }
+        return draft
+    }
+
+    private var canEditLogin: Bool {
+        activeVaultDraft?.canEdit ?? (canEditLegacyCredentials || !usesOwnerVaultForm)
+    }
+
+    private var canEditAccountCredentials: Bool {
+        activeVaultDraft?.canEditAccountCredentials ?? canEditLegacyCredentials
+    }
+
+    private func loginField(_ field: String, legacy: WritableKeyPath<Institution, String?>) -> Binding<String> {
+        Binding {
+            if let draft = activeVaultDraft { return draft.fields[field] ?? "" }
+            guard canEditLegacyCredentials || (field == "login_url" && !usesOwnerVaultForm) else { return "" }
+            let value = institution[keyPath: legacy]
+            return field == "password" ? SecurityService.editableValue(value) : value ?? ""
+        } set: { value in
+            if let draft = activeVaultDraft, draft.canEdit {
+                vaultDraft?.set(field, to: value)
+            } else if canEditLegacyCredentials || (field == "login_url" && !usesOwnerVaultForm) {
+                institution[keyPath: legacy] = value
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func copyCredential(_ field: String, label: String) -> some View {
+        if let value = activeVaultDraft?.fields[field], !value.isEmpty {
+            Button("Copy \(label)", systemImage: "doc.on.doc") {
+                guard let currentValue = activeVaultDraft?.fields[field] else { return }
+                SearchCredentialAccess.copy(currentValue)
+            }
+        }
+    }
+
+    private func receiveCredentials(_ credentials: RevealedResourceCredentials?) {
+        guard let credentials else {
+            guard vaultDraft != nil else { return }
+            vaultDraft = nil
+            showPassword = false
+            showAccountHUD = false
+            accountDraft.accountNumber = nil
+            accountDraft.routingNumber = nil
+            accountDraft.wireRoutingNumber = nil
+            return
+        }
+        guard usesOwnerVaultForm, auth.isAuthenticated, scenePhase == .active,
+              auth.currentUser?.id == institution.userId else { return }
+        vaultDraft = InstitutionVaultDraft(previous: credentials, viewerUserID: institution.userId, canEdit: true)
+        showPassword = true
+        appState.setInstitutionLogoWebsite(credentials.fields["login_url"], for: institution)
     }
 
     @State private var showDeleteConfirm = false
@@ -74,7 +141,8 @@ struct EditInstitutionSheet: View {
 
     private var isDirty: Bool {
         guard let snap = snapshot else { return isNew && !institution.name.trimmingCharacters(in: .whitespaces).isEmpty }
-        return snap != currentSnapshot
+        return snap != currentSnapshot || activeVaultDraft?.hasChanges == true ||
+            (usesOwnerVaultForm && savedMetadata != ResourceSecretPreparation.metadata(for: institution))
     }
 
     private var institutionRelationships: InstitutionRelationships {
@@ -204,6 +272,63 @@ struct EditInstitutionSheet: View {
     @State private var showLoanHUD = false
     @State private var loanDraft: Loan? = nil
 
+    @MainActor
+    private func save() {
+        guard !isSaving, !isViewer else { return }
+        let metadata = ResourceSecretPreparation.metadata(for: institution)
+        let draft = activeVaultDraft
+        // A vault draft can still exist during the transition to a locked scene.
+        guard vaultDraft == nil || draft != nil else { return }
+        let bank = institution
+        let useOwnerVaultForm = usesOwnerVaultForm
+        guard !useOwnerVaultForm || (auth.isAuthenticated && auth.currentUser?.id == bank.userId && scenePhase == .active) else { return }
+        let updateMetadata = metadata != savedMetadata
+        let portfolioUserID = appState.portfolioUserID
+        isSaving = true
+        Task { @MainActor in
+            defer { isSaving = false }
+            var savedVaultEdits = false
+            do {
+                if let draft {
+                    if draft.hasChanges, draft.canEdit {
+                        let saved = try await VaultService.shared.updateOwnerBankCredentials(
+                            id: bank.id, ownerUserID: draft.viewerUserID,
+                            plaintextFields: draft.fields, previous: draft.previous
+                        )
+                        guard appState.portfolioUserID == portfolioUserID,
+                              auth.currentUser?.id == draft.viewerUserID else { return }
+                        appState.setInstitutionLogoWebsite(saved.fields["login_url"], for: bank)
+                        // Keep the verified baseline if the following metadata write fails.
+                        if activeVaultDraft?.previous.ciphertext == draft.previous.ciphertext {
+                            vaultDraft = InstitutionVaultDraft(
+                                previous: saved, viewerUserID: draft.viewerUserID, canEdit: draft.canEdit
+                            )
+                        }
+                        savedVaultEdits = true
+                    }
+                    if updateMetadata {
+                        try await vm.saveInstitutionConfirmed(metadata, appState: appState, useOwnerVaultForm: true)
+                    }
+                } else {
+                    try await vm.saveInstitutionConfirmed(
+                        bank, appState: appState, useOwnerVaultForm: useOwnerVaultForm
+                    )
+                    if useOwnerVaultForm, canEditLegacyCredentials {
+                        appState.setInstitutionLogoWebsite(bank.loginUrl, for: bank)
+                    }
+                }
+                dismiss()
+            } catch {
+                let message = if error is ResourceSecretUpdateError || error is ResourceSecretRevealError {
+                    error.localizedDescription
+                } else {
+                    ResourceSaveFailure.message(for: error, resource: "bank")
+                }
+                saveError = savedVaultEdits ? "Your login details were saved. \(message)" : message
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -217,122 +342,134 @@ struct EditInstitutionSheet: View {
                         ResourceCredentialAccessCard(
                             resourceType: "institution", resourceID: institution.id,
                             ownerUserID: institution.userId,
-                            onStatusChange: { resourceCredentialStatus = $0 }
+                            onStatusChange: { resourceCredentialStatus = $0 },
+                            onOwnerBankCredentialsChange: usesOwnerVaultForm ? receiveCredentials : nil
                         )
                     }
                     
-                    Group {
-                        // ── Card 1: Bank Identity & Login ──────────────
-                        ZifrSheetCard(title: "LOGIN & IDENTITY", icon: "lock.shield") {
-                            VStack(spacing: 16) {
-                                HStack(spacing: 12) {
-                                    ZifrField(
-                                        label: "INSTITUTION",
-                                        placeholder: "e.g. Chase",
-                                        text: Binding(get: { institution.name }, set: { institution.name = $0 })
-                                    )
-                                    ZifrField(
-                                        label: "WEBSITE",
-                                        placeholder: "chase.com",
-                                        text: Binding(get: { institution.loginUrl ?? "" }, set: { institution.loginUrl = $0 }),
-                                        keyboardType: .URL,
-                                        textContentType: .URL
-                                    )
-                                    .textInputAutocapitalization(.never)
-                                }
+                    // ── Card 1: Bank Identity & Login ──────────────
+                    ZifrSheetCard(title: "LOGIN & IDENTITY", icon: "lock.shield") {
+                        VStack(spacing: 16) {
+                            HStack(spacing: 12) {
+                                ZifrField(
+                                    label: "INSTITUTION",
+                                    placeholder: "e.g. Chase",
+                                    text: Binding(get: { institution.name }, set: { institution.name = $0 })
+                                )
+                                .disabled(isViewer)
+                                ZifrField(
+                                    label: "WEBSITE",
+                                    placeholder: "chase.com",
+                                    text: loginField("login_url", legacy: \.loginUrl),
+                                    keyboardType: .URL,
+                                    textContentType: .URL
+                                )
+                                .textInputAutocapitalization(.never)
+                                .disabled(!canEditLogin)
+                                .contextMenu { copyCredential("login_url", label: "Website") }
+                            }
 
-                                if canAccessCredentials {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack(spacing: 12) {
-                                        ZifrAutocompleteField(
-                                            label: "LOGIN ID",
-                                            placeholder: "username",
-                                            text: Binding(
-                                                get: { (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "") },
-                                                set: { newValue in
-                                                    let old = institution.username
-                                                    institution.username = newValue
-                                                    if newValue.contains("@") && ((institution.email ?? "").isEmpty || institution.email == old) {
-                                                        institution.email = newValue
+                            if usesOwnerVaultForm || canEditLegacyCredentials {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        let username = loginField("username", legacy: \.username)
+                                        let email = loginField("email", legacy: \.email)
+                                        HStack(spacing: 12) {
+                                            ZifrAutocompleteField(
+                                                label: "LOGIN ID",
+                                                placeholder: "username",
+                                                text: Binding(
+                                                    get: { username.wrappedValue.isEmpty ? email.wrappedValue : username.wrappedValue },
+                                                    set: { newValue in
+                                                        let old = username.wrappedValue
+                                                        username.wrappedValue = newValue
+                                                        if newValue.contains("@") && (email.wrappedValue.isEmpty || email.wrappedValue == old) {
+                                                            email.wrappedValue = newValue
+                                                        }
                                                     }
+                                                ),
+                                                keyboardType: .emailAddress
+                                            )
+                                            .disabled(!canEditLogin)
+                                            .contextMenu { copyCredential("username", label: "Login ID") }
+
+                                            ZStack(alignment: .bottomTrailing) {
+                                                ZifrField(
+                                                    label: "PASSWORD",
+                                                    placeholder: "••••••••",
+                                                    text: loginField("password", legacy: \.password),
+                                                    isSecure: !showPassword,
+                                                    textContentType: .password
+                                                )
+                                                .textInputAutocapitalization(.never)
+                                                .disabled(!canEditLogin)
+
+                                                if canEditLegacyCredentials || activeVaultDraft != nil {
+                                                    SecretVisibilityToggle(isVisible: $showPassword)
+                                                        .padding(.bottom, 2)
                                                 }
-                                            ),
+                                            }
+                                            .contextMenu { copyCredential("password", label: "Password") }
+                                            if canEditLegacyCredentials && SecurityService.isLockedValue(institution.password) {
+                                                Image(systemName: "lock.trianglebadge.exclamationmark")
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundStyle(Color.gray)
+                                                    .accessibilityLabel("Password locked on this device")
+                                            }
+                                        }
+
+                                        if canEditLegacyCredentials {
+                                            let loginValue = username.wrappedValue.isEmpty ? email.wrappedValue : username.wrappedValue
+                                            DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
+                                        }
+                                    }
+
+                                    HStack(spacing: 12) {
+                                        ZifrField(
+                                            label: "EMAIL",
+                                            placeholder: "name@company.com",
+                                            text: loginField("email", legacy: \.email),
                                             keyboardType: .emailAddress
                                         )
+                                        .textInputAutocapitalization(.never)
+                                        .disabled(!canEditLogin)
+                                        .contextMenu { copyCredential("email", label: "Email") }
 
-                                        ZStack(alignment: .bottomTrailing) {
-                                            ZifrField(
-                                                label: "PASSWORD",
-                                                placeholder: "••••••••",
-                                                text: Binding(get: { SecurityService.editableValue(institution.password) }, set: { institution.password = $0 }),
-                                                isSecure: !showPassword,
-                                                textContentType: .password
-                                            )
-                                            .textInputAutocapitalization(.never)
-
-                                            SecretVisibilityToggle(isVisible: $showPassword)
-                                            .padding(.bottom, 2)
-                                        }
-                                        if SecurityService.isLockedValue(institution.password) {
-                                            Image(systemName: "lock.trianglebadge.exclamationmark")
-                                                .font(.system(size: 14, weight: .semibold))
-                                                .foregroundStyle(Color.gray)
-                                                .accessibilityLabel("Password locked on this device")
-                                        }
+                                        ZifrField(
+                                            label: "2FA",
+                                            placeholder: "Phone or App",
+                                            text: loginField("two_factor", legacy: \.twoFactor)
+                                        )
+                                        .disabled(!canEditLogin)
+                                        .contextMenu { copyCredential("two_factor", label: "2FA") }
                                     }
-                                    
-                                    let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
-                                    DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
-                                }
-                                
-                                HStack(spacing: 12) {
-                                    ZifrField(
-                                        label: "EMAIL",
-                                        placeholder: "name@company.com",
-                                        text: Binding(get: { institution.email ?? "" }, set: { institution.email = $0 }),
-                                        keyboardType: .emailAddress,
-                                        textContentType: .emailAddress
-                                    )
-                                    .textInputAutocapitalization(.never)
-
-                                    ZifrField(
-                                        label: "2FA",
-                                        placeholder: "Phone or App",
-                                        text: Binding(get: { institution.twoFactor ?? "" }, set: { institution.twoFactor = $0 })
-                                    )
-                                }
                                 } else {
-                                    Label {
-                                        Text("Use Secure Credentials above when available. Access is specific to this resource and device.")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.6))
-                                    } icon: {
-                                        Image(systemName: "lock.shield")
-                                            .foregroundStyle(Color(hex: "#C1AA78"))
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .accessibilityElement(children: .combine)
+                                    Label("Use Secure Credentials above when available. Access is specific to this resource and device.", systemImage: "lock.shield")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.6))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }
+                            .privacySensitive()
                         }
 
-                        // ── Card 2: Accounts ───────────────────────────
-                        if canAccessCredentials {
-                        InstitutionAccountsSection(
-                            institution: institution,
-                            vm: vm,
-                            onAdd: {
-                                accountDraft = InstitutionAccount()
-                                accountDraftIndex = nil
-                                showAccountHUD = true
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            },
-                            onEdit: { idx, acc in
-                                accountDraft = acc
-                                accountDraftIndex = idx
-                                showAccountHUD = true
-                            }
-                        )
+                        Group {
+                            // ── Card 2: Accounts ───────────────────────────
+                            if usesOwnerVaultForm || canEditLegacyCredentials {
+                            InstitutionAccountsSection(
+                                institution: $institution,
+                                vm: vm,
+                                onAdd: {
+                                    accountDraft = InstitutionAccount()
+                                    accountDraftIndex = nil
+                                    showAccountHUD = true
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                },
+                                onEdit: { idx, acc in
+                                    accountDraft = activeVaultDraft?.accountForEditing(acc) ?? acc
+                                    accountDraftIndex = idx
+                                    showAccountHUD = true
+                                }
+                            )
                         }
 
                         // ── Card 3: Cards ──────────────────────────────
@@ -547,6 +684,7 @@ struct EditInstitutionSheet: View {
             .disabled(isSaving)
             .onAppear {
                 snapshot = currentSnapshot
+                savedMetadata = ResourceSecretPreparation.metadata(for: institution)
             }
             .navigationTitle(institution.name.isEmpty ? "Institution" : institution.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -565,19 +703,7 @@ struct EditInstitutionSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
-                        Button(isSaving ? "Saving…" : "Save") {
-                            guard !isSaving else { return }
-                            isSaving = true
-                            Task { @MainActor in
-                                defer { isSaving = false }
-                                do {
-                                    try await vm.saveInstitutionConfirmed(institution, appState: appState)
-                                    dismiss()
-                                } catch {
-                                    saveError = ResourceSaveFailure.message(for: error, resource: "bank")
-                                }
-                            }
-                        }
+                        Button(isSaving ? "Saving…" : "Save", action: save)
                         .disabled(isSaving)
                         .fontWeight(.semibold)
                         .tint(isDirty ? .green : nil)
@@ -602,17 +728,32 @@ struct EditInstitutionSheet: View {
                     institutionName: institution.name.isEmpty ? "Institution" : institution.name,
                     institutionId: institution.id,
                     availableCards: appState.cards.filter { $0.companyId == institution.companyId },
+                    canEnterProtectedDetails: !usesOwnerVaultForm || canEditAccountCredentials,
+                    showsWireRoutingNumber: activeVaultDraft != nil,
                     companyId: institution.companyId,
                     vm: vm,
                     onSave: {
+                        var account = accountDraft
+                        if usesOwnerVaultForm {
+                            guard scenePhase == .active, auth.isAuthenticated, auth.currentUser?.id == institution.userId else { return }
+                            if !canEditLegacyCredentials {
+                                if activeVaultDraft?.canEditAccountCredentials == true {
+                                    do { try vaultDraft?.setAccount(account) }
+                                    catch { saveError = error.localizedDescription; return }
+                                }
+                                account.accountNumber = nil
+                                account.routingNumber = nil
+                                account.wireRoutingNumber = nil
+                            }
+                        }
                         var accs = institution.accounts
                         if let idx = accountDraftIndex {
-                            accs[idx] = accountDraft
+                            accs[idx] = account
                         } else {
-                            accs.append(accountDraft)
+                            accs.append(account)
                         }
                         institution.accounts = accs
-                        if !isNew {
+                        if !isNew && !usesOwnerVaultForm {
                             vm.saveInstitution(institution, appState: appState)
                         }
                         showAccountHUD = false
@@ -669,6 +810,75 @@ struct EditInstitutionSheet: View {
             } message: {
                 Text(syncErrorMsg ?? "An unknown error occurred.")
             }
+        }
+    }
+}
+
+/// Plaintext bank details live only in the open bank editor. Every update starts
+/// from the verified full set so editing a website preserves other vault fields.
+struct InstitutionVaultDraft {
+    let previous: RevealedResourceCredentials
+    let viewerUserID: UUID
+    let canEdit: Bool
+    private(set) var fields: [String: String]
+
+    init(previous: RevealedResourceCredentials, viewerUserID: UUID, canEdit: Bool) {
+        self.previous = previous
+        self.viewerUserID = viewerUserID
+        self.canEdit = canEdit
+        fields = previous.fields
+    }
+
+    var hasChanges: Bool { fields != previous.fields }
+    var canEditAccountCredentials: Bool { canEdit && protectedAccounts != nil }
+
+    private var protectedAccounts: [ResourceBankAccountCredentials]? {
+        guard let accounts = fields["accounts_data"] else { return [] }
+        return try? JSONDecoder().decode([ResourceBankAccountCredentials].self, from: Data(accounts.utf8))
+    }
+
+    mutating func set(_ field: String, to value: String) {
+        guard canEdit else { return }
+        fields[field] = value.isEmpty ? nil : value
+    }
+
+    func accountForEditing(_ account: InstitutionAccount) -> InstitutionAccount {
+        let saved = canEditAccountCredentials ? protectedAccounts?.first { $0.id == account.id } : nil
+        var draft = account
+        draft.accountNumber = saved?.accountNumber
+        draft.routingNumber = saved?.routingNumber
+        draft.wireRoutingNumber = saved?.wireRoutingNumber
+        return draft
+    }
+
+    mutating func setAccount(_ account: InstitutionAccount) throws {
+        guard canEdit, let saved = protectedAccounts else { throw ResourceSecretUpdateError.invalidFields }
+        func nonEmpty(_ value: String?) -> String? {
+            guard let value, !value.isEmpty else { return nil }
+            return value
+        }
+        let entry = ResourceBankAccountCredentials(
+            id: account.id,
+            accountNumber: nonEmpty(account.accountNumber),
+            routingNumber: nonEmpty(account.routingNumber),
+            wireRoutingNumber: nonEmpty(account.wireRoutingNumber)
+        )
+        var updated = saved
+        updated.removeAll { $0.id == entry.id }
+        if entry.accountNumber != nil || entry.routingNumber != nil || entry.wireRoutingNumber != nil {
+            if let index = saved.firstIndex(where: { $0.id == entry.id }) {
+                updated.insert(entry, at: index)
+            } else {
+                updated.append(entry)
+            }
+        }
+        guard updated != saved else { return }
+        if updated.isEmpty {
+            fields.removeValue(forKey: "accounts_data")
+        } else {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            fields["accounts_data"] = String(decoding: try encoder.encode(updated), as: UTF8.self)
         }
     }
 }

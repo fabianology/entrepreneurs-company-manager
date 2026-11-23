@@ -225,7 +225,7 @@ final class AppViewModel {
 
     @MainActor
     func saveInstitutionConfirmed(
-        _ institution: Institution, appState: AppState,
+        _ institution: Institution, appState: AppState, useOwnerVaultForm: Bool = false,
         persist: (Institution, Bool) async throws -> Void = { value, exists in
             if exists { try await DataRepository.shared.updateInstitution(value) }
             else { try await DataRepository.shared.insertInstitution(value) }
@@ -235,12 +235,18 @@ final class AppViewModel {
         try requireResourceSaveAccess(ownerID: institution.userId, companyID: institution.companyId,
             type: "institution", id: institution.id, exists: exists, appState: appState)
         let actorID = appState.portfolioUserID
-        try await persist(institution, exists)
+        let saved: Institution
+        if useOwnerVaultForm {
+            saved = try await DataRepository.shared.saveOwnerBankFromForm(institution, insert: !exists)
+        } else {
+            try await persist(institution, exists)
+            saved = institution
+        }
         guard appState.portfolioUserID == actorID else { throw CancellationError() }
         if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
-            appState.institutions[index] = institution
+            appState.institutions[index] = saved
         } else {
-            appState.institutions.append(institution)
+            appState.institutions.append(saved)
         }
     }
 
@@ -262,7 +268,10 @@ final class AppViewModel {
     }
 
     @MainActor
-    func saveFinancialInstitutionCascade(institution: Institution, cards: [FinancialCard], loans: [Loan], appState: AppState) async throws {
+    func saveFinancialInstitutionCascade(
+        institution: Institution, cards: [FinancialCard], loans: [Loan], appState: AppState,
+        onOwnerBankSaved: ((Institution) -> Void)? = nil
+    ) async throws {
         guard canEdit(companyId: institution.companyId, resourceType: "company", resourceId: institution.companyId, appState: appState) else {
             throw NSError(
                 domain: "AppViewModel",
@@ -271,13 +280,23 @@ final class AppViewModel {
             )
         }
 
+        if let onOwnerBankSaved {
+            try await saveInstitutionConfirmed(institution, appState: appState, useOwnerVaultForm: true)
+            if let saved = appState.institutions.first(where: { $0.id == institution.id }) {
+                onOwnerBankSaved(saved)
+            }
+        }
+
+        let actorID = appState.portfolioUserID
         let originalInstitutions = appState.institutions
         let originalCards = appState.cards
         let originalLoans = appState.loans
-        if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
-            appState.institutions[index] = institution
-        } else {
-            appState.institutions.append(institution)
+        if onOwnerBankSaved == nil {
+            if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
+                appState.institutions[index] = institution
+            } else {
+                appState.institutions.append(institution)
+            }
         }
         for card in cards {
             if let index = appState.cards.firstIndex(where: { $0.id == card.id }) {
@@ -295,7 +314,9 @@ final class AppViewModel {
         }
 
         do {
-            try await DataRepository.shared.upsertInstitution(institution)
+            if onOwnerBankSaved == nil {
+                try await DataRepository.shared.upsertInstitution(institution)
+            }
             for card in cards {
                 try await DataRepository.shared.upsertCard(card)
             }
@@ -306,6 +327,7 @@ final class AppViewModel {
                 }
             }
         } catch {
+            guard appState.portfolioUserID == actorID else { throw CancellationError() }
             appState.institutions = originalInstitutions
             appState.cards = originalCards
             appState.loans = originalLoans

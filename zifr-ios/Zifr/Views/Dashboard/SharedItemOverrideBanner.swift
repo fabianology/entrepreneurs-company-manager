@@ -87,6 +87,7 @@ struct ResourceCredentialAccessCard: View {
     let resourceID: UUID
     let ownerUserID: UUID
     var onStatusChange: ((String) -> Void)? = nil
+    var onOwnerBankCredentialsChange: ((RevealedResourceCredentials?) -> Void)? = nil
 
     @Environment(AuthViewModel.self) private var authVM
     @Environment(AppState.self) private var appState
@@ -148,8 +149,16 @@ struct ResourceCredentialAccessCard: View {
         }
     }
 
+    private var ownerBankPresentation: UUID? {
+        guard onOwnerBankCredentialsChange != nil, scenePhase == .active,
+              authVM.isAuthenticated, authVM.currentUser?.id == ownerUserID,
+              appState.portfolioUserID == ownerUserID else { return nil }
+        return resourceID
+    }
+
     var body: some View {
-        if let status, status != "not_ready", status != "unavailable" {
+        if let status, status != "not_ready", status != "unavailable",
+           !(status == "ready" && onOwnerBankCredentialsChange != nil) {
             ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
                 VStack(alignment: .leading, spacing: 14) {
                     switch status {
@@ -294,8 +303,20 @@ struct ResourceCredentialAccessCard: View {
         // Keep the whole card absent on older backends and for unactivated
         // collaborator keys. Only the owner sees the activation action.
         Color.clear.frame(height: 0)
-            .task(id: resourceID) { await loadStatus() }
-            .onDisappear { clearPlaintext() }
+            .task(id: onOwnerBankCredentialsChange == nil ? resourceID : ownerBankPresentation) {
+                guard onOwnerBankCredentialsChange == nil || ownerBankPresentation != nil else { return }
+                await loadStatus()
+            }
+            .onDisappear {
+                clearPlaintext()
+                onOwnerBankCredentialsChange?(nil)
+            }
+            .onChange(of: ownerBankPresentation) { _, presentation in
+                if presentation == nil, onOwnerBankCredentialsChange != nil {
+                    clearPlaintext()
+                    onOwnerBankCredentialsChange?(nil)
+                }
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
                     // Face ID temporarily makes the app inactive. Clear visible
@@ -393,9 +414,23 @@ struct ResourceCredentialAccessCard: View {
     private func loadStatus() async {
         let token = operationID
         do {
-            let result = try await VaultService.shared.resourceSecretAccessStatus(
-                type: resourceType, id: resourceID
-            )
+            let result: String
+            if let onOwnerBankCredentialsChange {
+                guard ownerBankPresentation != nil else { return }
+                result = try await VaultService.shared.ownerBankCredentialStatus(id: resourceID, ownerUserID: ownerUserID)
+                if result == "ready" {
+                    let credentials = try await VaultService.shared.readOwnerBankCredentials(id: resourceID, ownerUserID: ownerUserID)
+                    guard !Task.isCancelled, token == operationID, ownerBankPresentation != nil else { return }
+                    onOwnerBankCredentialsChange(credentials)
+                } else {
+                    guard !Task.isCancelled, token == operationID, ownerBankPresentation != nil else { return }
+                    onOwnerBankCredentialsChange(nil)
+                }
+            } else {
+                result = try await VaultService.shared.resourceSecretAccessStatus(
+                    type: resourceType, id: resourceID
+                )
+            }
             guard !Task.isCancelled, token == operationID else { return }
             status = result
             onStatusChange?(result)
@@ -403,6 +438,7 @@ struct ResourceCredentialAccessCard: View {
             if result != "ready" { plaintextFields.removeAll() }
         } catch {
             guard !Task.isCancelled, token == operationID else { return }
+            onOwnerBankCredentialsChange?(nil)
             // A missing RPC means this build is talking to an older backend.
             status = "unavailable"
             if error.localizedDescription.contains("PGRST202") {

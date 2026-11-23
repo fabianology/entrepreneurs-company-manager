@@ -204,10 +204,55 @@ struct SectionHeader: View {
     }
 }
 
+struct InstitutionLogoImage<Fallback: View>: View {
+    let institution: Institution
+    let size: CGFloat
+    @ViewBuilder let fallback: () -> Fallback
+
+    @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var auth: AuthViewModel?
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var canLoadVaultWebsite: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad &&
+        scenePhase == .active && auth?.isAuthenticated == true &&
+        auth?.currentUser?.id == institution.userId && appState.portfolioUserID == institution.userId
+    }
+
+    private var lookupBankID: UUID? {
+        canLoadVaultWebsite && appState.hasLoadedPortfolio ? institution.id : nil
+    }
+
+    var body: some View {
+        let logo = appState.institutionLogo(for: institution, allowVaultWebsite: canLoadVaultWebsite)
+        Group {
+            if let host = logo.host {
+                FaviconImage(website: host, size: size, usesEphemeralSession: logo.fromVault)
+            } else {
+                fallback()
+            }
+        }
+        .task(id: lookupBankID) {
+            guard lookupBankID != nil else { return }
+            appState.loadInstitutionLogoWebsiteIfNeeded(for: institution)
+        }
+    }
+}
+
 struct FaviconImage: View {
     let website: String
     var size: CGFloat = 32
     var fallbackInitial: String? = nil
+    var usesEphemeralSession = false
+
+    @State private var fetchedImage: (URL, UIImage)?
+    private static let ephemeralSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        configuration.urlCredentialStorage = nil
+        return URLSession(configuration: configuration)
+    }()
 
     private var cleanDomain: String {
         var str = website.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -227,21 +272,29 @@ struct FaviconImage: View {
 
     private var faviconURL: URL? {
         guard !cleanDomain.isEmpty else { return nil }
-        return URL(string: "https://www.google.com/s2/favicons?domain=\(cleanDomain)&sz=256")
+        var components = URLComponents(string: "https://www.google.com/s2/favicons")
+        components?.queryItems = [
+            URLQueryItem(name: "domain", value: cleanDomain),
+            URLQueryItem(name: "sz", value: "256")
+        ]
+        return components?.url
     }
 
     var body: some View {
         ZStack {
             if let url = faviconURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable()
-                            .scaledToFit()
-                            .frame(width: size, height: size)
-                            .clipShape(RoundedRectangle(cornerRadius: max(4, size * 0.2)))
-                    default:
+                if usesEphemeralSession {
+                    if let (loadedURL, image) = fetchedImage, loadedURL == url {
+                        favicon(Image(uiImage: image))
+                    } else {
                         globeFallback
+                    }
+                } else {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image): favicon(image)
+                        default: globeFallback
+                        }
                     }
                 }
             } else {
@@ -249,6 +302,21 @@ struct FaviconImage: View {
             }
         }
         .frame(width: size, height: size)
+        .task(id: usesEphemeralSession ? faviconURL : nil) {
+            fetchedImage = nil
+            guard usesEphemeralSession, let url = faviconURL,
+                  let (data, response) = try? await Self.ephemeralSession.data(from: url),
+                  !Task.isCancelled, (response as? HTTPURLResponse)?.statusCode == 200,
+                  let image = UIImage(data: data) else { return }
+            fetchedImage = (url, image)
+        }
+    }
+
+    private func favicon(_ image: Image) -> some View {
+        image.resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: max(4, size * 0.2)))
     }
 
     private var globeFallback: some View {

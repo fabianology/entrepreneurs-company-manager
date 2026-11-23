@@ -19,11 +19,40 @@ enum ShareInviteResult {
 }
 
 /// Safe form copy: an interrupted response does not prove a remote rollback.
+enum ProtectedResourceSaveError: LocalizedError {
+    case vaultAccessRequired
+    case ownerRequired
+    case rotationPending
+    case backendUpdateRequired
+
+    var errorDescription: String? {
+        switch self {
+        case .vaultAccessRequired:
+            "Set up Password Vault or get access on this device to save these credentials. Your draft is still here."
+        case .ownerRequired:
+            "Ask the owner to save the first credentials for this item. Your draft is still here."
+        case .rotationPending:
+            "Finish securing your vault in Password Vault settings, then try again. Your draft is still here."
+        case .backendUpdateRequired:
+            "This server needs the Password Vault update before it can save credentials. Your draft is still here."
+        }
+    }
+}
+
 enum ResourceSaveFailure {
     static func message(for error: Error, resource: String) -> String {
         // These app-owned errors already distinguish stale ledgers and access
         // denial safely; never flatten their specific recovery instructions.
         if let loanError = error as? LoanSaveError { return loanError.localizedDescription }
+        if let error = error as? ProtectedResourceSaveError { return error.localizedDescription }
+        if let error = error as? ResourceSecretPreparationError { return error.localizedDescription }
+        switch (error as? PostgrestError)?.message {
+        case "LEGACY_CREDENTIALS_REQUIRE_CONVERSION":
+            return "Move this bank’s existing login details to Password Vault before editing them. Your draft is still here."
+        case "RESOURCE_SECRET_CHANGED", "RESOURCE_SECRET_SOURCE_CHANGED":
+            return "This bank’s login details changed. Reopen the bank to check its current details."
+        default: break
+        }
         let code = (error as? PostgrestError)?.code
         let local = error as NSError
         if code == "42501" || ((local.domain == "ResourceSave" || local.domain == "DataRepository") && local.code == 403) {
@@ -849,8 +878,41 @@ class DataRepository {
         }
     }
 
+    /// iPad owner form saves keep first credentials and bank metadata atomic.
+    func saveOwnerBankFromForm(_ bank: Institution, insert: Bool) async throws -> Institution {
+        let session = try await client.auth.session
+        guard session.user.id == bank.userId else { throw ProtectedResourceSaveError.ownerRequired }
+        let stored = insert ? nil : try await fetchVisibleInstitutions().first { $0.id == bank.id }
+        let original = stored.map(decryptInstitutionSecrets)
+        let record = ResourceSecretPreparation.metadata(for: bank)
+        if let candidate = try ResourceSecretPreparation.candidate(for: bank, snapshot: nil, comparedTo: original) {
+            let snapshot = try await VaultService.shared.requireProtectedSaveAccess(for: bank.userId)
+            try await VaultService.shared.saveProtected(
+                candidate, record: record, insert: insert, snapshot: snapshot,
+                legacyWebsiteDigest: candidate.legacyWebsiteDigest(matching: stored?.loginUrl)
+            )
+            return record
+        }
+        if insert {
+            try await client.from("institutions").insert(record).execute()
+        } else {
+            let preserved = preservingStoredInstitutionSecrets(in: record, from: stored)
+            let rows: [MutationReceipt] = try await client.from("institutions")
+                .update(preserved).eq("id", value: bank.id).select("id").execute().value
+            try requireUpdatedRow(rows, resource: "bank")
+        }
+        return bank
+    }
+
     private func preservingStoredInstitutionSecrets(in proposed: Institution) async throws -> Institution {
-        guard let stored = try await fetchVisibleInstitutions().first(where: { $0.id == proposed.id }) else { return proposed }
+        let stored = try await fetchVisibleInstitutions().first { $0.id == proposed.id }
+        return preservingStoredInstitutionSecrets(in: proposed, from: stored)
+    }
+
+    private func preservingStoredInstitutionSecrets(
+        in proposed: Institution, from stored: Institution?
+    ) -> Institution {
+        guard let stored else { return proposed }
         let storedAccounts = stored.accounts.reduce(into: [String: InstitutionAccount]()) { result, account in
             if result[account.id] == nil { result[account.id] = account }
         }
@@ -2198,6 +2260,14 @@ final class VaultKeySession: @unchecked Sendable {
         return current
     }
 
+    func discard(for userID: UUID, keyVersion: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        if current?.userID == userID, current?.keyVersion == keyVersion {
+            current = nil
+        }
+    }
+
     func clear() {
         lock.lock()
         current = nil
@@ -2415,6 +2485,12 @@ struct ResourceSecretAccessStatus: Decodable {
     let status: String
 }
 
+struct RevealedResourceCredentials {
+    let fields: [String: String]
+    let keyVersion: Int
+    let ciphertext: [String: String]
+}
+
 enum ResourceSecretRevealError: LocalizedError {
     case deviceNeedsApproval
     case unavailable
@@ -2435,11 +2511,17 @@ enum ResourceSecretRevealError: LocalizedError {
 enum ResourceSecretUpdateError: LocalizedError {
     case invalidFields
     case verificationUnavailable
+    case changed
+    case accessChanged
 
     var errorDescription: String? {
         switch self {
         case .invalidFields:
             return "These credential fields could not be saved safely. Nothing was changed."
+        case .changed:
+            return "The saved credentials changed while you were editing. Reopen them to see the latest version."
+        case .accessChanged:
+            return "Your credential access changed. Check with the owner before trying again."
         case .verificationUnavailable:
             return "The server accepted the change, but this device couldn't confirm the readback. Refresh this resource before trying again."
         }
@@ -2470,6 +2552,14 @@ struct ResourceSecretPreparationCandidate {
     let resourceType: String
     let resourceID: UUID
     let plaintextFields: [String: String]
+
+    func legacyWebsiteDigest(matching storedWebsite: String?) -> String? {
+        guard resourceType == "institution", let storedWebsite, !storedWebsite.isEmpty,
+              let website = plaintextFields["login_url"],
+              website.utf8.elementsEqual(storedWebsite.utf8) else { return nil }
+        return SHA256.hash(data: Data(storedWebsite.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+    }
 }
 
 struct ResourceSecretPreparationReport {
@@ -2532,7 +2622,7 @@ enum ResourceSecretActivationError: LocalizedError {
     }
 }
 
-private struct ResourceBankAccountCredentials: Codable, Equatable {
+struct ResourceBankAccountCredentials: Codable, Equatable {
     let id: String
     let accountNumber: String?
     let routingNumber: String?
@@ -2540,15 +2630,33 @@ private struct ResourceBankAccountCredentials: Codable, Equatable {
 }
 
 enum ResourceSecretPreparation {
+    static func metadata(for original: Institution) -> Institution {
+        var record = original
+        record.loginUrl = nil
+        record.username = nil
+        record.email = nil
+        record.password = nil
+        record.twoFactor = nil
+        record.accounts = original.accounts.map { value in
+            var account = value
+            account.accountNumber = nil
+            account.routingNumber = nil
+            account.wireRoutingNumber = nil
+            return account
+        }
+        return record
+    }
+
+
     // Never re-encrypt an unreadable legacy envelope as if its literal bytes
     // were a password. Leave the entire resource unchanged for owner review.
     static func verifiedPlaintext(
-        _ value: String?, snapshot: VaultKeySession.Snapshot,
+        _ value: String?, snapshot: VaultKeySession.Snapshot?,
         storedResourceType: String, resourceID: UUID, fieldName: String
     ) throws -> String? {
         guard let value, !value.isEmpty else { return nil }
         if value.hasPrefix("miloom:") {
-            guard let version = VaultCryptography.fieldKeyVersion(in: value),
+            guard let snapshot, let version = VaultCryptography.fieldKeyVersion(in: value),
                   let key = snapshot.key(for: version) else {
                 throw ResourceSecretPreparationError.lockedValue
             }
@@ -2567,7 +2675,7 @@ enum ResourceSecretPreparation {
             }
             return plaintext
         }
-        if value.hasPrefix("miloom-resource:") {
+        if value.hasPrefix("miloom-resource:") || SecurityService.isLockedValue(value) {
             throw ResourceSecretPreparationError.lockedValue
         }
         return value
@@ -2616,14 +2724,38 @@ enum ResourceSecretPreparation {
     }
 
     static func candidate(
-        for institution: Institution, snapshot: VaultKeySession.Snapshot
+        for institution: Institution, snapshot: VaultKeySession.Snapshot?, comparedTo previous: Institution? = nil
     ) throws -> ResourceSecretPreparationCandidate? {
+        let previousAccounts = (previous?.accounts ?? []).reduce(into: [String: InstitutionAccount]()) {
+            if $0[$1.id] == nil { $0[$1.id] = $1 }
+        }
+        func changed(_ value: String?, _ original: String?) -> Bool {
+            guard let value, !value.isEmpty else { return false }
+            return value != original
+        }
+        if let previous {
+            let loginChanged = changed(institution.loginUrl, previous.loginUrl)
+                || changed(institution.username, previous.username)
+                || changed(institution.email, previous.email)
+                || changed(institution.password, previous.password)
+                || changed(institution.twoFactor, previous.twoFactor)
+            let accountChanged = institution.accounts.contains { account in
+                let original = previousAccounts[account.id]
+                return changed(account.accountNumber, original?.accountNumber)
+                    || changed(account.routingNumber, original?.routingNumber)
+                    || changed(account.wireRoutingNumber, original?.wireRoutingNumber)
+            }
+            guard loginChanged || accountChanged else { return nil }
+        }
+
         var fields: [String: String] = [:]
         func include(_ name: String, _ value: String?) throws {
             if let plaintext = try verifiedPlaintext(
                 value, snapshot: snapshot, storedResourceType: "institution",
                 resourceID: institution.id, fieldName: name
-            ) { fields[name] = plaintext }
+            ) {
+                fields[name] = plaintext
+            }
         }
         try include("login_url", institution.loginUrl)
         try include("username", institution.username)
@@ -2709,6 +2841,75 @@ struct VaultRotationResult {
 
 final class VaultService: @unchecked Sendable {
     static let shared = VaultService()
+
+    func requireProtectedSaveAccess(for userID: UUID) async throws -> VaultKeySession.Snapshot {
+        if VaultKeySession.shared.snapshot(for: userID) == nil {
+            await restoreSessionIfAvailable(for: userID)
+        }
+        guard let snapshot = VaultKeySession.shared.snapshot(for: userID) else {
+            throw ProtectedResourceSaveError.vaultAccessRequired
+        }
+        return snapshot
+    }
+
+    private struct ProtectedSaveParams<Record: Encodable>: Encodable {
+        let p_resource_type: String?
+        let p_record: Record
+        let p_insert: Bool?
+        let p_owner_account_key_version: Int
+        let p_owner_wrapped_resource_key: String
+        let p_encrypted_fields: [String: String]
+        let p_actor_device_id: UUID
+        let p_key_confirmation: String
+        let p_expected_legacy_website_digest: String?
+    }
+
+    func saveProtected<Record: Encodable>(
+        _ candidate: ResourceSecretPreparationCandidate, record: Record, insert: Bool,
+        snapshot: VaultKeySession.Snapshot, legacyWebsiteDigest: String? = nil
+    ) async throws {
+        let session = try await client.auth.refreshSession()
+        guard session.user.id == snapshot.userID else { throw CancellationError() }
+        let resource = ResourceKeyContext(
+            ownerUserID: snapshot.userID, resourceType: candidate.resourceType,
+            resourceID: candidate.resourceID, keyVersion: 1
+        )
+        let resourceKey = SymmetricKey(size: .bits256)
+        let ownerContext = ResourceOwnerWrapContext(resource: resource, accountKeyVersion: snapshot.keyVersion)
+        let wrap = try VaultCryptography.wrapResourceKeyForOwner(resourceKey, using: snapshot.key, context: ownerContext)
+        let readbackKey = try VaultCryptography.unwrapResourceKeyForOwner(wrap, using: snapshot.key, context: ownerContext)
+        var encrypted: [String: String] = [:]
+        for (field, plaintext) in candidate.plaintextFields {
+            let context = ResourceSecretFieldContext(resource: resource, fieldName: field)
+            let envelope = try VaultCryptography.encryptResourceSecret(plaintext, using: resourceKey, context: context)
+            guard try VaultCryptography.decryptResourceSecret(envelope, using: readbackKey, context: context) == plaintext else {
+                throw ResourceSecretPreparationError.verificationFailed
+            }
+            encrypted[field] = envelope
+        }
+        let usesLegacyWebsite = legacyWebsiteDigest != nil
+        let rpc = usesLegacyWebsite
+            ? "miloom_save_owned_bank_with_legacy_website" : "miloom_save_owned_protected_resource"
+        do {
+            try await client.rpc(rpc, params: ProtectedSaveParams(
+                p_resource_type: usesLegacyWebsite ? nil : resource.resourceType,
+                p_record: record, p_insert: usesLegacyWebsite ? nil : insert,
+                p_owner_account_key_version: snapshot.keyVersion, p_owner_wrapped_resource_key: wrap,
+                p_encrypted_fields: encrypted, p_actor_device_id: snapshot.deviceID,
+                p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key),
+                p_expected_legacy_website_digest: legacyWebsiteDigest
+            )).execute()
+        } catch let error as PostgrestError where error.code == "PGRST202" {
+            throw ProtectedResourceSaveError.backendUpdateRequired
+        } catch let error as PostgrestError where error.message == "TRUSTED_OWNER_DEVICE_REQUIRED" {
+            if (try? await overview())?.metadata?.rotationStatus == "migrating" {
+                throw ProtectedResourceSaveError.rotationPending
+            }
+            VaultKeySession.shared.discard(for: snapshot.userID, keyVersion: snapshot.keyVersion)
+            throw ProtectedResourceSaveError.vaultAccessRequired
+        }
+    }
+
 
     private var client: SupabaseClient { SupabaseService.shared.client }
 
@@ -3390,18 +3591,60 @@ final class VaultService: @unchecked Sendable {
         catch { throw ResourceSecretRevealError.invalidSecret }
     }
 
-    /// The caller sends the complete edited field set; only resource-bound
-    /// ciphertext crosses the network. Optimistic compare rejects stale edits.
+    func ownerBankCredentialStatus(id: UUID, ownerUserID: UUID) async throws -> String {
+        let session = try await client.auth.session
+        guard session.user.id == ownerUserID else { throw CancellationError() }
+        await restoreSessionIfAvailable(for: ownerUserID)
+        return try await resourceSecretAccessStatus(type: "institution", id: id)
+    }
+
+    func readOwnerBankCredentials(id: UUID, ownerUserID: UUID) async throws -> RevealedResourceCredentials {
+        let material = try await loadResourceSecretMaterial(
+            type: "institution", id: id, expectedOwnerUserID: ownerUserID, expectedViewerUserID: ownerUserID
+        )
+        do {
+            return try RevealedResourceCredentials(
+                fields: material.plaintextFields(), keyVersion: material.resource.keyVersion,
+                ciphertext: material.encryptedFields
+            )
+        } catch { throw ResourceSecretRevealError.invalidSecret }
+    }
+
     func updateResourceSecret(
-        type: String, id: UUID, expectedOwnerUserID: UUID,
-        plaintextFields: [String: String]
+        type: String, id: UUID, expectedOwnerUserID: UUID, plaintextFields: [String: String]
     ) async throws {
         try await confirmResourceSecretPresence(
             reason: "Save the encrypted credentials for this Miloom resource."
         )
-        let material = try await loadResourceSecretMaterial(
-            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
+        _ = try await updateResourceSecret(
+            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID, expectedViewerUserID: nil,
+            plaintextFields: plaintextFields, previous: nil
         )
+    }
+
+    func updateOwnerBankCredentials(
+        id: UUID, ownerUserID: UUID, plaintextFields: [String: String], previous: RevealedResourceCredentials
+    ) async throws -> RevealedResourceCredentials {
+        try await updateResourceSecret(
+            type: "institution", id: id, expectedOwnerUserID: ownerUserID, expectedViewerUserID: ownerUserID,
+            plaintextFields: plaintextFields, previous: previous
+        )
+    }
+
+    /// The caller sends the complete edited field set; only resource-bound
+    /// ciphertext crosses the network. Optimistic compare rejects stale edits.
+    private func updateResourceSecret(
+        type: String, id: UUID, expectedOwnerUserID: UUID, expectedViewerUserID: UUID?,
+        plaintextFields: [String: String], previous: RevealedResourceCredentials?
+    ) async throws -> RevealedResourceCredentials {
+        let material = try await loadResourceSecretMaterial(
+            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID,
+            expectedViewerUserID: expectedViewerUserID
+        )
+        if let previous, previous.keyVersion != material.resource.keyVersion
+            || previous.ciphertext != material.encryptedFields {
+            throw ResourceSecretUpdateError.changed
+        }
         let allowed: Set<String>
         switch type {
         case "institution":
@@ -3413,7 +3656,7 @@ final class VaultService: @unchecked Sendable {
         default:
             throw ResourceSecretUpdateError.invalidFields
         }
-        guard !plaintextFields.isEmpty,
+        guard previous != nil || !plaintextFields.isEmpty,
               Set(plaintextFields.keys).isSubset(of: allowed),
               !plaintextFields.values.contains(where: { $0.isEmpty }) else {
             throw ResourceSecretUpdateError.invalidFields
@@ -3427,7 +3670,12 @@ final class VaultService: @unchecked Sendable {
         let oldPlaintext: [String: String]
         do { oldPlaintext = try material.plaintextFields() }
         catch { throw ResourceSecretRevealError.invalidSecret }
-        if oldPlaintext == plaintextFields { return }
+        if oldPlaintext == plaintextFields {
+            return RevealedResourceCredentials(
+                fields: oldPlaintext, keyVersion: material.resource.keyVersion,
+                ciphertext: material.encryptedFields
+            )
+        }
 
         var encrypted: [String: String] = [:]
         for (field, value) in plaintextFields {
@@ -3444,24 +3692,71 @@ final class VaultService: @unchecked Sendable {
             let p_new_encrypted_fields: [String: String]
             let p_actor_device_id: UUID
         }
-        try await client.rpc("miloom_update_resource_secret", params: Params(
-            p_resource_type: type, p_resource_id: id,
-            p_key_version: material.resource.keyVersion,
-            p_expected_encrypted_fields: material.encryptedFields,
-            p_new_encrypted_fields: encrypted,
-            p_actor_device_id: material.deviceID
-        )).execute()
+        do {
+            try await client.rpc("miloom_update_resource_secret", params: Params(
+                p_resource_type: type, p_resource_id: id,
+                p_key_version: material.resource.keyVersion,
+                p_expected_encrypted_fields: material.encryptedFields,
+                p_new_encrypted_fields: encrypted,
+                p_actor_device_id: material.deviceID
+            )).execute()
+        } catch let error as PostgrestError where error.message == "RESOURCE_SECRET_CHANGED" {
+            throw ResourceSecretUpdateError.changed
+        } catch let error as PostgrestError where error.message == "RESOURCE_SECRET_ACCESS_NOT_GRANTED" {
+            throw ResourceSecretUpdateError.accessChanged
+        }
         do {
             let readback = try await loadResourceSecretMaterial(
-                type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
+                type: type, id: id, expectedOwnerUserID: expectedOwnerUserID,
+                expectedViewerUserID: expectedViewerUserID
             )
             guard readback.resource.keyVersion == material.resource.keyVersion,
                   readback.encryptedFields == encrypted,
                   try readback.plaintextFields() == plaintextFields else {
                 throw ResourceSecretUpdateError.verificationUnavailable
             }
+            return RevealedResourceCredentials(
+                fields: plaintextFields, keyVersion: readback.resource.keyVersion,
+                ciphertext: readback.encryptedFields
+            )
         } catch {
             throw ResourceSecretUpdateError.verificationUnavailable
+        }
+    }
+
+    /// Logos use only the saved website's validated hostname. Reading a logo
+    /// never loads the rest of the bank's plaintext credentials into the UI.
+    func institutionLogoWebsiteHost(id: UUID, ownerUserID: UUID) async throws -> String? {
+        let session = try await client.auth.session
+        guard session.user.id == ownerUserID else { throw CancellationError() }
+        let snapshot = try requireSnapshot(for: ownerUserID)
+        guard let material = try await ownerResourceSecretMaterial(type: "institution", id: id, snapshot: snapshot),
+              let ciphertext = material.encryptedFields["login_url"] else { return nil }
+        let website = try material.plaintext(ciphertext, field: "login_url")
+        return SearchBrand.websiteURL(website)?.host
+    }
+
+    private func ownerResourceSecretMaterial(
+        type: String, id: UUID, snapshot: VaultKeySession.Snapshot
+    ) async throws -> ResourceSecretMaterial? {
+        guard let record = try await ownerResourceSecret(type: type, id: id, snapshot: snapshot),
+              record.state == "active" else { return nil }
+        do {
+            guard let accountKey = snapshot.key(for: record.ownerAccountKeyVersion) else {
+                throw ResourceSecretRevealError.invalidSecret
+            }
+            let resource = ResourceKeyContext(
+                ownerUserID: snapshot.userID, resourceType: type, resourceID: id, keyVersion: record.keyVersion
+            )
+            let key = try VaultCryptography.unwrapResourceKeyForOwner(
+                record.ownerWrappedResourceKey, using: accountKey,
+                context: ResourceOwnerWrapContext(resource: resource, accountKeyVersion: record.ownerAccountKeyVersion)
+            )
+            return ResourceSecretMaterial(
+                resource: resource, key: key, deviceID: snapshot.deviceID, encryptedFields: record.encryptedFields
+            )
+        } catch {
+            throw ResourceSecretRevealError.invalidSecret
         }
     }
 
@@ -3471,51 +3766,33 @@ final class VaultService: @unchecked Sendable {
         let deviceID: UUID
         let encryptedFields: [String: String]
 
+        func plaintext(_ ciphertext: String, field: String) throws -> String {
+            try VaultCryptography.decryptResourceSecret(
+                ciphertext, using: key,
+                context: ResourceSecretFieldContext(resource: resource, fieldName: field)
+            )
+        }
+
         func plaintextFields() throws -> [String: String] {
             var result: [String: String] = [:]
             for (field, ciphertext) in encryptedFields {
-                result[field] = try VaultCryptography.decryptResourceSecret(
-                    ciphertext, using: key,
-                    context: ResourceSecretFieldContext(resource: resource, fieldName: field)
-                )
+                result[field] = try plaintext(ciphertext, field: field)
             }
             return result
         }
     }
 
     private func loadResourceSecretMaterial(
-        type: String, id: UUID, expectedOwnerUserID: UUID
+        type: String, id: UUID, expectedOwnerUserID: UUID, expectedViewerUserID: UUID? = nil
     ) async throws -> ResourceSecretMaterial {
         let session = try await client.auth.refreshSession()
+        if let expectedViewerUserID, session.user.id != expectedViewerUserID { throw CancellationError() }
         if session.user.id == expectedOwnerUserID {
             let snapshot = try requireSnapshot(for: session.user.id)
-            guard let record = try await ownerResourceSecret(
-                type: type, id: id, snapshot: snapshot
-            ), record.state == "active", !record.encryptedFields.isEmpty else {
+            guard let material = try await ownerResourceSecretMaterial(type: type, id: id, snapshot: snapshot) else {
                 throw ResourceSecretRevealError.unavailable
             }
-            do {
-                guard let accountKey = snapshot.key(for: record.ownerAccountKeyVersion) else {
-                    throw ResourceSecretRevealError.invalidSecret
-                }
-                let resource = ResourceKeyContext(
-                    ownerUserID: session.user.id, resourceType: type,
-                    resourceID: id, keyVersion: record.keyVersion
-                )
-                let key = try VaultCryptography.unwrapResourceKeyForOwner(
-                    record.ownerWrappedResourceKey, using: accountKey,
-                    context: ResourceOwnerWrapContext(
-                        resource: resource,
-                        accountKeyVersion: record.ownerAccountKeyVersion
-                    )
-                )
-                return ResourceSecretMaterial(
-                    resource: resource, key: key, deviceID: snapshot.deviceID,
-                    encryptedFields: record.encryptedFields
-                )
-            } catch {
-                throw ResourceSecretRevealError.invalidSecret
-            }
+            return material
         }
 
         let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: session.user.id)

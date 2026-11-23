@@ -260,10 +260,7 @@ struct StackedInstitutionDeckView: View {
 
         return HStack(alignment: .center, spacing: 16) {
             // Logo
-            if let loginUrl = inst.loginUrl, !loginUrl.isEmpty {
-                FaviconImage(website: loginUrl, size: 40)
-                    .frame(width: 56, height: 56)
-            } else {
+            InstitutionLogoImage(institution: inst, size: 40) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color.white.opacity(0.06))
@@ -277,7 +274,8 @@ struct StackedInstitutionDeckView: View {
                         .foregroundStyle(Color.white.opacity(0.8))
                 }
             }
-            
+            .frame(width: 56, height: 56)
+
             VStack(alignment: .leading, spacing: 6) {
                 // Name with health dot
                 Text(inst.name.isEmpty ? "Bank" : inst.name)

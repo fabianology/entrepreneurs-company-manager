@@ -12,6 +12,12 @@ struct AddFinancialWizard: View {
     
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var auth
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var usesOwnerBankVault: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad && appState.portfolioUserID == institution.userId
+    }
 
     @State private var currentStep: Int = 1
     @State private var completedSteps: Set<Int> = []
@@ -241,6 +247,8 @@ struct AddFinancialWizard: View {
 
     private func saveAllAndDismiss() {
         guard !isSaving else { return }
+        let useOwnerBankVault = usesOwnerBankVault
+        guard !useOwnerBankVault || (auth.isAuthenticated && auth.currentUser?.id == institution.userId && scenePhase == .active) else { return }
 
         // Prepare the institution and its accounts
         var instToSave = institution
@@ -264,11 +272,19 @@ struct AddFinancialWizard: View {
         isSaving = true
         Task {
             do {
+                let ownerBankSaved: ((Institution) -> Void)? = useOwnerBankVault ? { saved in
+                    institution = saved
+                    accounts = saved.accounts
+                    if let website = instToSave.loginUrl {
+                        appState.setInstitutionLogoWebsite(website, for: saved)
+                    }
+                } : nil
                 try await vm.saveFinancialInstitutionCascade(
                     institution: instToSave,
                     cards: finalCards,
                     loans: finalLoans,
-                    appState: appState
+                    appState: appState,
+                    onOwnerBankSaved: ownerBankSaved
                 )
 
                 if let plaidItemId = linkedPlaidItemId {
@@ -291,7 +307,11 @@ struct AddFinancialWizard: View {
             } catch {
                 await MainActor.run {
                     isSaving = false
-                    appState.error = "The Plaid data could not be saved. Your connection is still available—tap Save to retry."
+                    if useOwnerBankVault {
+                        appState.error = ResourceSaveFailure.message(for: error, resource: "financial details")
+                    } else {
+                        appState.error = "The Plaid data could not be saved. Your connection is still available—tap Save to retry."
+                    }
                 }
             }
         }
@@ -636,12 +656,14 @@ struct AddFinancialWizard: View {
                             institution = existing
                             isNewInstitution = false
                             institution.isDisconnected = false
-                            if institution.loginUrl?.isEmpty != false {
+                            if !usesOwnerBankVault, institution.loginUrl?.isEmpty != false {
                                 institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
                             }
                         } else {
                             institution.name = instName
-                            institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
+                            if !usesOwnerBankVault {
+                                institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
+                            }
                         }
                         hasManuallyEditedWebsite = true
                         
@@ -745,7 +767,7 @@ struct AddFinancialWizard: View {
                             institution.name
                         }, set: { newName in
                             institution.name = newName
-                            if !hasManuallyEditedWebsite {
+                            if !usesOwnerBankVault, !hasManuallyEditedWebsite {
                                 let cleanName = newName.lowercased().replacingOccurrences(of: " ", with: "")
                                 institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
                             }
