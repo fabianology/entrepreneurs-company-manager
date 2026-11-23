@@ -23,6 +23,7 @@ enum ProtectedResourceSaveError: LocalizedError {
     case vaultAccessRequired
     case ownerRequired
     case rotationPending
+    case backendUpdateRequired
 
     var errorDescription: String? {
         switch self {
@@ -32,6 +33,8 @@ enum ProtectedResourceSaveError: LocalizedError {
             "Ask the owner to save the first credentials for this item. Your draft is still here."
         case .rotationPending:
             "Finish securing your vault in Password Vault settings, then try again. Your draft is still here."
+        case .backendUpdateRequired:
+            "This server needs the Password Vault update before it can save credentials. Your draft is still here."
         }
     }
 }
@@ -846,7 +849,9 @@ class DataRepository {
     private func saveInstitution(_ inst: Institution, insert: Bool) async throws {
         let session = try await client.auth.session
         let record = ResourceSecretPreparation.metadata(for: inst)
-        if let candidate = try ResourceSecretPreparation.candidate(for: inst, snapshot: nil) {
+        let stored = insert ? nil : try await fetchVisibleInstitutions().first { $0.id == inst.id }
+        let original = stored.map(decryptInstitutionSecrets)
+        if let candidate = try ResourceSecretPreparation.candidate(for: inst, snapshot: nil, comparedTo: original) {
             guard session.user.id == inst.userId else { throw ProtectedResourceSaveError.ownerRequired }
             let snapshot = try await VaultService.shared.requireProtectedSaveAccess(for: inst.userId)
             try await VaultService.shared.saveProtected(candidate, record: record, insert: insert, snapshot: snapshot)
@@ -855,7 +860,7 @@ class DataRepository {
         if insert {
             try await client.from("institutions").insert(record).execute()
         } else {
-            let preserved = try await preservingStoredInstitutionSecrets(in: record)
+            let preserved = preservingStoredInstitutionAccountNumbers(in: record, from: stored)
             let rows: [MutationReceipt] = try await client.from("institutions")
                 .update(preserved).eq("id", value: inst.id).select("id").execute().value
             try requireUpdatedRow(rows, resource: "bank")
@@ -879,13 +884,12 @@ class DataRepository {
         }
     }
 
-    private func preservingStoredInstitutionSecrets(in proposed: Institution) async throws -> Institution {
-        guard let stored = try await fetchVisibleInstitutions().first(where: { $0.id == proposed.id }) else { return proposed }
+    private func preservingStoredInstitutionAccountNumbers(in proposed: Institution, from stored: Institution?) -> Institution {
+        guard let stored else { return proposed }
         let storedAccounts = stored.accounts.reduce(into: [String: InstitutionAccount]()) { result, account in
             if result[account.id] == nil { result[account.id] = account }
         }
         var preserved = proposed
-        preserved.password = stored.password
         preserved.accounts = proposed.accounts.map { account in
             guard let storedAccount = storedAccounts[account.id] else {
                 var newAccount = account
@@ -2664,21 +2668,28 @@ enum ResourceSecretPreparation {
     }
 
     static func candidate(
-        for institution: Institution, snapshot: VaultKeySession.Snapshot?
+        for institution: Institution, snapshot: VaultKeySession.Snapshot?, comparedTo previous: Institution? = nil
     ) throws -> ResourceSecretPreparationCandidate? {
         var fields: [String: String] = [:]
-        func include(_ name: String, _ value: String?) throws {
+        var hasCredentialChange = previous == nil
+        func include(_ name: String, _ value: String?, original: String?) throws {
             if let plaintext = try verifiedPlaintext(
                 value, snapshot: snapshot, storedResourceType: "institution",
                 resourceID: institution.id, fieldName: name
-            ) { fields[name] = plaintext }
+            ) {
+                fields[name] = plaintext
+                if value != original { hasCredentialChange = true }
+            }
         }
-        try include("login_url", institution.loginUrl)
-        try include("username", institution.username)
-        try include("email", institution.email)
-        try include("password", institution.password)
-        try include("two_factor", institution.twoFactor)
+        try include("login_url", institution.loginUrl, original: previous?.loginUrl)
+        try include("username", institution.username, original: previous?.username)
+        try include("email", institution.email, original: previous?.email)
+        try include("password", institution.password, original: previous?.password)
+        try include("two_factor", institution.twoFactor, original: previous?.twoFactor)
 
+        let previousAccounts = (previous?.accounts ?? []).reduce(into: [String: InstitutionAccount]()) {
+            if $0[$1.id] == nil { $0[$1.id] = $1 }
+        }
         var accountCredentials: [ResourceBankAccountCredentials] = []
         for account in institution.accounts {
             let prefix = "accounts.\(account.id)"
@@ -2698,12 +2709,19 @@ enum ResourceSecretPreparation {
                 fieldName: "\(prefix).wire_routing_number"
             )
             if accountNumber != nil || routingNumber != nil || wireRoutingNumber != nil {
+                let original = previousAccounts[account.id]
+                if (accountNumber != nil && account.accountNumber != original?.accountNumber)
+                    || (routingNumber != nil && account.routingNumber != original?.routingNumber)
+                    || (wireRoutingNumber != nil && account.wireRoutingNumber != original?.wireRoutingNumber) {
+                    hasCredentialChange = true
+                }
                 accountCredentials.append(ResourceBankAccountCredentials(
                     id: account.id, accountNumber: accountNumber,
                     routingNumber: routingNumber, wireRoutingNumber: wireRoutingNumber
                 ))
             }
         }
+        guard hasCredentialChange else { return nil }
         if !accountCredentials.isEmpty {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]
@@ -2830,6 +2848,8 @@ final class VaultService: @unchecked Sendable {
                 p_encrypted_fields: encrypted, p_actor_device_id: snapshot.deviceID,
                 p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
             )).execute()
+        } catch let error as PostgrestError where error.code == "PGRST202" {
+            throw ProtectedResourceSaveError.backendUpdateRequired
         } catch let error as PostgrestError where error.message == "TRUSTED_OWNER_DEVICE_REQUIRED" {
             if (try? await overview())?.metadata?.rotationStatus == "migrating" {
                 throw ProtectedResourceSaveError.rotationPending
@@ -3492,14 +3512,18 @@ final class VaultService: @unchecked Sendable {
             let p_resource_id: UUID
             let p_device_id: UUID?
         }
-        let rows: [ResourceSecretAccessStatus] = try await client.rpc(
-            "miloom_resource_credential_status", params: Params(
-                p_resource_type: type, p_resource_id: id,
-                p_device_id: VaultKeySession.shared.snapshot(for: session.user.id)?.deviceID
-            )
-        ).execute().value
-        guard rows.count == 1 else { throw ResourceSecretRevealError.unavailable }
-        return rows[0]
+        do {
+            let rows: [ResourceSecretAccessStatus] = try await client.rpc(
+                "miloom_resource_credential_status", params: Params(
+                    p_resource_type: type, p_resource_id: id,
+                    p_device_id: VaultKeySession.shared.snapshot(for: session.user.id)?.deviceID
+                )
+            ).execute().value
+            guard rows.count == 1 else { throw ResourceSecretRevealError.unavailable }
+            return rows[0]
+        } catch let error as PostgrestError where error.code == "PGRST202" {
+            throw ProtectedResourceSaveError.backendUpdateRequired
+        }
     }
 
     /// Reveal only one exact resource after device presence. Callers must keep

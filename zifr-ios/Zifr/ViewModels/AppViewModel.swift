@@ -233,17 +233,21 @@ final class AppViewModel {
             else { try await DataRepository.shared.insertInstitution(value) }
         }
     ) async throws {
-        let exists = appState.institutions.contains { $0.id == institution.id }
+        let original = appState.institutions.first { $0.id == institution.id }
+        let exists = original != nil
         try requireResourceSaveAccess(ownerID: institution.userId, companyID: institution.companyId,
             type: "institution", id: institution.id, exists: exists, appState: appState)
         let actorID = appState.portfolioUserID
+        let credentialChange = try ResourceSecretPreparation.candidate(for: institution, snapshot: nil, comparedTo: original)
         try await persist(institution, exists)
         guard appState.portfolioUserID == actorID else { throw CancellationError() }
-        let metadata = ResourceSecretPreparation.metadata(for: institution, includeCredentialPresence: true)
+        let saved = credentialChange == nil
+            ? institution
+            : ResourceSecretPreparation.metadata(for: institution, includeCredentialPresence: true)
         if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
-            appState.institutions[index] = metadata
+            appState.institutions[index] = saved
         } else {
-            appState.institutions.append(metadata)
+            appState.institutions.append(saved)
         }
     }
 
@@ -274,7 +278,9 @@ final class AppViewModel {
             )
         }
 
-        if try ResourceSecretPreparation.candidate(for: institution, snapshot: nil) != nil
+        let original = appState.institutions.first { $0.id == institution.id }
+        let credentialChange = try ResourceSecretPreparation.candidate(for: institution, snapshot: nil, comparedTo: original)
+        if try credentialChange != nil
             || cards.contains(where: { try ResourceSecretPreparation.candidate(for: $0, snapshot: nil) != nil }) {
             _ = try await VaultService.shared.requireProtectedSaveAccess(for: institution.userId)
         }
@@ -282,10 +288,13 @@ final class AppViewModel {
         let originalInstitutions = appState.institutions
         let originalCards = appState.cards
         let originalLoans = appState.loans
+        let saved = credentialChange == nil
+            ? institution
+            : ResourceSecretPreparation.metadata(for: institution, includeCredentialPresence: true)
         if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
-            appState.institutions[index] = ResourceSecretPreparation.metadata(for: institution, includeCredentialPresence: true)
+            appState.institutions[index] = saved
         } else {
-            appState.institutions.append(ResourceSecretPreparation.metadata(for: institution, includeCredentialPresence: true))
+            appState.institutions.append(saved)
         }
         for card in cards {
             if let index = appState.cards.firstIndex(where: { $0.id == card.id }) {

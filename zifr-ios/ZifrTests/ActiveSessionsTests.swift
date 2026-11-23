@@ -1141,6 +1141,29 @@ final class ResourceSecretPreparationTests: XCTestCase {
         XCTAssertNil(try ResourceSecretPreparation.candidate(for: metadata, snapshot: nil))
     }
 
+    func testExistingBankWebsiteAndCredentialsDoNotTurnNewAccountIntoAProtectedSave() throws {
+        let original = Institution(
+            userId: UUID(), companyId: UUID(), name: "Sample Bank", loginUrl: "example.com",
+            password: "synthetic existing password",
+            accounts: [InstitutionAccount(id: "older", name: "Checking", accountNumber: "123456")]
+        )
+        var draft = original
+        draft.accounts.insert(InstitutionAccount(id: "new", name: "Savings"), at: 0)
+        XCTAssertNil(try ResourceSecretPreparation.candidate(for: draft, snapshot: nil, comparedTo: original))
+
+        draft.accounts[0].routingNumber = "012345678"
+        let candidate = try XCTUnwrap(ResourceSecretPreparation.candidate(for: draft, snapshot: nil, comparedTo: original))
+        XCTAssertNotNil(candidate.plaintextFields["accounts_data"])
+    }
+
+    func testAddingFirstPasswordToExistingBankRequiresVault() throws {
+        let original = Institution(userId: UUID(), companyId: UUID(), name: "Sample Bank")
+        var draft = original
+        draft.password = "synthetic new password"
+        let candidate = try XCTUnwrap(ResourceSecretPreparation.candidate(for: draft, snapshot: nil, comparedTo: original))
+        XCTAssertEqual(candidate.plaintextFields["password"], "synthetic new password")
+    }
+
     private let owner = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     private let device = UUID(uuidString: "70000000-0000-0000-0000-000000000001")!
     private let bank = UUID(uuidString: "30000000-0000-0000-0000-000000000001")!

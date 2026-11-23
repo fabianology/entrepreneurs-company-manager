@@ -274,10 +274,10 @@ struct ResourceCredentialAccessCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .font(.subheadline)
             }
-        } else if errorMessage != nil {
+        } else if let errorMessage {
             ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Credential access couldn't be checked. Try again when connected.")
+                    Text(errorMessage)
                         .foregroundStyle(.secondary)
                     actionButton("Try Again", symbol: "arrow.clockwise", action: refresh)
                 }
@@ -416,7 +416,11 @@ struct ResourceCredentialAccessCard: View {
             status = "unavailable"
             canEdit = false
             onStatusChange?("check_failed")
-            errorMessage = "Credential access couldn’t be checked. Try again when connected."
+            if case ProtectedResourceSaveError.backendUpdateRequired = error {
+                errorMessage = "This server needs the Password Vault update before credentials can be added or opened."
+            } else {
+                errorMessage = "Credential access couldn’t be checked. Try again when connected."
+            }
         }
     }
 
