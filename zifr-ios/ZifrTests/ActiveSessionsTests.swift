@@ -79,6 +79,101 @@ final class ResourceCredentialRevealGateTests: XCTestCase {
     }
 }
 
+final class InstitutionVaultDraftTests: XCTestCase {
+    private func makeDraft(_ fields: [String: String]) -> InstitutionVaultDraft {
+        InstitutionVaultDraft(
+            previous: RevealedResourceCredentials(fields: fields, keyVersion: 1, ciphertext: [:]),
+            viewerUserID: UUID(), canEdit: true
+        )
+    }
+
+    func testEditingOnlyWebsitePreservesPasswordAndAccountPayload() {
+        let accounts = #"[ { "id": "checking", "accountNumber": "account-test" } ]"#
+        var draft = makeDraft(["password": "synthetic-password", "accounts_data": accounts])
+        XCTAssertFalse(draft.hasChanges)
+
+        draft.set("login_url", to: "https://bank.example.test/sign-in")
+
+        XCTAssertTrue(draft.hasChanges)
+        XCTAssertEqual(draft.fields["login_url"], "https://bank.example.test/sign-in")
+        XCTAssertEqual(draft.fields["password"], "synthetic-password")
+        XCTAssertEqual(draft.fields["accounts_data"], accounts)
+    }
+
+    func testClearingWebsiteRemovesOnlyThatField() {
+        var draft = makeDraft([
+            "login_url": "bank.example.test", "password": "synthetic-password", "email": "user@example.test"
+        ])
+
+        draft.set("login_url", to: "")
+
+        XCTAssertTrue(draft.hasChanges)
+        XCTAssertEqual(draft.fields, ["password": "synthetic-password", "email": "user@example.test"])
+    }
+
+    func testAccountEditUsesIDAndPreservesSiblingCredentials() throws {
+        let accounts = """
+        [
+          {"id":"savings","accountNumber":"account-savings"},
+          {"id":"checking","accountNumber":"account-checking","wireRoutingNumber":"wire-checking"}
+        ]
+        """
+        var draft = makeDraft(["password": "synthetic-password", "accounts_data": accounts])
+        let checking = InstitutionAccount(id: "checking", name: "Bank account")
+        let savings = InstitutionAccount(id: "savings", name: checking.name)
+        XCTAssertTrue(draft.canEditAccountCredentials)
+        var edited = draft.accountForEditing(checking)
+        XCTAssertEqual(edited.accountNumber, "account-checking")
+        edited.routingNumber = "routing-checking"
+
+        try draft.setAccount(edited)
+
+        XCTAssertTrue(draft.hasChanges)
+        XCTAssertEqual(draft.accountForEditing(checking).routingNumber, "routing-checking")
+        XCTAssertEqual(draft.accountForEditing(checking).wireRoutingNumber, "wire-checking")
+        XCTAssertEqual(draft.accountForEditing(savings).accountNumber, "account-savings")
+        XCTAssertEqual(draft.fields["password"], "synthetic-password")
+    }
+
+    func testInvalidAccountPayloadCannotBeRewritten() {
+        let accounts = #"{"accountNumber":"account-without-id"}"#
+        let original = ["password": "synthetic-password", "accounts_data": accounts]
+        var draft = makeDraft(original)
+
+        XCTAssertFalse(draft.canEditAccountCredentials)
+        XCTAssertThrowsError(try draft.setAccount(InstitutionAccount(
+            id: "checking", accountNumber: "replacement"
+        )))
+        XCTAssertEqual(draft.fields, original)
+        XCTAssertFalse(draft.hasChanges)
+    }
+}
+
+final class InstitutionLogoTests: XCTestCase {
+    @MainActor
+    func testLogoUsesValidatedHostAndStaysInItsPortfolio() {
+        let state = AppState()
+        let owner = UUID()
+        let bank = Institution(
+            userId: owner, companyId: UUID(), name: "Sample Bank",
+            loginUrl: "https://legacy.example.test/sign-in"
+        )
+        state.portfolioUserID = owner
+        XCTAssertEqual(state.institutionLogo(for: bank, allowVaultWebsite: true).host, "legacy.example.test")
+
+        state.setInstitutionLogoWebsite("https://current.example.test/access?destination=sample", for: bank)
+        XCTAssertEqual(state.institutionLogo(for: bank, allowVaultWebsite: true).host, "current.example.test")
+        XCTAssertEqual(state.institutionLogo(for: bank, allowVaultWebsite: false).host, "legacy.example.test")
+
+        state.setInstitutionLogoWebsite("https://name:secret@invalid.example.test", for: bank)
+        XCTAssertNil(state.institutionLogo(for: bank, allowVaultWebsite: true).host)
+
+        state.portfolioUserID = UUID()
+        state.portfolioUserID = owner
+        XCTAssertEqual(state.institutionLogo(for: bank, allowVaultWebsite: true).host, "legacy.example.test")
+    }
+}
+
 final class ActiveSessionsTests: XCTestCase {
     @MainActor
     func testOverviewPaymentFailureRetryKeepsDraftIdentityAndOriginalOwner() async throws {

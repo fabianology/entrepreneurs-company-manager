@@ -3,7 +3,7 @@ import SwiftData
 
 // MARK: - Institution Accounts Section
 struct InstitutionAccountsSection: View {
-    @State var institution: Institution
+    @Binding var institution: Institution
     @Bindable var vm: AppViewModel
     let onAdd: () -> Void
     let onEdit: (Int, InstitutionAccount) -> Void

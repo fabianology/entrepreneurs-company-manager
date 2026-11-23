@@ -2550,7 +2550,7 @@ enum ResourceSecretActivationError: LocalizedError {
     }
 }
 
-private struct ResourceBankAccountCredentials: Codable, Equatable {
+struct ResourceBankAccountCredentials: Codable, Equatable {
     let id: String
     let accountNumber: String?
     let routingNumber: String?
@@ -3647,19 +3647,59 @@ final class VaultService: @unchecked Sendable {
         }
     }
 
+    /// Logos use only the saved website's validated hostname. Reading a logo
+    /// never loads the rest of the bank's plaintext credentials into the UI.
+    func institutionLogoWebsiteHost(id: UUID, ownerUserID: UUID) async throws -> String? {
+        let session = try await client.auth.session
+        guard session.user.id == ownerUserID else { throw CancellationError() }
+        let snapshot = try requireSnapshot(for: ownerUserID)
+        guard let material = try await ownerResourceSecretMaterial(type: "institution", id: id, snapshot: snapshot),
+              let ciphertext = material.encryptedFields["login_url"] else { return nil }
+        let website = try material.plaintext(ciphertext, field: "login_url")
+        return SearchBrand.websiteURL(website)?.host
+    }
+
+    private func ownerResourceSecretMaterial(
+        type: String, id: UUID, snapshot: VaultKeySession.Snapshot
+    ) async throws -> ResourceSecretMaterial? {
+        guard let record = try await ownerResourceSecret(type: type, id: id, snapshot: snapshot),
+              record.state == "active" else { return nil }
+        do {
+            guard let accountKey = snapshot.key(for: record.ownerAccountKeyVersion) else {
+                throw ResourceSecretRevealError.invalidSecret
+            }
+            let resource = ResourceKeyContext(
+                ownerUserID: snapshot.userID, resourceType: type, resourceID: id, keyVersion: record.keyVersion
+            )
+            let key = try VaultCryptography.unwrapResourceKeyForOwner(
+                record.ownerWrappedResourceKey, using: accountKey,
+                context: ResourceOwnerWrapContext(resource: resource, accountKeyVersion: record.ownerAccountKeyVersion)
+            )
+            return ResourceSecretMaterial(
+                resource: resource, key: key, deviceID: snapshot.deviceID, encryptedFields: record.encryptedFields
+            )
+        } catch {
+            throw ResourceSecretRevealError.invalidSecret
+        }
+    }
+
     private struct ResourceSecretMaterial {
         let resource: ResourceKeyContext
         let key: SymmetricKey
         let deviceID: UUID
         let encryptedFields: [String: String]
 
+        func plaintext(_ ciphertext: String, field: String) throws -> String {
+            try VaultCryptography.decryptResourceSecret(
+                ciphertext, using: key,
+                context: ResourceSecretFieldContext(resource: resource, fieldName: field)
+            )
+        }
+
         func plaintextFields() throws -> [String: String] {
             var result: [String: String] = [:]
             for (field, ciphertext) in encryptedFields {
-                result[field] = try VaultCryptography.decryptResourceSecret(
-                    ciphertext, using: key,
-                    context: ResourceSecretFieldContext(resource: resource, fieldName: field)
-                )
+                result[field] = try plaintext(ciphertext, field: field)
             }
             return result
         }
@@ -3672,33 +3712,10 @@ final class VaultService: @unchecked Sendable {
         guard session.user.id == expectedViewerUserID else { throw CancellationError() }
         if session.user.id == expectedOwnerUserID {
             let snapshot = try requireSnapshot(for: session.user.id)
-            guard let record = try await ownerResourceSecret(
-                type: type, id: id, snapshot: snapshot
-            ), record.state == "active" else {
+            guard let material = try await ownerResourceSecretMaterial(type: type, id: id, snapshot: snapshot) else {
                 throw ResourceSecretRevealError.unavailable
             }
-            do {
-                guard let accountKey = snapshot.key(for: record.ownerAccountKeyVersion) else {
-                    throw ResourceSecretRevealError.invalidSecret
-                }
-                let resource = ResourceKeyContext(
-                    ownerUserID: session.user.id, resourceType: type,
-                    resourceID: id, keyVersion: record.keyVersion
-                )
-                let key = try VaultCryptography.unwrapResourceKeyForOwner(
-                    record.ownerWrappedResourceKey, using: accountKey,
-                    context: ResourceOwnerWrapContext(
-                        resource: resource,
-                        accountKeyVersion: record.ownerAccountKeyVersion
-                    )
-                )
-                return ResourceSecretMaterial(
-                    resource: resource, key: key, deviceID: snapshot.deviceID,
-                    encryptedFields: record.encryptedFields
-                )
-            } catch {
-                throw ResourceSecretRevealError.invalidSecret
-            }
+            return material
         }
 
         let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: session.user.id)

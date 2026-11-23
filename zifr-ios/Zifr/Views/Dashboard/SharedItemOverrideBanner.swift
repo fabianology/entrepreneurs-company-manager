@@ -93,6 +93,7 @@ struct ResourceCredentialAccessCard: View {
     let resourceID: UUID
     let ownerUserID: UUID
     var onStatusChange: ((String) -> Void)? = nil
+    var onCredentialsChange: ((RevealedResourceCredentials?, UUID, Bool) -> Void)? = nil
 
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var auth
@@ -193,7 +194,9 @@ struct ResourceCredentialAccessCard: View {
     }
 
     var body: some View {
-        if hasCurrentPresentation { credentialContent }
+        if hasCurrentPresentation && (onCredentialsChange == nil || revealed == nil) {
+            credentialContent
+        }
         Color.clear.frame(height: 0)
             .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: refresh))
             .task(id: LoadRequest(presentation: activePresentation, refreshID: refreshID)) {
@@ -376,6 +379,9 @@ struct ResourceCredentialAccessCard: View {
     }
 
     private func resetPresentation() {
+        if let presentation, revealed != nil {
+            onCredentialsChange?(nil, presentation.viewerUserID, false)
+        }
         revealGate.invalidate()
         presentation = nil
         status = nil
@@ -438,6 +444,10 @@ struct ResourceCredentialAccessCard: View {
                 )
                 guard isCurrent(scope, token: token) else { return }
                 self.revealed = saved
+                if scope.resourceType == "institution",
+                   let bank = appState.institutions.first(where: { $0.id == scope.resourceID }) {
+                    appState.setInstitutionLogoWebsite(saved.fields["login_url"], for: bank)
+                }
                 clearEditor()
             } catch {
                 guard isCurrent(scope, token: token) else { return }
@@ -498,6 +508,7 @@ struct ResourceCredentialAccessCard: View {
             )
             guard isCurrent(scope, token: token) else { return }
             revealed = credentials
+            onCredentialsChange?(credentials, scope.viewerUserID, canEdit)
         } catch {
             guard isCurrent(scope, token: token) else { return }
             errorMessage = error.localizedDescription

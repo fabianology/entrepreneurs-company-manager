@@ -9,6 +9,7 @@ struct InstitutionAccountHUD: View {
     var institutionId: UUID? = nil
     var availableCards: [FinancialCard] = []
     var canEnterProtectedDetails = true
+    var showsWireRoutingNumber = false
     let companyId: UUID
     @Bindable var vm: AppViewModel
     let onSave: () -> Void
@@ -115,7 +116,7 @@ struct InstitutionAccountHUD: View {
                                     keyboardType: .numberPad
                                 )
 
-                                if !(draft.wireRoutingNumber ?? "").isEmpty {
+                                if showsWireRoutingNumber || !(draft.wireRoutingNumber ?? "").isEmpty {
                                     ZifrField(
                                         label: "WIRE ROUTING NUMBER",
                                         placeholder: SecurityService.isLockedValue(draft.wireRoutingNumber) ? SecurityService.lockedValueLabel : "Provided when different from ACH",

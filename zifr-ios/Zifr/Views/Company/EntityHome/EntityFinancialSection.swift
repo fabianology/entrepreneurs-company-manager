@@ -334,15 +334,13 @@ struct EntityFinancialSection: View {
             },
             collapsedHeader: {
                 HStack {
-                    if !(inst.loginUrl ?? "").isEmpty {
-                        FaviconImage(website: inst.loginUrl ?? "", size: 32)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else {
+                    InstitutionLogoImage(institution: inst, size: 32) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 8).fill(finColor).frame(width: 32, height: 32)
                             Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(.white)
                         }
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     Text(inst.name)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
