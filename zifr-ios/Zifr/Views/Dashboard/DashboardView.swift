@@ -296,7 +296,7 @@ struct DashboardView: View {
 
 
     private var alignsClosedDuoSearch: Bool {
-        usesDuoSideToolbar && !usesDuoLandscapeDashboard
+        usesDuoSideToolbar && !usesDuoLandscapeDashboard && !duoLayout.usesStackedLayout
     }
 
     private var closedDuoSearchOffset: CGFloat {
@@ -1492,16 +1492,19 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     private let compactStatusAreaGap: CGFloat = 12
 
     private var hasNativeSideToolbar: Bool { layout.usesExpandedLandscape }
-    private var hasCustomSideToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar && (!layout.usesStackedLayout || !showsPrimaryActions) }
+    private var hasCustomSideToolbar: Bool { layout.isDuoDevice && !hasNativeSideToolbar }
     private var railOnLeadingEdge: Bool { layout.placesSplitControlsOnLeadingEdge(in: layoutDirection) }
     private var railPaddingEdge: Edge.Set { railOnLeadingEdge ? .leading : .trailing }
 
     func body(content: Content) -> some View {
         let usesClosedRail = hasCustomSideToolbar && layout.usesCompactLayout && isActive
-        let usesFixedWidthRail = reservesCompactContentWidth && usesClosedRail
+        let usesFixedWidthRail = usesClosedRail && (reservesCompactContentWidth || layout.usesStackedLayout)
+        // Entity pages route drags from this empty strip to the selected tab.
+        let reservesGestureMargin = usesClosedRail && layout.usesStackedLayout && reservesCompactContentWidth
         let closedRailEdges: Edge.Set = usesFixedWidthRail && layout.isExpanded ? .horizontal : railPaddingEdge
         content
             // Take the rail out of the content's width before the financial deck is measured.
+            .padding(.leading, reservesGestureMargin ? 28 : 0)
             .padding(railPaddingEdge, usesFixedWidthRail ? toolbarWidth + toolbarTrailingPadding : 0)
             .background {
                 if usesFixedWidthRail { Color.zifrBG.ignoresSafeArea() }
@@ -1517,8 +1520,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                     sideToolbar(isClosed: usesClosedRail)
                 }
             }
-            // Release the system side-toolbar strip when stacked controls move
-            // into the page. Keep the vertical safe areas at the divider and home indicator.
+            // The fixed-width rail already reserves space for its controls.
             .ignoresSafeArea(.container, edges: usesClosedRail ? closedRailEdges : (layout.usesStackedLayout ? .horizontal : []))
             .background {
                 if usesClosedRail && showsPrimaryActions {
@@ -1539,7 +1541,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                         .ignoresSafeArea(.container, edges: [.top, .leading, .trailing])
                 }
             }
-            .toolbar((hasCustomSideToolbar || layout.usesStackedLayout) && isActive ? .hidden : .automatic, for: .navigationBar)
+            .toolbar(hasCustomSideToolbar && isActive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if hasNativeSideToolbar && isActive {
                     if showsPrimaryActions {

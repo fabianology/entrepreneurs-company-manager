@@ -839,6 +839,7 @@ struct CompanyDetailView: View {
     private var duoGestureLayout: DuoSideSwipe.Layout {
         if usesInlineEntityPanel { return .split }
         if usesDuoPortraitLayout { return .portrait }
+        if duoLayout.usesStackedLayout { return .stacked }
         return duoLayout.usesLeftSplitToolbar ? .leftSplitPane : .compact
     }
 
@@ -1038,7 +1039,7 @@ struct CompanyDetailView: View {
     }
 
     private var duoSearchOffset: CGFloat {
-        guard usesDuoSideToolbar, let adminY = duoAdminWindowCenterY,
+        guard usesDuoSideToolbar, !duoLayout.usesStackedLayout, let adminY = duoAdminWindowCenterY,
               let rowY = duoSearchRowWindowCenterY else { return 0 }
         let adjustment = adminY - rowY
         return abs(adjustment) <= 44 ? adjustment : 0

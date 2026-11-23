@@ -18,6 +18,17 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertFalse(DuoSideSwipe.Layout.leftSplitPane.acceptsStart(x: 443, page: mirroredPage, leftPanel: nil))
     }
 
+    func testStackedSideGesturesAcceptBothMarginsAndLeaveTheCardInteractive() {
+        let page = CGRect(x: 28, y: 0, width: 567, height: 564)
+        let layout = DuoSideSwipe.Layout.stacked
+        for x: CGFloat in [12, 40, 584, 632] {
+            XCTAssertTrue(layout.acceptsStart(x: x, page: page, leftPanel: nil))
+        }
+        for x: CGFloat in [50, page.midX, 572] {
+            XCTAssertFalse(layout.acceptsStart(x: x, page: page, leftPanel: nil))
+        }
+    }
+
     func testDuoSideSwipeRespectsTheLandscapePaneAndDivider() {
         let page = CGRect(x: 450, y: 0, width: 410, height: 650)
         let panel = CGRect(x: 0, y: 0, width: 430, height: 650)
