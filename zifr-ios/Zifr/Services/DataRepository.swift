@@ -49,7 +49,7 @@ enum ResourceSaveFailure {
         switch (error as? PostgrestError)?.message {
         case "LEGACY_CREDENTIALS_REQUIRE_CONVERSION":
             return "This record has credentials from an earlier version. They still need to be transferred to Password Vault. Your draft is still here."
-        case "RESOURCE_SECRET_CHANGED":
+        case "RESOURCE_SECRET_CHANGED", "RESOURCE_SECRET_SOURCE_CHANGED":
             return "These credentials changed while you were editing. Reopen the record to check the latest version. Your draft is still here."
         default: break
         }
@@ -854,7 +854,10 @@ class DataRepository {
         if let candidate = try ResourceSecretPreparation.candidate(for: inst, snapshot: nil, comparedTo: original) {
             guard session.user.id == inst.userId else { throw ProtectedResourceSaveError.ownerRequired }
             let snapshot = try await VaultService.shared.requireProtectedSaveAccess(for: inst.userId)
-            try await VaultService.shared.saveProtected(candidate, record: record, insert: insert, snapshot: snapshot)
+            try await VaultService.shared.saveProtected(
+                candidate, record: record, insert: insert, snapshot: snapshot,
+                legacyWebsiteDigest: candidate.legacyWebsiteDigest(matching: stored?.loginUrl)
+            )
             return
         }
         if insert {
@@ -2477,6 +2480,14 @@ struct ResourceSecretPreparationCandidate {
     let resourceType: String
     let resourceID: UUID
     let plaintextFields: [String: String]
+
+    func legacyWebsiteDigest(matching storedWebsite: String?) -> String? {
+        guard resourceType == "institution", let storedWebsite, !storedWebsite.isEmpty,
+              let website = plaintextFields["login_url"],
+              website.utf8.elementsEqual(storedWebsite.utf8) else { return nil }
+        return SHA256.hash(data: Data(storedWebsite.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+    }
 }
 
 struct ResourceSecretPreparationReport {
@@ -2808,19 +2819,20 @@ final class VaultService: @unchecked Sendable {
     }
 
     private struct ProtectedSaveParams<Record: Encodable>: Encodable {
-        let p_resource_type: String
+        let p_resource_type: String?
         let p_record: Record
-        let p_insert: Bool
+        let p_insert: Bool?
         let p_owner_account_key_version: Int
         let p_owner_wrapped_resource_key: String
         let p_encrypted_fields: [String: String]
         let p_actor_device_id: UUID
         let p_key_confirmation: String
+        let p_expected_legacy_website_digest: String?
     }
 
     func saveProtected<Record: Encodable>(
         _ candidate: ResourceSecretPreparationCandidate, record: Record, insert: Bool,
-        snapshot: VaultKeySession.Snapshot
+        snapshot: VaultKeySession.Snapshot, legacyWebsiteDigest: String? = nil
     ) async throws {
         let session = try await client.auth.refreshSession()
         guard session.user.id == snapshot.userID else { throw CancellationError() }
@@ -2841,12 +2853,17 @@ final class VaultService: @unchecked Sendable {
             }
             encrypted[field] = envelope
         }
+        let usesLegacyWebsite = legacyWebsiteDigest != nil
+        let rpc = usesLegacyWebsite
+            ? "miloom_save_owned_bank_with_legacy_website" : "miloom_save_owned_protected_resource"
         do {
-            try await client.rpc("miloom_save_owned_protected_resource", params: ProtectedSaveParams(
-                p_resource_type: resource.resourceType, p_record: record, p_insert: insert,
+            try await client.rpc(rpc, params: ProtectedSaveParams(
+                p_resource_type: usesLegacyWebsite ? nil : resource.resourceType,
+                p_record: record, p_insert: usesLegacyWebsite ? nil : insert,
                 p_owner_account_key_version: snapshot.keyVersion, p_owner_wrapped_resource_key: wrap,
                 p_encrypted_fields: encrypted, p_actor_device_id: snapshot.deviceID,
-                p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+                p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key),
+                p_expected_legacy_website_digest: legacyWebsiteDigest
             )).execute()
         } catch let error as PostgrestError where error.code == "PGRST202" {
             throw ProtectedResourceSaveError.backendUpdateRequired

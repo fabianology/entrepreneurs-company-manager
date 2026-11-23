@@ -1164,6 +1164,23 @@ final class ResourceSecretPreparationTests: XCTestCase {
         XCTAssertEqual(candidate.plaintextFields["password"], "synthetic new password")
     }
 
+    func testFirstPasswordCarriesAnUnchangedLegacyWebsiteForAnAtomicSave() throws {
+        let original = Institution(
+            userId: UUID(), companyId: UUID(), name: "Sample Bank", loginUrl: "example.test"
+        )
+        var draft = original
+        draft.password = "synthetic new password"
+        let candidate = try XCTUnwrap(ResourceSecretPreparation.candidate(
+            for: draft, snapshot: nil, comparedTo: original
+        ))
+        XCTAssertEqual(candidate.plaintextFields["login_url"], original.loginUrl)
+        XCTAssertEqual(candidate.legacyWebsiteDigest(matching: original.loginUrl),
+                       "9b263fbcb589853137b33ddcafa5bcc5403464ead4da766d0f819348bf8d472c")
+        XCTAssertNil(candidate.legacyWebsiteDigest(matching: "changed.example.test"))
+        XCTAssertNil(candidate.legacyWebsiteDigest(matching: nil))
+        XCTAssertNil(ResourceSecretPreparation.metadata(for: draft).loginUrl)
+    }
+
     private let owner = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     private let device = UUID(uuidString: "70000000-0000-0000-0000-000000000001")!
     private let bank = UUID(uuidString: "30000000-0000-0000-0000-000000000001")!
