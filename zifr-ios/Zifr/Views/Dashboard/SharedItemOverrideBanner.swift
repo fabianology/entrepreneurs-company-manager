@@ -5,11 +5,17 @@ import SwiftUI
 struct ResourceCredentialRevealGate {
     private(set) var operationID = UUID()
 
+    static func authenticatedViewer(
+        signedInUserID: UUID?, portfolioUserID: UUID?, isUnlocked: Bool, isActive: Bool
+    ) -> UUID? {
+        guard isUnlocked, isActive, let signedInUserID, signedInUserID == portfolioUserID else { return nil }
+        return signedInUserID
+    }
+
     mutating func invalidate() { operationID = UUID() }
 
-    func accept(_ fields: [String: String], for token: UUID, isActive: Bool) -> [String: String]? {
-        guard token == operationID, isActive else { return nil }
-        return fields
+    func allows(_ token: UUID, isActive: Bool) -> Bool {
+        token == operationID && isActive
     }
 }
 
@@ -80,17 +86,21 @@ struct SharedItemOverrideBanner: View {
     }
 }
 
-/// Loads status only on the detail screen. Plaintext exists only in this view,
-/// after a local device-presence check, and is discarded on hide/background.
+/// Loads credentials only while this exact resource is shown in an unlocked app.
+/// Plaintext is kept in this presentation and cleared when it stops being active.
 struct ResourceCredentialAccessCard: View {
     let resourceType: String
     let resourceID: UUID
     let ownerUserID: UUID
     var onStatusChange: ((String) -> Void)? = nil
+    var onCredentialsChange: ((RevealedResourceCredentials?, UUID, Bool) -> Void)? = nil
 
     @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var auth
     @Environment(\.scenePhase) private var scenePhase
     @State private var status: String?
+    @State private var presentation: Presentation?
+    @State private var refreshID = UUID()
     @State private var revealed: RevealedResourceCredentials?
     @State private var canEdit = false
     @State private var showingVaultAccess = false
@@ -98,11 +108,37 @@ struct ResourceCredentialAccessCard: View {
     @State private var draftFields: [String: String] = [:]
     @State private var draftAccounts: [AccountCredentials] = []
     @State private var isEditing = false
-    @State private var isWorking = false
+    @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var revealGate = ResourceCredentialRevealGate()
     private var operationID: UUID { revealGate.operationID }
-    @State private var isRevealing = false
+    private struct Presentation: Equatable {
+        let resourceType: String
+        let resourceID: UUID
+        let ownerUserID: UUID
+        let viewerUserID: UUID
+    }
+
+    private struct LoadRequest: Equatable {
+        let presentation: Presentation?
+        let refreshID: UUID
+    }
+
+    private var activePresentation: Presentation? {
+        guard let viewer = ResourceCredentialRevealGate.authenticatedViewer(
+            signedInUserID: auth.currentUser?.id, portfolioUserID: appState.portfolioUserID,
+            isUnlocked: auth.isAuthenticated, isActive: scenePhase == .active
+        ) else { return nil }
+        return Presentation(
+            resourceType: resourceType, resourceID: resourceID,
+            ownerUserID: ownerUserID, viewerUserID: viewer
+        )
+    }
+
+    private var hasCurrentPresentation: Bool {
+        guard let activePresentation else { return false }
+        return presentation == activePresentation
+    }
 
     private struct AccountCredentials: Codable, Identifiable {
         let id: String
@@ -158,6 +194,23 @@ struct ResourceCredentialAccessCard: View {
     }
 
     var body: some View {
+        if hasCurrentPresentation && (onCredentialsChange == nil || revealed == nil) {
+            credentialContent
+        }
+        Color.clear.frame(height: 0)
+            .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: refresh))
+            .task(id: LoadRequest(presentation: activePresentation, refreshID: refreshID)) {
+                guard let activePresentation else { return }
+                await startLoading(activePresentation)
+            }
+            .onChange(of: activePresentation) { _, current in
+                if current == nil { resetPresentation() }
+            }
+            .onDisappear { resetPresentation() }
+    }
+
+    @ViewBuilder
+    private var credentialContent: some View {
         if let status, status != "not_ready", status != "unavailable" {
             ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
                 VStack(alignment: .leading, spacing: 14) {
@@ -193,14 +246,16 @@ struct ResourceCredentialAccessCard: View {
                                 .keyboardType(.numberPad)
                             }
                             HStack {
-                                actionButton("Cancel", symbol: "xmark") { isEditing = false }
+                                actionButton("Cancel", symbol: "xmark", action: clearEditor)
                                 actionButton("Save", symbol: "checkmark", action: save)
                             }
-                            .disabled(isWorking)
+                            .disabled(isSaving)
                         } else if revealed == nil {
-                            Text("Credentials are available for this resource only. Face ID or your passcode is required to reveal them.")
-                                .foregroundStyle(.secondary)
-                            actionButton("Reveal Credentials", symbol: "eye", action: reveal)
+                            if errorMessage == nil {
+                                ProgressView("Loading credentials…")
+                            } else {
+                                actionButton("Try Again", symbol: "arrow.clockwise", action: refresh)
+                            }
                         } else {
                             ForEach(Array(fields.enumerated()), id: \.offset) { _, field in
                                 credentialRow(field.0, value: field.1)
@@ -225,16 +280,12 @@ struct ResourceCredentialAccessCard: View {
                                 Text("You can view and copy these details in Miloom. The service controls what a person can do with its password.")
                                     .foregroundStyle(.secondary)
                             }
-                            HStack {
-                                if canEdit && (plaintextFields["accounts_data"] == nil || accounts != nil) {
-                                    actionButton("Edit", symbol: "pencil") {
-                                        draftFields = plaintextFields
-                                        draftAccounts = accountsForEditing
-                                        isEditing = true
-                                    }
-                                }
-                                actionButton("Hide", symbol: "eye.slash") {
-                                    clearPlaintext()
+                            if canEdit && (plaintextFields["accounts_data"] == nil || accounts != nil) {
+                                actionButton("Edit", symbol: "pencil") {
+                                    guard hasCurrentPresentation else { return }
+                                    draftFields = plaintextFields
+                                    draftAccounts = accountsForEditing
+                                    isEditing = true
                                 }
                             }
                         }
@@ -274,35 +325,16 @@ struct ResourceCredentialAccessCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .font(.subheadline)
             }
-        } else if errorMessage != nil {
+        } else if let errorMessage {
             ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Credential access couldn't be checked. Try again when connected.")
+                    Text(errorMessage)
                         .foregroundStyle(.secondary)
                     actionButton("Try Again", symbol: "arrow.clockwise", action: refresh)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        Color.clear.frame(height: 0)
-            .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: refresh))
-            .task(id: resourceID) { await loadStatus() }
-            .task(id: status == "pending" || status == "locked") {
-                while !Task.isCancelled && (status == "pending" || status == "locked") {
-                    do { try await Task.sleep(for: .seconds(10)) }
-                    catch { break }
-                    if scenePhase == .active { await loadStatus() }
-                }
-            }
-            .onDisappear { clearPlaintext() }
-            .onChange(of: scenePhase) { _, phase in
-                if phase != .active {
-                    // Face ID temporarily makes the app inactive. Clear visible
-                    // secrets, but keep its pending reveal alive; actual background
-                    // entry or dismissal must still invalidate the result.
-                    clearPlaintext(invalidateOperation: phase == .background || !isRevealing)
-                }
-            }
     }
 
     private func credentialRow(_ title: String, value: String) -> some View {
@@ -316,6 +348,7 @@ struct ResourceCredentialAccessCard: View {
                     .foregroundStyle(.primary)
                 Spacer()
                 Button {
+                    guard hasCurrentPresentation else { return }
                     SearchCredentialAccess.copy(value)
                 } label: {
                     Image(systemName: "doc.on.doc")
@@ -336,15 +369,32 @@ struct ResourceCredentialAccessCard: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(Color(hex: "#C1AA78"))
-        .disabled(isWorking)
+        .disabled(isSaving)
     }
 
-    private func clearPlaintext(invalidateOperation: Bool = true) {
-        if invalidateOperation { revealGate.invalidate() }
-        revealed = nil
+    private func clearEditor() {
         draftFields.removeAll()
         draftAccounts.removeAll()
         isEditing = false
+    }
+
+    private func resetPresentation() {
+        if let presentation, revealed != nil {
+            onCredentialsChange?(nil, presentation.viewerUserID, false)
+        }
+        revealGate.invalidate()
+        presentation = nil
+        status = nil
+        canEdit = false
+        isSaving = false
+        errorMessage = nil
+        revealed = nil
+        clearEditor()
+    }
+
+    private func isCurrent(_ scope: Presentation, token: UUID) -> Bool {
+        !Task.isCancelled && presentation == scope &&
+            revealGate.allows(token, isActive: activePresentation == scope)
     }
 
     private func binding(for key: String) -> Binding<String> {
@@ -367,7 +417,8 @@ struct ResourceCredentialAccessCard: View {
     }
 
     private func save() {
-        guard !isWorking, canEdit, let revealed else { return }
+        guard !isSaving, canEdit, let scope = activePresentation,
+              presentation == scope, let revealed else { return }
         let token = operationID
         var updated = draftFields.filter { !$0.value.isEmpty && $0.key != "accounts_data" }
         if !draftAccounts.isEmpty,
@@ -382,80 +433,85 @@ struct ResourceCredentialAccessCard: View {
             }
             updated["accounts_data"] = String(decoding: data, as: UTF8.self)
         }
-        isWorking = true
+        isSaving = true
         errorMessage = nil
         Task {
             do {
-                try await VaultService.shared.updateResourceSecret(
-                    type: resourceType, id: resourceID,
-                    expectedOwnerUserID: ownerUserID,
+                let saved = try await VaultService.shared.updateResourceSecret(
+                    type: scope.resourceType, id: scope.resourceID,
+                    expectedOwnerUserID: scope.ownerUserID, expectedViewerUserID: scope.viewerUserID,
                     plaintextFields: updated, previous: revealed
                 )
-                if token == operationID { clearPlaintext() }
+                guard isCurrent(scope, token: token) else { return }
+                self.revealed = saved
+                if scope.resourceType == "institution",
+                   let bank = appState.institutions.first(where: { $0.id == scope.resourceID }) {
+                    appState.setInstitutionLogoWebsite(saved.fields["login_url"], for: bank)
+                }
+                clearEditor()
             } catch {
-                if token == operationID { errorMessage = error.localizedDescription }
+                guard isCurrent(scope, token: token) else { return }
+                errorMessage = error.localizedDescription
             }
-            isWorking = false
-        }
-    }
-
-    private func loadStatus() async {
-        let token = operationID
-        do {
-            let result = try await VaultService.shared.resourceSecretAccessStatus(
-                type: resourceType, id: resourceID
-            )
-            guard !Task.isCancelled, token == operationID else { return }
-            status = result.status
-            canEdit = result.canEdit
-            onStatusChange?(result.status)
-            errorMessage = nil
-            if result.status != "ready" { clearPlaintext() }
-        } catch {
-            guard !Task.isCancelled, token == operationID else { return }
-            status = "unavailable"
-            canEdit = false
-            onStatusChange?("check_failed")
-            errorMessage = "Credential access couldn’t be checked. Try again when connected."
+            isSaving = false
         }
     }
 
     private func refresh() {
-        guard !isWorking else { return }
-        isWorking = true
-        Task {
-            await loadStatus()
-            isWorking = false
+        guard !isSaving, activePresentation != nil else { return }
+        refreshID = UUID()
+    }
+
+    private func startLoading(_ scope: Presentation) async {
+        guard !Task.isCancelled, activePresentation == scope else { return }
+        resetPresentation()
+        presentation = scope
+        onStatusChange?("checking")
+        let token = operationID
+        await loadCredentials(for: scope, token: token)
+        while isCurrent(scope, token: token), status == "pending" || status == "locked" {
+            do { try await Task.sleep(for: .seconds(10)) }
+            catch { return }
+            guard isCurrent(scope, token: token) else { return }
+            await loadCredentials(for: scope, token: token)
         }
     }
 
-    private func reveal() {
-        guard !isWorking else { return }
-        let token = operationID
-        isWorking = true
-        isRevealing = true
-        errorMessage = nil
-        Task {
-            defer { isRevealing = false; isWorking = false }
-            do {
-                let credentials = try await VaultService.shared.revealResourceSecret(
-                    type: resourceType, id: resourceID,
-                    expectedOwnerUserID: ownerUserID
-                )
-                guard revealGate.accept(credentials.fields, for: token, isActive: scenePhase == .active) != nil else {
-                    isWorking = false
-                    return
-                }
-                revealed = credentials
-            } catch {
-                guard token == operationID else {
-                    isWorking = false
-                    return
-                }
-                errorMessage = error.localizedDescription
-                await loadStatus()
+    private func loadCredentials(for scope: Presentation, token: UUID) async {
+        do {
+            let result = try await VaultService.shared.resourceSecretAccessStatus(
+                type: scope.resourceType, id: scope.resourceID
+            )
+            guard isCurrent(scope, token: token) else { return }
+            status = result.status
+            canEdit = result.canEdit
+            errorMessage = nil
+            onStatusChange?(result.status)
+            guard result.status == "ready" else { return }
+        } catch {
+            guard isCurrent(scope, token: token) else { return }
+            status = "unavailable"
+            canEdit = false
+            onStatusChange?("check_failed")
+            if case ProtectedResourceSaveError.backendUpdateRequired = error {
+                errorMessage = "This server needs the Password Vault update before credentials can be added or opened."
+            } else {
+                errorMessage = "Credential access couldn’t be checked. Try again when connected."
             }
-            isWorking = false
+            return
+        }
+
+        do {
+            let credentials = try await VaultService.shared.readResourceCredentials(
+                type: scope.resourceType, id: scope.resourceID,
+                expectedOwnerUserID: scope.ownerUserID, expectedViewerUserID: scope.viewerUserID
+            )
+            guard isCurrent(scope, token: token) else { return }
+            revealed = credentials
+            onCredentialsChange?(credentials, scope.viewerUserID, canEdit)
+        } catch {
+            guard isCurrent(scope, token: token) else { return }
+            errorMessage = error.localizedDescription
         }
     }
 }

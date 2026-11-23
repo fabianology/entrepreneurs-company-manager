@@ -61,7 +61,73 @@ final class AppState {
     // This session marker prevents old in-memory records from crossing account boundaries.
     var portfolioLoadingUserID: UUID?
     var portfolioLoadID = UUID()
-    var portfolioUserID: UUID? { didSet { searchRevision &+= 1 } }
+    var portfolioUserID: UUID? {
+        didSet {
+            searchRevision &+= 1
+            if oldValue != portfolioUserID { clearInstitutionLogoWebsites() }
+        }
+    }
+    private enum InstitutionLogoWebsite {
+        case loading(UUID, Task<Void, Never>)
+        case resolved(String?)
+        case retryAfter(Date)
+    }
+    // Artwork state belongs to the unlocked portfolio and never enters a record or a search cache.
+    private var institutionLogoWebsites: [UUID: InstitutionLogoWebsite] = [:]
+
+    @MainActor
+    func institutionLogo(
+        for institution: Institution, allowVaultWebsite: Bool
+    ) -> (host: String?, fromVault: Bool) {
+        if allowVaultWebsite, portfolioUserID == institution.userId,
+           case let .resolved(host) = institutionLogoWebsites[institution.id] {
+            return (host, true)
+        }
+        return (SearchBrand.websiteURL(institution.loginUrl)?.host, false)
+    }
+
+    @MainActor
+    func setInstitutionLogoWebsite(_ website: String?, for institution: Institution) {
+        guard portfolioUserID == institution.userId else { return }
+        if case let .loading(_, task) = institutionLogoWebsites[institution.id] {
+            task.cancel()
+        }
+        institutionLogoWebsites[institution.id] = .resolved(SearchBrand.websiteURL(website)?.host)
+    }
+
+    @MainActor
+    func loadInstitutionLogoWebsiteIfNeeded(for institution: Institution) {
+        let bankID = institution.id
+        let ownerID = institution.userId
+        guard hasLoadedPortfolio, portfolioUserID == ownerID,
+              institution.loginUrl?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else { return }
+        switch institutionLogoWebsites[bankID] {
+        case .loading, .resolved: return
+        case .retryAfter(let date) where date > Date(): return
+        default: break
+        }
+
+        let token = UUID()
+        let task = Task { [weak self] in
+            let result: InstitutionLogoWebsite
+            do {
+                let host = try await VaultService.shared.institutionLogoWebsiteHost(id: bankID, ownerUserID: ownerID)
+                result = .resolved(SearchBrand.websiteURL(host)?.host)
+            } catch {
+                result = .retryAfter(Date().addingTimeInterval(30))
+            }
+            guard !Task.isCancelled, let self, self.portfolioUserID == ownerID,
+                  case let .loading(currentToken, _) = self.institutionLogoWebsites[bankID],
+                  currentToken == token else { return }
+            self.institutionLogoWebsites[bankID] = result
+        }
+        institutionLogoWebsites[bankID] = .loading(token, task)
+    }
+
+    private func clearInstitutionLogoWebsites() {
+        for case let .loading(_, task) in institutionLogoWebsites.values { task.cancel() }
+        institutionLogoWebsites.removeAll()
+    }
     var searchRevision: UInt64 = 0
     var searchDocumentPages: [SearchDocumentPage] = [] { didSet { searchRevision &+= 1 } }
     var searchDocumentStatus = "Document contents have not been indexed" { didSet { searchRevision &+= 1 } }
