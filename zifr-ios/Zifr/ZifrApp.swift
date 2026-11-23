@@ -93,6 +93,16 @@ struct ZifrApp: App {
                 appState.entitlementSnapshot = accessController.effectiveSnapshot
                 await pushRegistration
             }
+            .task(id: authViewModel.isAuthenticated && scenePhase == .active) {
+                guard authViewModel.isAuthenticated, scenePhase == .active else { return }
+                while !Task.isCancelled {
+                    if let userID = authViewModel.currentUser?.id {
+                        await VaultService.shared.deliverPendingCredentials(for: userID)
+                    }
+                    do { try await Task.sleep(for: .seconds(20)) }
+                    catch { break }
+                }
+            }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .background {
                     backgroundDate = Date()

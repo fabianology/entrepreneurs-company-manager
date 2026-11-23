@@ -99,7 +99,7 @@ final class AppViewModel {
             let original = appState.subscriptions[idx]
             appState.subscriptions[idx] = mutableSub
             Task {
-                do { try await DataRepository.shared.updateSubscription(mutableSub) }
+                do { try await DataRepository.shared.updateSubscription(ResourceSecretPreparation.metadata(for: mutableSub)) }
                 catch { await MainActor.run { if let currentIdx = appState.subscriptions.firstIndex(where: { $0.id == sub.id }) { appState.subscriptions[currentIdx] = original }; appState.error = "Failed to update service." } }
             }
         } else {
@@ -127,6 +127,7 @@ final class AppViewModel {
         saved.lastUpdated = Date()
         try await persist(saved, exists)
         guard appState.portfolioUserID == actorID else { throw CancellationError() }
+        saved = ResourceSecretPreparation.metadata(for: saved, includeCredentialPresence: true)
         if let index = appState.subscriptions.firstIndex(where: { $0.id == saved.id }) {
             appState.subscriptions[index] = saved
         } else {
@@ -156,7 +157,7 @@ final class AppViewModel {
             let original = appState.cards[idx]
             appState.cards[idx] = card
             Task {
-                do { try await DataRepository.shared.updateCard(card) }
+                do { try await DataRepository.shared.updateCard(ResourceSecretPreparation.metadata(for: card)) }
                 catch { await MainActor.run { if let currentIdx = appState.cards.firstIndex(where: { $0.id == card.id }) { appState.cards[currentIdx] = original }; appState.error = "Failed to update card." } }
             }
         } else {
@@ -182,10 +183,11 @@ final class AppViewModel {
         let actorID = appState.portfolioUserID
         try await persist(card, exists)
         guard appState.portfolioUserID == actorID else { throw CancellationError() }
+        let metadata = ResourceSecretPreparation.metadata(for: card, includeCredentialPresence: true)
         if let index = appState.cards.firstIndex(where: { $0.id == card.id }) {
-            appState.cards[index] = card
+            appState.cards[index] = metadata
         } else {
-            appState.cards.append(card)
+            appState.cards.append(metadata)
         }
     }
 
@@ -211,7 +213,7 @@ final class AppViewModel {
             let original = appState.institutions[idx]
             appState.institutions[idx] = inst
             Task {
-                do { try await DataRepository.shared.updateInstitution(inst) }
+                do { try await DataRepository.shared.updateInstitution(ResourceSecretPreparation.metadata(for: inst)) }
                 catch { await MainActor.run { if let currentIdx = appState.institutions.firstIndex(where: { $0.id == inst.id }) { appState.institutions[currentIdx] = original }; appState.error = "Failed to update bank." } }
             }
         } else {
@@ -237,10 +239,11 @@ final class AppViewModel {
         let actorID = appState.portfolioUserID
         try await persist(institution, exists)
         guard appState.portfolioUserID == actorID else { throw CancellationError() }
+        let metadata = ResourceSecretPreparation.metadata(for: institution, includeCredentialPresence: true)
         if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
-            appState.institutions[index] = institution
+            appState.institutions[index] = metadata
         } else {
-            appState.institutions.append(institution)
+            appState.institutions.append(metadata)
         }
     }
 
@@ -271,19 +274,24 @@ final class AppViewModel {
             )
         }
 
+        if try ResourceSecretPreparation.candidate(for: institution, snapshot: nil) != nil
+            || cards.contains(where: { try ResourceSecretPreparation.candidate(for: $0, snapshot: nil) != nil }) {
+            _ = try await VaultService.shared.requireProtectedSaveAccess(for: institution.userId)
+        }
+
         let originalInstitutions = appState.institutions
         let originalCards = appState.cards
         let originalLoans = appState.loans
         if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
-            appState.institutions[index] = institution
+            appState.institutions[index] = ResourceSecretPreparation.metadata(for: institution, includeCredentialPresence: true)
         } else {
-            appState.institutions.append(institution)
+            appState.institutions.append(ResourceSecretPreparation.metadata(for: institution, includeCredentialPresence: true))
         }
         for card in cards {
             if let index = appState.cards.firstIndex(where: { $0.id == card.id }) {
-                appState.cards[index] = card
+                appState.cards[index] = ResourceSecretPreparation.metadata(for: card, includeCredentialPresence: true)
             } else {
-                appState.cards.append(card)
+                appState.cards.append(ResourceSecretPreparation.metadata(for: card, includeCredentialPresence: true))
             }
         }
         for loan in loans {

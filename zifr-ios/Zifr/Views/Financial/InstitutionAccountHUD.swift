@@ -8,6 +8,7 @@ struct InstitutionAccountHUD: View {
     let institutionName: String
     var institutionId: UUID? = nil
     var availableCards: [FinancialCard] = []
+    var canEnterProtectedDetails = true
     let companyId: UUID
     @Bindable var vm: AppViewModel
     let onSave: () -> Void
@@ -85,58 +86,65 @@ struct InstitutionAccountHUD: View {
                                 text: $draft.name
                             )
 
-                            ZifrField(
-                                label: "ACCOUNT NUMBER",
-                                placeholder: SecurityService.isLockedValue(draft.accountNumber) ? SecurityService.lockedValueLabel : "e.g. 1234567890",
-                                text: Binding(
-                                    get: { SecurityService.editableValue(draft.accountNumber) },
-                                    set: { newValue in
-                                        draft.accountNumber = newValue
-                                        let filtered = newValue.filter { $0.isNumber }
-                                        if filtered.count >= 4 {
-                                            draft.last4 = String(filtered.suffix(4))
-                                        } else {
-                                            draft.last4 = filtered
-                                        }
-                                    }
-                                ),
-                                keyboardType: .numberPad
-                            )
-
-                            ZifrField(
-                                label: "ROUTING NUMBER",
-                                placeholder: SecurityService.isLockedValue(draft.routingNumber) ? SecurityService.lockedValueLabel : "e.g. 021000021",
-                                text: Binding(
-                                    get: { SecurityService.editableValue(draft.routingNumber) },
-                                    set: { draft.routingNumber = $0 }
-                                ),
-                                keyboardType: .numberPad
-                            )
-
-                            if !(draft.wireRoutingNumber ?? "").isEmpty {
+                            if canEnterProtectedDetails {
                                 ZifrField(
-                                    label: "WIRE ROUTING NUMBER",
-                                    placeholder: SecurityService.isLockedValue(draft.wireRoutingNumber) ? SecurityService.lockedValueLabel : "Provided when different from ACH",
+                                    label: "ACCOUNT NUMBER",
+                                    placeholder: SecurityService.isLockedValue(draft.accountNumber) ? SecurityService.lockedValueLabel : "e.g. 1234567890",
                                     text: Binding(
-                                        get: { SecurityService.editableValue(draft.wireRoutingNumber) },
-                                        set: { draft.wireRoutingNumber = $0 }
+                                        get: { SecurityService.editableValue(draft.accountNumber) },
+                                        set: { newValue in
+                                            draft.accountNumber = newValue
+                                            let filtered = newValue.filter { $0.isNumber }
+                                            if filtered.count >= 4 {
+                                                draft.last4 = String(filtered.suffix(4))
+                                            } else {
+                                                draft.last4 = filtered
+                                            }
+                                        }
                                     ),
                                     keyboardType: .numberPad
                                 )
-                            }
 
-                            if [draft.accountNumber, draft.routingNumber, draft.wireRoutingNumber].contains(where: SecurityService.isLockedValue) {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Label("Some bank details are locked. Replace individual values or preserve them unchanged.", systemImage: "lock.trianglebadge.exclamationmark")
-                                    Button("Clear All Locked Bank Details", role: .destructive) {
-                                        if SecurityService.isLockedValue(draft.accountNumber) { draft.accountNumber = nil }
-                                        if SecurityService.isLockedValue(draft.routingNumber) { draft.routingNumber = nil }
-                                        if SecurityService.isLockedValue(draft.wireRoutingNumber) { draft.wireRoutingNumber = nil }
-                                    }
+                                ZifrField(
+                                    label: "ROUTING NUMBER",
+                                    placeholder: SecurityService.isLockedValue(draft.routingNumber) ? SecurityService.lockedValueLabel : "e.g. 021000021",
+                                    text: Binding(
+                                        get: { SecurityService.editableValue(draft.routingNumber) },
+                                        set: { draft.routingNumber = $0 }
+                                    ),
+                                    keyboardType: .numberPad
+                                )
+
+                                if !(draft.wireRoutingNumber ?? "").isEmpty {
+                                    ZifrField(
+                                        label: "WIRE ROUTING NUMBER",
+                                        placeholder: SecurityService.isLockedValue(draft.wireRoutingNumber) ? SecurityService.lockedValueLabel : "Provided when different from ACH",
+                                        text: Binding(
+                                            get: { SecurityService.editableValue(draft.wireRoutingNumber) },
+                                            set: { draft.wireRoutingNumber = $0 }
+                                        ),
+                                        keyboardType: .numberPad
+                                    )
                                 }
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color.orange.opacity(0.8))
-                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                                if [draft.accountNumber, draft.routingNumber, draft.wireRoutingNumber].contains(where: SecurityService.isLockedValue) {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Label("Some bank details are locked. Replace individual values or preserve them unchanged.", systemImage: "lock.trianglebadge.exclamationmark")
+                                        Button("Clear All Locked Bank Details", role: .destructive) {
+                                            if SecurityService.isLockedValue(draft.accountNumber) { draft.accountNumber = nil }
+                                            if SecurityService.isLockedValue(draft.routingNumber) { draft.routingNumber = nil }
+                                            if SecurityService.isLockedValue(draft.wireRoutingNumber) { draft.wireRoutingNumber = nil }
+                                        }
+                                    }
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(Color.orange.opacity(0.8))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            } else {
+                                Text("Open Secure Credentials in the bank to manage saved account and routing numbers.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
 
                             if draft.isTokenizedAccountNumber == true {

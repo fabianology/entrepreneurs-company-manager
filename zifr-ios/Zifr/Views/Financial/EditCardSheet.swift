@@ -15,6 +15,7 @@ struct EditCardSheet: View {
     @State private var resourceCredentialStatus = "checking"
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var showingVaultAccess = false
     @State private var newInstitutionDraftID = UUID()
     @State private var institutionChangeSaved = false
     @State private var showDeleteConfirm = false
@@ -52,11 +53,6 @@ struct EditCardSheet: View {
     @State private var showTransactions = false
     
     // Institution Draft
-    @State private var instWebsite: String = ""
-    @State private var instLogin: String = ""
-    @State private var instPass: String = ""
-    @State private var instEmail: String = ""
-    @State private var instTwoFactor: String = ""
     @State private var showInstPassword = false
     @State private var isEditingInstitution = false
 
@@ -114,88 +110,6 @@ struct EditCardSheet: View {
         !institutionName.isEmpty
     }
 
-    private func suggestedInstitutionWebsite(for name: String) -> String {
-        let normalizedName = name
-            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .joined()
-            .lowercased()
-
-        guard !normalizedName.isEmpty else { return "" }
-
-        let knownDomains: [String: String] = [
-            "ally": "ally.com",
-            "allybank": "ally.com",
-            "amex": "americanexpress.com",
-            "americanexpress": "americanexpress.com",
-            "apple": "apple.com",
-            "applecard": "apple.com",
-            "bankofamerica": "bankofamerica.com",
-            "barclays": "barclays.com",
-            "capitalone": "capitalone.com",
-            "charlesschwab": "schwab.com",
-            "chase": "chase.com",
-            "chasebank": "chase.com",
-            "citi": "citi.com",
-            "citibank": "citi.com",
-            "citizens": "citizensbank.com",
-            "citizensbank": "citizensbank.com",
-            "discover": "discover.com",
-            "fidelity": "fidelity.com",
-            "fidelityinvestments": "fidelity.com",
-            "fifththird": "53.com",
-            "fifththirdbank": "53.com",
-            "goldmansachs": "goldmansachs.com",
-            "jpmorgan": "jpmorgan.com",
-            "jpmorganchase": "chase.com",
-            "marcus": "marcus.com",
-            "navyfederal": "navyfederal.org",
-            "navyfederalcreditunion": "navyfederal.org",
-            "paypal": "paypal.com",
-            "pnc": "pnc.com",
-            "pncbank": "pnc.com",
-            "regions": "regions.com",
-            "regionsbank": "regions.com",
-            "sofi": "sofi.com",
-            "synchrony": "synchrony.com",
-            "synchronybank": "synchrony.com",
-            "td": "td.com",
-            "tdbank": "tdbank.com",
-            "truist": "truist.com",
-            "usaa": "usaa.com",
-            "usbank": "usbank.com",
-            "vanguard": "vanguard.com",
-            "venmo": "venmo.com",
-            "wellsfargo": "wellsfargo.com"
-        ]
-
-        if let knownDomain = knownDomains[normalizedName] {
-            return knownDomain
-        }
-
-        let genericSuffixes = [
-            "federalcreditunion",
-            "creditunion",
-            "financialservices",
-            "financial",
-            "nationalbank",
-            "bankandtrust",
-            "banktrust",
-            "bank"
-        ]
-
-        let simplifiedName = genericSuffixes.reduce(normalizedName) { result, suffix in
-            guard result.hasSuffix(suffix), result.count > suffix.count else { return result }
-            return String(result.dropLast(suffix.count))
-        }
-
-        if let knownDomain = knownDomains[simplifiedName] {
-            return knownDomain
-        }
-
-        return "\(simplifiedName).com"
-    }
-
     @ViewBuilder private var institutionDetailsSection: some View {
         if isNewInstitution && card.userId == appState.portfolioUserID {
             VStack(alignment: .leading, spacing: 8) {
@@ -206,7 +120,6 @@ struct EditCardSheet: View {
                         get: { card.institutionName ?? "" },
                         set: { newName in
                             card.institutionName = newName
-                            instWebsite = suggestedInstitutionWebsite(for: newName)
                         }
                     )
                 )
@@ -221,11 +134,6 @@ struct EditCardSheet: View {
                                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                         isNewInstitution = false
                                         card.institutionName = inst.name
-                                        instWebsite = inst.loginUrl ?? ""
-                                        instLogin = inst.username ?? ""
-                                        instPass = inst.password ?? ""
-                                        instEmail = inst.email ?? ""
-                                        instTwoFactor = inst.twoFactor ?? ""
                                         isEditingInstitution = false
                                     }
                                 } label: {
@@ -270,11 +178,6 @@ struct EditCardSheet: View {
                         ForEach(institutions) { inst in
                             Button(inst.name.isEmpty ? "Unnamed" : inst.name) {
                                 card.institutionName = inst.name
-                                instWebsite = inst.loginUrl ?? ""
-                                instLogin = inst.username ?? ""
-                                instPass = inst.password ?? ""
-                                instEmail = inst.email ?? ""
-                                instTwoFactor = inst.twoFactor ?? ""
                                 isEditingInstitution = false
                             }
                         }
@@ -621,6 +524,33 @@ struct EditCardSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    @MainActor
+    private func save() {
+        guard !isSaving else { return }
+        isSaving = true
+        card.institutionName = institutionName
+        Task { @MainActor in
+            defer { isSaving = false }
+            do {
+                if try ResourceSecretPreparation.candidate(for: card, snapshot: nil) != nil,
+                   card.userId == appState.portfolioUserID {
+                    _ = try await VaultService.shared.requireProtectedSaveAccess(for: card.userId)
+                }
+                if try await saveInstitutionData() { institutionChangeSaved = true }
+                try await vm.saveCardConfirmed(card, appState: appState)
+                dismiss()
+            } catch ProtectedResourceSaveError.vaultAccessRequired {
+                showingVaultAccess = true
+            } catch {
+                var message = ResourceSaveFailure.message(for: error, resource: "card")
+                if institutionChangeSaved {
+                    message += " Institution changes that were already confirmed remain saved."
+                }
+                saveError = message
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -883,25 +813,7 @@ struct EditCardSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
-                        Button(isSaving ? "Saving…" : "Save") {
-                            guard !isSaving else { return }
-                            isSaving = true
-                            card.institutionName = institutionName
-                            Task { @MainActor in
-                                defer { isSaving = false }
-                                do {
-                                    if try await saveInstitutionData() { institutionChangeSaved = true }
-                                    try await vm.saveCardConfirmed(card, appState: appState)
-                                    dismiss()
-                                } catch {
-                                    var message = ResourceSaveFailure.message(for: error, resource: "card")
-                                    if institutionChangeSaved {
-                                        message += " Institution changes that were already confirmed remain saved."
-                                    }
-                                    saveError = message
-                                }
-                            }
-                        }
+                        Button(isSaving ? "Saving…" : "Save", action: save)
                         .fontWeight(.semibold)
                         .tint(canSave && isDirty ? .green : nil)
                         .disabled(!canSave || isSaving)
@@ -909,6 +821,7 @@ struct EditCardSheet: View {
                 }
             }
             .interactiveDismissDisabled(isNew || isSaving)
+            .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: save))
             .alert("Card Not Saved", isPresented: Binding(
                 get: { saveError != nil }, set: { if !$0 { saveError = nil } }
             )) {
@@ -1005,41 +918,14 @@ struct EditCardSheet: View {
         // Collaborators manage an independently granted bank in its own editor.
         guard card.userId == appState.portfolioUserID else { return false }
 
-        if isNewInstitution {
-            // Stable identity across retries: a confirmed bank followed by a
-            // failed card save must not create a second institution.
-            var newInst = appState.institutions.first { $0.id == newInstitutionDraftID }
-                ?? Institution(id: newInstitutionDraftID, userId: card.userId, companyId: card.companyId)
-            newInst.name = institutionName
-            newInst.loginUrl = instWebsite
-            newInst.username = instLogin
-            newInst.password = instPass
-            newInst.email = instEmail
-            newInst.twoFactor = instTwoFactor
-            if appState.institutions.first(where: { $0.id == newInst.id }) != newInst {
-                try await vm.saveInstitutionConfirmed(newInst, appState: appState)
-                return true
-            }
-        } else {
-            let instName = institutionName.lowercased()
-            if !instName.isEmpty {
-                if var existing = appState.institutions.first(where: {
-                    $0.companyId == card.companyId && $0.userId == card.userId && $0.name.lowercased() == instName
-                }) {
-                    let original = existing
-                    if !instWebsite.isEmpty { existing.loginUrl = instWebsite }
-                    if !instLogin.isEmpty { existing.username = instLogin }
-                    if !instPass.isEmpty { existing.password = instPass }
-                    if !instEmail.isEmpty { existing.email = instEmail }
-                    if !instTwoFactor.isEmpty { existing.twoFactor = instTwoFactor }
-                    if existing != original {
-                        try await vm.saveInstitutionConfirmed(existing, appState: appState)
-                        return true
-                    }
-                }
-            }
-        }
-        return false
+        guard isNewInstitution, !institutionChangeSaved else { return false }
+        let newInstitution = Institution(
+            id: newInstitutionDraftID, userId: card.userId,
+            companyId: card.companyId, name: institutionName
+        )
+        if appState.institutions.contains(where: { $0.id == newInstitutionDraftID }) { return false }
+        try await vm.saveInstitutionConfirmed(newInstitution, appState: appState)
+        return true
     }
 
     private func moneyField(label: String, value: Binding<Double>) -> some View {

@@ -946,6 +946,49 @@ final class ResourceVaultCryptographyTests: XCTestCase {
     private let recipient = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     private let device = UUID(uuidString: "70000000-0000-0000-0000-000000000001")!
 
+    func testRecoveryPassphraseSupportsSpacesAndUsesAnIndependentSalt() async throws {
+        let password = "orchard velvet delta graphite"
+        let context = VaultRecoveryWrapContext(ownerUserID: owner, keyVersion: 1)
+        let key = SymmetricKey(size: .bits256)
+        let first = try await VaultCryptography.wrapVaultKeyWithPassword(key, password: password, context: context)
+        let second = try await VaultCryptography.wrapVaultKeyWithPassword(key, password: password, context: context)
+        XCTAssertNotEqual(first.split(separator: ":")[3], second.split(separator: ":")[3])
+        XCTAssertFalse(first.contains(password))
+        let recovered = try await VaultCryptography.unwrapVaultKeyWithPassword(first, password: password, context: context)
+        XCTAssertEqual(VaultCryptography.keyConfirmation(for: recovered), VaultCryptography.keyConfirmation(for: key))
+        for (input, ownerID) in [("wrong recovery password", owner), (password, recipient)] {
+            do {
+                _ = try await VaultCryptography.unwrapVaultKeyWithPassword(
+                    first, password: input, context: VaultRecoveryWrapContext(ownerUserID: ownerID, keyVersion: 1)
+                )
+                XCTFail("Wrong recovery input or account unwrapped the key")
+            } catch VaultCryptographyError.authenticationFailed {
+                // Expected.
+            }
+        }
+    }
+
+    func testRecoveryReplacementAndRotationPreservePasswordSemantics() async throws {
+        let original = "hazel moth lake notebook"
+        let replacement = "solstice pepper cotton creek"
+        XCTAssertTrue(VaultRecoveryMethod.acceptsPassword(replacement))
+        XCTAssertFalse(VaultRecoveryMethod.acceptsPassword("password password password"))
+        let previous = SymmetricKey(size: .bits256)
+        let rotated = SymmetricKey(size: .bits256)
+        let first = VaultRecoveryWrapContext(ownerUserID: owner, keyVersion: 1)
+        let second = VaultRecoveryWrapContext(ownerUserID: owner, keyVersion: 2)
+        let replaced = try await VaultRecoveryMethod.password(replacement).wrap(previous, context: first)
+        do {
+            _ = try await VaultCryptography.unwrapVaultKeyWithPassword(replaced, password: original, context: first)
+            XCTFail("Old password still opened the replacement wrap")
+        } catch VaultCryptographyError.authenticationFailed {
+            // Expected.
+        }
+        let current = try await VaultRecoveryMethod.password(replacement).wrap(rotated, context: second)
+        let recovered = try await VaultCryptography.unwrapVaultKeyWithPassword(current, password: replacement, context: second)
+        XCTAssertEqual(VaultCryptography.keyConfirmation(for: recovered), VaultCryptography.keyConfirmation(for: rotated))
+    }
+
     func testResourceCiphertextIsBoundToOwnerResourceAndVersion() throws {
         let key = SymmetricKey(size: .bits256)
         let context = ResourceSecretFieldContext(resource: ResourceKeyContext(ownerUserID: owner, resourceType: "institution", resourceID: bank, keyVersion: 1), fieldName: "password")
@@ -1084,6 +1127,20 @@ final class ResourceVaultCryptographyTests: XCTestCase {
 }
 
 final class ResourceSecretPreparationTests: XCTestCase {
+    func testOrdinaryRecordsAndMetadataCarryNoProtectedFields() throws {
+        let owner = UUID()
+        let company = UUID()
+        let ordinary = Institution(userId: owner, companyId: company, name: "Bank")
+        XCTAssertNil(try ResourceSecretPreparation.candidate(for: ordinary, snapshot: nil))
+        let service = Subscription(userId: owner, companyId: company, name: "Service", loginId: "login", password: "123")
+        XCTAssertEqual(try ResourceSecretPreparation.candidate(for: service, snapshot: nil)?.plaintextFields["password"], "123")
+        XCTAssertNil(try ResourceSecretPreparation.candidate(for: ResourceSecretPreparation.metadata(for: service), snapshot: nil))
+        let card = FinancialCard(userId: owner, companyId: company, name: "Card", cardNumber: "1234", last4: "1234")
+        let metadata = ResourceSecretPreparation.metadata(for: card)
+        XCTAssertEqual(metadata.last4, card.last4)
+        XCTAssertNil(try ResourceSecretPreparation.candidate(for: metadata, snapshot: nil))
+    }
+
     private let owner = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     private let device = UUID(uuidString: "70000000-0000-0000-0000-000000000001")!
     private let bank = UUID(uuidString: "30000000-0000-0000-0000-000000000001")!

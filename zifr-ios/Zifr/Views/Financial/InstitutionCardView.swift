@@ -324,6 +324,7 @@ struct InstitutionCardView: View {
                 institutionName: institution.name.isEmpty ? "Bank" : institution.name,
                 institutionId: institution.id,
                 availableCards: appState.cards.filter { $0.companyId == institution.companyId },
+                canEnterProtectedDetails: false,
                 companyId: institution.companyId,
                 vm: vm,
                 onSave: {

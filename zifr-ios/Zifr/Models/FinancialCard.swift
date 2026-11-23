@@ -7,6 +7,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
     var name: String
     var login: String?
     var password: String?
+    var hasScopedCredentials: Bool? = nil
     var institutionName: String?
     var cardHolder: String?
     var cardNumber: String?
@@ -36,6 +37,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
         case name
         case login
         case password
+        case hasScopedCredentials = "has_scoped_credentials"
         case institutionName = "institution_name"
         case cardHolder = "card_holder"
         case cardNumber = "card_number"

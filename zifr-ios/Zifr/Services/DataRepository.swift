@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 import CryptoKit
+import CommonCrypto
 import Security
 import LocalAuthentication
 #if canImport(UIKit)
@@ -61,12 +62,37 @@ enum ShareInviteResult {
     case invitationCreatedEmailFailed
 }
 
+enum ProtectedResourceSaveError: LocalizedError {
+    case vaultAccessRequired
+    case ownerRequired
+    case rotationPending
+
+    var errorDescription: String? {
+        switch self {
+        case .vaultAccessRequired:
+            "Set up Password Vault or get access on this device to save these credentials. Your draft is still here."
+        case .ownerRequired:
+            "Ask the owner to save the first credentials for this item. Your draft is still here."
+        case .rotationPending:
+            "Finish securing your vault in Password Vault settings, then try again. Your draft is still here."
+        }
+    }
+}
+
 /// Safe form copy: an interrupted response does not prove a remote rollback.
 enum ResourceSaveFailure {
     static func message(for error: Error, resource: String) -> String {
         // These app-owned errors already distinguish stale ledgers and access
         // denial safely; never flatten their specific recovery instructions.
         if let loanError = error as? LoanSaveError { return loanError.localizedDescription }
+        if let vaultError = error as? ProtectedResourceSaveError { return vaultError.localizedDescription }
+        switch (error as? PostgrestError)?.message {
+        case "LEGACY_CREDENTIALS_REQUIRE_CONVERSION":
+            return "This record has credentials from an earlier version. They still need to be transferred to Password Vault. Your draft is still here."
+        case "RESOURCE_SECRET_CHANGED":
+            return "These credentials changed while you were editing. Reopen the record to check the latest version. Your draft is still here."
+        default: break
+        }
         let code = (error as? PostgrestError)?.code
         let local = error as NSError
         if code == "42501" || ((local.domain == "ResourceSave" || local.domain == "DataRepository") && local.code == 403) {
@@ -315,31 +341,30 @@ class DataRepository {
         (error as? PostgrestError)?.code == "PGRST202"
     }
 
-    private func fetchVisibleSubscriptions() async throws -> [Subscription] {
+    private func fetchVisibleRecords<Record: Decodable>(table: String) async throws -> [Record] {
         do {
-            return try await client.rpc("miloom_visible_subscriptions").execute().value
+            return try await client.rpc("miloom_visible_\(table)_with_credentials").execute().value
         } catch {
             guard isMissingVisibleRecordsRPC(error) else { throw error }
-            return try await client.from("subscriptions").select().execute().value
         }
+        do {
+            return try await client.rpc("miloom_visible_\(table)").execute().value
+        } catch {
+            guard isMissingVisibleRecordsRPC(error) else { throw error }
+            return try await client.from(table).select().execute().value
+        }
+    }
+
+    private func fetchVisibleSubscriptions() async throws -> [Subscription] {
+        try await fetchVisibleRecords(table: "subscriptions")
     }
 
     private func fetchVisibleCards() async throws -> [FinancialCard] {
-        do {
-            return try await client.rpc("miloom_visible_financial_cards").execute().value
-        } catch {
-            guard isMissingVisibleRecordsRPC(error) else { throw error }
-            return try await client.from("financial_cards").select().execute().value
-        }
+        try await fetchVisibleRecords(table: "financial_cards")
     }
 
     private func fetchVisibleInstitutions() async throws -> [Institution] {
-        do {
-            return try await client.rpc("miloom_visible_institutions").execute().value
-        } catch {
-            guard isMissingVisibleRecordsRPC(error) else { throw error }
-            return try await client.from("institutions").select().execute().value
-        }
+        try await fetchVisibleRecords(table: "institutions")
     }
 
     func fetchAlertRules() async throws -> [AlertRule] {
@@ -451,7 +476,7 @@ class DataRepository {
             guard original != normalized else { return nil }
             normalized.password = SecurityService.shared.decrypt(normalized.password, context: vaultContext(owner: normalized.userId, type: "subscription", id: normalized.id, field: "password"))
             guard appState.subscriptions.first(where: { $0.id == original.id }) == normalized else { return nil }
-            return normalized
+            return ResourceSecretPreparation.metadata(for: normalized)
         }
 
         // Persist a complete raw server snapshot, retaining the original encrypted
@@ -829,129 +854,134 @@ class DataRepository {
     
     // MARK: - Subscriptions
     func insertSubscription(_ sub: Subscription) async throws {
-        var secureSub = sub
-        secureSub.password = SecurityService.shared.encrypt(secureSub.password, context: vaultContext(owner: sub.userId, type: "subscription", id: sub.id, field: "password"))
-        try await client.from("subscriptions").insert(secureSub).execute()
+        try await saveSubscription(sub, insert: true)
     }
+
     func updateSubscription(_ sub: Subscription) async throws {
-        let session = try? await client.auth.session
-        var secureSub = sub
-        if let session, sub.userId != session.user.id {
-            // The backend preserves owner credentials on collaborator edits.
-            secureSub.password = nil
-        } else {
-            secureSub.password = SecurityService.shared.encrypt(secureSub.password, context: vaultContext(owner: sub.userId, type: "subscription", id: sub.id, field: "password"))
+        try await saveSubscription(sub, insert: false)
+    }
+
+    private func saveSubscription(_ sub: Subscription, insert: Bool) async throws {
+        let session = try await client.auth.session
+        let record = ResourceSecretPreparation.metadata(for: sub)
+        if let candidate = try ResourceSecretPreparation.candidate(for: sub, snapshot: nil) {
+            guard session.user.id == sub.userId else { throw ProtectedResourceSaveError.ownerRequired }
+            let snapshot = try await VaultService.shared.requireProtectedSaveAccess(for: sub.userId)
+            try await VaultService.shared.saveProtected(candidate, record: record, insert: insert, snapshot: snapshot)
+            return
         }
-        let rows: [MutationReceipt] = try await client.from("subscriptions")
-            .update(secureSub)
-            .eq("id", value: sub.id)
-            .select("id")
-            .execute().value
-        try requireUpdatedRow(rows, resource: "service")
-        if let session, sub.userId != session.user.id {
-            let log = ActivityLog(userId: sub.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_subscription", message: "\(session.user.email ?? "Someone") updated the shared subscription '\(sub.name)'.", resourceId: sub.id, resourceType: "subscription")
-            try? await insertActivityLog(log)
+        if insert {
+            try await client.from("subscriptions").insert(record).execute()
+        } else {
+            // Omit two-factor metadata so older stored credentials survive an
+            // ordinary update from a client that has not revealed them.
+            let encoded = try PostgrestClient.Configuration.jsonEncoder.encode(record)
+            var metadata = try JSONDecoder().decode([String: AnyJSON].self, from: encoded)
+            metadata.removeValue(forKey: "two_factor_auth")
+            let rows: [MutationReceipt] = try await client.from("subscriptions")
+                .update(metadata).eq("id", value: sub.id).select("id").execute().value
+            try requireUpdatedRow(rows, resource: "service")
+            if session.user.id != sub.userId {
+                let log = ActivityLog(userId: sub.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_subscription", message: "\(session.user.email ?? "Someone") updated the shared subscription '\(sub.name)'.", resourceId: sub.id, resourceType: "subscription")
+                try? await insertActivityLog(log)
+            }
         }
     }
+
     func deleteSubscription(_ id: UUID) async throws {
         try await client.from("subscriptions").delete().eq("id", value: id).execute()
     }
-    
+
     // MARK: - Financial Cards
     func insertCard(_ card: FinancialCard) async throws {
-        var secureCard = card
-        secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
-        try await client.from("financial_cards").insert(secureCard).execute()
+        try await saveCard(card, insert: true)
     }
+
     func updateCard(_ card: FinancialCard) async throws {
-        let session = try? await client.auth.session
-        var secureCard = card
-        if let session, card.userId != session.user.id {
-            secureCard.password = nil
-        } else {
-            secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
-        }
-        let rows: [MutationReceipt] = try await client.from("financial_cards")
-            .update(secureCard)
-            .eq("id", value: card.id)
-            .select("id")
-            .execute().value
-        try requireUpdatedRow(rows, resource: "card")
-        if let session, card.userId != session.user.id {
-            let log = ActivityLog(userId: card.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_card", message: "\(session.user.email ?? "Someone") updated the shared card '\(card.name)'.", resourceId: card.id, resourceType: "card")
-            try? await insertActivityLog(log)
-        }
+        try await saveCard(card, insert: false)
     }
-    func upsertCard(_ card: FinancialCard) async throws {
-        var secureCard = card
-        if let session = try? await client.auth.session, card.userId != session.user.id {
-            secureCard.password = nil
-        } else {
-            secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
-        }
-        // INSERT ... ON CONFLICT DO UPDATE needs SELECT grants for every
-        // updated column, including credentials. Keep those grants closed.
-        let updated: [MutationReceipt] = try await client.from("financial_cards")
-            .update(secureCard).eq("id", value: card.id).select("id").execute().value
-        if !updated.isEmpty {
-            try requireUpdatedRow(updated, resource: "card")
+
+    private func saveCard(_ card: FinancialCard, insert: Bool) async throws {
+        let session = try await client.auth.session
+        let record = ResourceSecretPreparation.metadata(for: card)
+        if let candidate = try ResourceSecretPreparation.candidate(for: card, snapshot: nil) {
+            guard session.user.id == card.userId else { throw ProtectedResourceSaveError.ownerRequired }
+            let snapshot = try await VaultService.shared.requireProtectedSaveAccess(for: card.userId)
+            try await VaultService.shared.saveProtected(candidate, record: record, insert: insert, snapshot: snapshot)
             return
         }
-        do {
-            try await client.from("financial_cards").insert(secureCard).execute()
-        } catch let error as PostgrestError where error.code == "23505" {
-            let retry: [MutationReceipt] = try await client.from("financial_cards")
-                .update(secureCard).eq("id", value: card.id).select("id").execute().value
-            try requireUpdatedRow(retry, resource: "card")
+        if insert {
+            try await client.from("financial_cards").insert(record).execute()
+        } else {
+            let rows: [MutationReceipt] = try await client.from("financial_cards")
+                .update(record).eq("id", value: card.id).select("id").execute().value
+            try requireUpdatedRow(rows, resource: "card")
+            if session.user.id != card.userId {
+                let log = ActivityLog(userId: card.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_card", message: "\(session.user.email ?? "Someone") updated the shared card '\(card.name)'.", resourceId: card.id, resourceType: "card")
+                try? await insertActivityLog(log)
+            }
         }
     }
+
+    func upsertCard(_ card: FinancialCard) async throws {
+        do { try await updateCard(card) }
+        catch {
+            let local = error as NSError
+            guard (local.domain == "DataRepository" && local.code == 403)
+                    || (error as? PostgrestError)?.message == "PROTECTED_RESOURCE_NOT_FOUND" else { throw error }
+            do { try await insertCard(card) }
+            catch let conflict as PostgrestError where conflict.code == "23505" {
+                try await updateCard(card)
+            }
+        }
+    }
+
     func deleteCard(_ id: UUID) async throws {
         try await client.from("financial_cards").delete().eq("id", value: id).execute()
     }
-    
+
     // MARK: - Institutions
     func insertInstitution(_ inst: Institution) async throws {
-        let secureInst = encryptInstitutionSecrets(inst)
-        try await client.from("institutions").insert(secureInst).execute()
+        try await saveInstitution(inst, insert: true)
     }
+
     func updateInstitution(_ inst: Institution) async throws {
-        let session = try? await client.auth.session
-        let secureInst: Institution
-        if let session, inst.userId != session.user.id {
-            secureInst = try await preservingStoredInstitutionSecrets(in: inst)
-        } else {
-            secureInst = encryptInstitutionSecrets(inst)
-        }
-        let rows: [MutationReceipt] = try await client.from("institutions")
-            .update(secureInst)
-            .eq("id", value: inst.id)
-            .select("id")
-            .execute().value
-        try requireUpdatedRow(rows, resource: "bank")
-        if let session, inst.userId != session.user.id {
-            let log = ActivityLog(userId: inst.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_institution", message: "\(session.user.email ?? "Someone") updated the shared institution '\(inst.name)'.", resourceId: inst.id, resourceType: "institution")
-            try? await insertActivityLog(log)
-        }
+        try await saveInstitution(inst, insert: false)
     }
-    func upsertInstitution(_ inst: Institution) async throws {
-        let secureInst: Institution
-        if let session = try? await client.auth.session, inst.userId != session.user.id {
-            secureInst = try await preservingStoredInstitutionSecrets(in: inst)
-        } else {
-            secureInst = encryptInstitutionSecrets(inst)
-        }
-        let updated: [MutationReceipt] = try await client.from("institutions")
-            .update(secureInst).eq("id", value: inst.id).select("id").execute().value
-        if !updated.isEmpty {
-            try requireUpdatedRow(updated, resource: "bank")
+
+    private func saveInstitution(_ inst: Institution, insert: Bool) async throws {
+        let session = try await client.auth.session
+        let record = ResourceSecretPreparation.metadata(for: inst)
+        if let candidate = try ResourceSecretPreparation.candidate(for: inst, snapshot: nil) {
+            guard session.user.id == inst.userId else { throw ProtectedResourceSaveError.ownerRequired }
+            let snapshot = try await VaultService.shared.requireProtectedSaveAccess(for: inst.userId)
+            try await VaultService.shared.saveProtected(candidate, record: record, insert: insert, snapshot: snapshot)
             return
         }
-        do {
-            try await client.from("institutions").insert(secureInst).execute()
-        } catch let error as PostgrestError where error.code == "23505" {
-            let retry: [MutationReceipt] = try await client.from("institutions")
-                .update(secureInst).eq("id", value: inst.id).select("id").execute().value
-            try requireUpdatedRow(retry, resource: "bank")
+        if insert {
+            try await client.from("institutions").insert(record).execute()
+        } else {
+            let preserved = try await preservingStoredInstitutionSecrets(in: record)
+            let rows: [MutationReceipt] = try await client.from("institutions")
+                .update(preserved).eq("id", value: inst.id).select("id").execute().value
+            try requireUpdatedRow(rows, resource: "bank")
+            if session.user.id != inst.userId {
+                let log = ActivityLog(userId: inst.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_institution", message: "\(session.user.email ?? "Someone") updated the shared institution '\(inst.name)'.", resourceId: inst.id, resourceType: "institution")
+                try? await insertActivityLog(log)
+            }
+        }
+    }
+
+    func upsertInstitution(_ inst: Institution) async throws {
+        do { try await updateInstitution(inst) }
+        catch {
+            let local = error as NSError
+            guard (local.domain == "DataRepository" && local.code == 403)
+                    || (error as? PostgrestError)?.message == "PROTECTED_RESOURCE_NOT_FOUND" else { throw error }
+            do { try await insertInstitution(inst) }
+            catch let conflict as PostgrestError where conflict.code == "23505" {
+                try await updateInstitution(inst)
+            }
         }
     }
 
@@ -977,20 +1007,6 @@ class DataRepository {
             return merged
         }
         return preserved
-    }
-
-    private func encryptInstitutionSecrets(_ institution: Institution) -> Institution {
-        var secured = institution
-        secured.password = SecurityService.shared.encrypt(secured.password, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "password"))
-        secured.accounts = secured.accounts.map { account in
-            var securedAccount = account
-            let prefix = "accounts.\(account.id)"
-            securedAccount.accountNumber = SecurityService.shared.encrypt(account.accountNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).account_number"))
-            securedAccount.routingNumber = SecurityService.shared.encrypt(account.routingNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).routing_number"))
-            securedAccount.wireRoutingNumber = SecurityService.shared.encrypt(account.wireRoutingNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).wire_routing_number"))
-            return securedAccount
-        }
-        return secured
     }
 
     private func decryptInstitutionSecrets(_ institution: Institution) -> Institution {
@@ -1133,6 +1149,13 @@ class DataRepository {
         return report
     }
 
+    private struct LegacyVaultReplacement: Encodable {
+        let field: String
+        let account_id: String?
+        let old_value: String
+        let new_value: String
+    }
+
     func rotateVaultSecrets(
         snapshot: VaultKeySession.Snapshot,
         fromKeyVersion: Int
@@ -1143,101 +1166,73 @@ class DataRepository {
         let institutions = try await fetchVisibleInstitutions().filter { $0.userId == owner }
         var report = VaultMigrationReport()
 
-        struct PasswordPatch: Encodable { let password: String }
-        for subscription in subscriptions {
-            let context = VaultFieldContext(ownerUserID: owner, resourceType: "subscription", resourceID: subscription.id, fieldName: "password", keyVersion: snapshot.keyVersion)
-            switch rotateSecret(subscription.password, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
-            case .migrated(let value):
-                do {
-                    let rows: [MutationReceipt] = try await client.from("subscriptions").update(PasswordPatch(password: value)).eq("id", value: subscription.id).eq("user_id", value: owner).select("id").execute().value
-                    try requireUpdatedRow(rows, resource: "service")
-                    report.migratedFields += 1
-                } catch {
-                    report.failedRecords += 1
-                    report.remainingOldVaultFields += 1
-                    AppDiagnostics.failure("vault", "rotate_subscription", error: error)
-                }
+        func replacement(
+            for value: String?, resourceType: String, id: UUID,
+            field: String = "password", accountID: String? = nil, cryptographicField: String = "password"
+        ) -> LegacyVaultReplacement? {
+            let context = VaultFieldContext(
+                ownerUserID: owner, resourceType: resourceType, resourceID: id,
+                fieldName: cryptographicField, keyVersion: snapshot.keyVersion
+            )
+            switch rotateSecret(value, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
+            case .migrated(let encrypted):
+                guard let value else { return nil }
+                return LegacyVaultReplacement(field: field, account_id: accountID, old_value: value, new_value: encrypted)
             case .oldVaultLocked: report.remainingOldVaultFields += 1
             case .legacyLocked: report.skippedLockedFields += 1
             case .unchanged: break
             }
+            return nil
         }
 
-        for card in cards {
-            let context = VaultFieldContext(ownerUserID: owner, resourceType: "financial_card", resourceID: card.id, fieldName: "password", keyVersion: snapshot.keyVersion)
-            switch rotateSecret(card.password, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
-            case .migrated(let value):
-                do {
-                    let rows: [MutationReceipt] = try await client.from("financial_cards").update(PasswordPatch(password: value)).eq("id", value: card.id).eq("user_id", value: owner).select("id").execute().value
-                    try requireUpdatedRow(rows, resource: "card")
-                    report.migratedFields += 1
-                } catch {
-                    report.failedRecords += 1
-                    report.remainingOldVaultFields += 1
-                    AppDiagnostics.failure("vault", "rotate_card", error: error)
-                }
-            case .oldVaultLocked: report.remainingOldVaultFields += 1
-            case .legacyLocked: report.skippedLockedFields += 1
-            case .unchanged: break
+        func rewrap(_ replacements: [LegacyVaultReplacement], type: String, id: UUID) async {
+            guard !replacements.isEmpty else { return }
+            struct Params: Encodable {
+                let p_resource_type: String
+                let p_resource_id: UUID
+                let p_replacements: [LegacyVaultReplacement]
+                let p_actor_device_id: UUID
+                let p_key_confirmation: String
             }
-        }
-
-        struct InstitutionSecretsPatch: Encodable {
-            let password: String?
-            let accountsData: [InstitutionAccount]
-            enum CodingKeys: String, CodingKey {
-                case password
-                case accountsData = "accounts_data"
-            }
-        }
-        for institution in institutions {
-            var password = institution.password
-            var accounts = institution.accounts
-            var migratedCount = 0
-            var oldLockedCount = 0
-            var legacyLockedCount = 0
-            let passwordContext = VaultFieldContext(ownerUserID: owner, resourceType: "institution", resourceID: institution.id, fieldName: "password", keyVersion: snapshot.keyVersion)
-            switch rotateSecret(password, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: passwordContext) {
-            case .migrated(let encrypted): password = encrypted; migratedCount += 1
-            case .oldVaultLocked: oldLockedCount += 1
-            case .legacyLocked: legacyLockedCount += 1
-            case .unchanged: break
-            }
-            for index in accounts.indices {
-                let prefix = "accounts.\(accounts[index].id)"
-                let fields: [(String, WritableKeyPath<InstitutionAccount, String?>)] = [
-                    ("account_number", \.accountNumber),
-                    ("routing_number", \.routingNumber),
-                    ("wire_routing_number", \.wireRoutingNumber)
-                ]
-                for (field, keyPath) in fields {
-                    let context = VaultFieldContext(ownerUserID: owner, resourceType: "institution", resourceID: institution.id, fieldName: "\(prefix).\(field)", keyVersion: snapshot.keyVersion)
-                    var value = accounts[index][keyPath: keyPath]
-                    switch rotateSecret(value, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
-                    case .migrated(let encrypted): value = encrypted; migratedCount += 1
-                    case .oldVaultLocked: oldLockedCount += 1
-                    case .legacyLocked: legacyLockedCount += 1
-                    case .unchanged: break
-                    }
-                    accounts[index][keyPath: keyPath] = value
-                }
-            }
-            report.remainingOldVaultFields += oldLockedCount
-            report.skippedLockedFields += legacyLockedCount
-            guard migratedCount > 0 else { continue }
             do {
-                let rows: [MutationReceipt] = try await client.from("institutions")
-                    .update(InstitutionSecretsPatch(password: password, accountsData: accounts))
-                    .eq("id", value: institution.id)
-                    .eq("user_id", value: owner)
-                    .select("id").execute().value
-                try requireUpdatedRow(rows, resource: "bank")
-                report.migratedFields += migratedCount
+                try await client.rpc("miloom_rewrap_legacy_vault_fields", params: Params(
+                    p_resource_type: type, p_resource_id: id, p_replacements: replacements,
+                    p_actor_device_id: snapshot.deviceID,
+                    p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+                )).execute()
+                report.migratedFields += replacements.count
             } catch {
                 report.failedRecords += 1
-                report.remainingOldVaultFields += migratedCount
-                AppDiagnostics.failure("vault", "rotate_institution", error: error)
+                report.remainingOldVaultFields += replacements.count
+                AppDiagnostics.failure("vault", "rewrap_legacy_credential", error: error)
             }
+        }
+
+        for service in subscriptions {
+            let field = replacement(for: service.password, resourceType: "subscription", id: service.id)
+            await rewrap(field.map { [$0] } ?? [], type: "subscription", id: service.id)
+        }
+        for card in cards {
+            let field = replacement(for: card.password, resourceType: "financial_card", id: card.id)
+            await rewrap(field.map { [$0] } ?? [], type: "card", id: card.id)
+        }
+        for bank in institutions {
+            let password = replacement(for: bank.password, resourceType: "institution", id: bank.id)
+            var fields = password.map { [$0] } ?? []
+            for account in bank.accounts {
+                let candidates = [
+                    ("accountNumber", "account_number", account.accountNumber),
+                    ("routingNumber", "routing_number", account.routingNumber),
+                    ("wireRoutingNumber", "wire_routing_number", account.wireRoutingNumber)
+                ]
+                for (field, cryptographicField, value) in candidates {
+                    if let item = replacement(
+                        for: value, resourceType: "institution", id: bank.id, field: field,
+                        accountID: account.id, cryptographicField: "accounts.\(account.id).\(cryptographicField)"
+                    ) { fields.append(item) }
+                }
+            }
+            await rewrap(fields, type: "institution", id: bank.id)
         }
         return report
     }
@@ -1291,10 +1286,9 @@ class DataRepository {
                   ) else { return .oldVaultLocked }
             plaintext = decrypted
         } else if value.hasPrefix("enc:") {
-            guard let decrypted = SecurityService.shared.decryptLegacyStrict(value) else { return .legacyLocked }
-            plaintext = decrypted
+            return .legacyLocked
         } else {
-            plaintext = value
+            return .unchanged
         }
         guard let encrypted = try? VaultCryptography.encryptField(plaintext, using: snapshot.key, context: context) else {
             return .oldVaultLocked
@@ -1495,7 +1489,7 @@ class DataRepository {
     }
     
     // MARK: - Sharing
-    func inviteUser(email: String, role: String, resourceId: UUID, resourceType: String) async throws -> ShareInviteResult {
+    func inviteUser(email: String, role: String, resourceId: UUID, resourceType: String, includeCredentials: Bool = true) async throws -> ShareInviteResult {
         AppDiagnostics.event("sharing", "invite_user", status: "started")
         
         guard (try? await client.auth.session.user) != nil else {
@@ -1511,6 +1505,7 @@ class DataRepository {
                 let p_role: String
                 let p_resource_id: UUID
                 let p_resource_type: String
+                let p_include_credentials: Bool
             }
             
             struct ShareRPCResponse: Decodable {
@@ -1527,10 +1522,11 @@ class DataRepository {
                 p_email: email,
                 p_role: role,
                 p_resource_id: resourceId,
-                p_resource_type: resourceType
+                p_resource_type: resourceType,
+                p_include_credentials: includeCredentials
             )
             
-            let response: ShareRPCResponse = try await client.rpc("miloom_share_resource", params: params).execute().value
+            let response: ShareRPCResponse = try await client.rpc("miloom_share_resource_with_credentials", params: params).execute().value
             
             if response.status == "shared_directly" {
                 AppDiagnostics.event("sharing", "share_resource", status: "shared_directly")
@@ -1571,11 +1567,12 @@ class DataRepository {
 
     /// Entity Admins have a separate Viewer-only server endpoint. Never route
     /// their request through the Owner's broader role-management RPC.
-    func inviteViewerAsEntityAdmin(email: String, resourceId: UUID, resourceType: String) async throws -> ShareInviteResult {
+    func inviteViewerAsEntityAdmin(email: String, resourceId: UUID, resourceType: String, includeCredentials: Bool = true) async throws -> ShareInviteResult {
         struct Params: Encodable {
             let p_email: String
             let p_resource_id: UUID
             let p_resource_type: String
+            let p_include_credentials: Bool
         }
         struct Response: Decodable {
             let status: String
@@ -1588,8 +1585,8 @@ class DataRepository {
         }
 
         let response: Response = try await client.rpc(
-            "miloom_admin_share_viewer",
-            params: Params(p_email: email, p_resource_id: resourceId, p_resource_type: resourceType)
+            "miloom_admin_share_viewer_with_credentials",
+            params: Params(p_email: email, p_resource_id: resourceId, p_resource_type: resourceType, p_include_credentials: includeCredentials)
         ).execute().value
         if response.status == "shared_directly" { return .sharedDirectly }
         guard response.status == "invitation_created", let invitationId = response.invitationId else {
@@ -2115,10 +2112,10 @@ final class SecurityService {
     private var symmetricKey: SymmetricKey?
     
     private init() {
-        self.symmetricKey = loadOrGenerateKey()
+        self.symmetricKey = loadLegacyKey()
     }
     
-    private func loadOrGenerateKey() -> SymmetricKey {
+    private func loadLegacyKey() -> SymmetricKey? {
         // Try to load existing key from Keychain
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -2133,36 +2130,15 @@ final class SecurityService {
         if status == errSecSuccess, let keyData = item as? Data {
             return SymmetricKey(data: keyData)
         }
-        
-        // Generate new key
-        let newKey = SymmetricKey(size: .bits256)
-        let keyData = newKey.withUnsafeBytes { Data(Array($0)) }
-        
-        // Save to Keychain
-        let addQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: keyTag,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        ]
-        
-        SecItemAdd(addQuery as CFDictionary, nil)
-        return newKey
+        return nil
     }
     
-    func encrypt(_ string: String?) -> String? {
-        Self.encryptValue(string, using: symmetricKey)
-    }
-
     func encrypt(_ string: String?, context: VaultFieldContext?) -> String? {
-        guard let string, !string.isEmpty else { return string }
-        guard !Self.isLockedValue(string) else { return string }
-        guard let context,
+        guard let string, !string.isEmpty, !Self.isLockedValue(string),
+              let context,
               let snapshot = VaultKeySession.shared.snapshot(for: context.ownerUserID),
-              snapshot.keyVersion == context.keyVersion else {
-            return encrypt(string)
-        }
-        return (try? VaultCryptography.encryptField(string, using: snapshot.key, context: context)) ?? string
+              let key = snapshot.key(for: context.keyVersion) else { return nil }
+        return try? VaultCryptography.encryptField(string, using: key, context: context)
     }
 
     func decrypt(_ string: String?) -> String? {
@@ -2205,15 +2181,15 @@ final class SecurityService {
     }
 
     static func encryptValue(_ string: String?, using key: SymmetricKey?) -> String? {
-        guard let string, !string.isEmpty, let key else { return string }
+        guard let string, !string.isEmpty, let key else { return nil }
         guard !isLockedValue(string) else { return string }
 
         do {
             let sealedBox = try AES.GCM.seal(Data(string.utf8), using: key)
-            guard let combined = sealedBox.combined else { return string }
+            guard let combined = sealedBox.combined else { return nil }
             return "enc:" + combined.base64EncodedString()
         } catch {
-            return string
+            return nil
         }
     }
 
@@ -2285,6 +2261,13 @@ final class VaultKeySession: @unchecked Sendable {
         current = nil
         lock.unlock()
     }
+
+    func discard(for userID: UUID, unlessKeyVersion: Int? = nil) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard current?.userID == userID, current?.keyVersion != unlessKeyVersion else { return }
+        current = nil
+    }
 }
 
 struct VaultAccountMetadata: Decodable {
@@ -2342,10 +2325,12 @@ struct VaultDeviceWrapRecord: Decodable {
 }
 
 struct VaultRecoveryWrapRecord: Decodable {
+    let id: UUID
     let keyVersion: Int
     let wrappedKey: String
 
     enum CodingKeys: String, CodingKey {
+        case id
         case keyVersion = "key_version"
         case wrappedKey = "wrapped_key"
     }
@@ -2495,6 +2480,18 @@ struct DeviceResourceSecretRecord: Decodable {
 
 struct ResourceSecretAccessStatus: Decodable {
     let status: String
+    let canEdit: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case canEdit = "can_edit"
+    }
+}
+
+struct RevealedResourceCredentials {
+    let fields: [String: String]
+    let keyVersion: Int
+    let ciphertext: [String: String]
 }
 
 enum ResourceSecretRevealError: LocalizedError {
@@ -2505,9 +2502,9 @@ enum ResourceSecretRevealError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .deviceNeedsApproval:
-            return "This device needs vault approval before it can request credentials."
+            return "Get Password Vault access on this device to see these credentials."
         case .unavailable:
-            return "These credentials are not available on this device. Access may need owner approval or key rotation."
+            return "These credentials are still unavailable on this device. Check your access and try again."
         case .invalidSecret:
             return "Miloom couldn't verify these encrypted credentials. Nothing was revealed."
         }
@@ -2517,11 +2514,17 @@ enum ResourceSecretRevealError: LocalizedError {
 enum ResourceSecretUpdateError: LocalizedError {
     case invalidFields
     case verificationUnavailable
+    case changed
+    case accessChanged
 
     var errorDescription: String? {
         switch self {
         case .invalidFields:
             return "These credential fields could not be saved safely. Nothing was changed."
+        case .changed:
+            return "The saved credentials changed while you were editing. Reopen them to see the latest version."
+        case .accessChanged:
+            return "Your credential access changed. Check with the owner before trying again."
         case .verificationUnavailable:
             return "The server accepted the change, but this device couldn't confirm the readback. Refresh this resource before trying again."
         }
@@ -2599,13 +2602,58 @@ private struct ResourceBankAccountCredentials: Codable, Equatable {
 }
 
 enum ResourceSecretPreparation {
+    static func metadata(for original: Subscription, includeCredentialPresence: Bool = false) -> Subscription {
+        var record = original
+        record.loginId = nil
+        record.password = nil
+        record.twoFactorAuth = "None"
+        record.recoveryMethod = nil
+        record.hasScopedCredentials = includeCredentialPresence
+            && (original.hasScopedCredentials == true || (try? candidate(for: original, snapshot: nil)) != nil)
+            ? true : nil
+        return record
+    }
+
+    static func metadata(for original: FinancialCard, includeCredentialPresence: Bool = false) -> FinancialCard {
+        var record = original
+        record.login = nil
+        record.password = nil
+        record.cardNumber = nil
+        record.expiry = nil
+        record.hasScopedCredentials = includeCredentialPresence
+            && (original.hasScopedCredentials == true || (try? candidate(for: original, snapshot: nil)) != nil)
+            ? true : nil
+        return record
+    }
+
+    static func metadata(for original: Institution, includeCredentialPresence: Bool = false) -> Institution {
+        var record = original
+        record.loginUrl = nil
+        record.username = nil
+        record.email = nil
+        record.password = nil
+        record.twoFactor = nil
+        record.accounts = original.accounts.map { stored in
+            var account = stored
+            account.accountNumber = nil
+            account.routingNumber = nil
+            account.wireRoutingNumber = nil
+            return account
+        }
+        record.hasScopedCredentials = includeCredentialPresence
+            && (original.hasScopedCredentials == true || (try? candidate(for: original, snapshot: nil)) != nil)
+            ? true : nil
+        return record
+    }
+
     // Never re-encrypt an unreadable legacy envelope as if its literal bytes
     // were a password. Leave the entire resource unchanged for owner review.
     static func verifiedPlaintext(
-        _ value: String?, snapshot: VaultKeySession.Snapshot,
+        _ value: String?, snapshot: VaultKeySession.Snapshot?,
         storedResourceType: String, resourceID: UUID, fieldName: String
     ) throws -> String? {
         guard let value, !value.isEmpty else { return nil }
+        guard let snapshot else { return value }
         if value.hasPrefix("miloom:") {
             guard let version = VaultCryptography.fieldKeyVersion(in: value),
                   let key = snapshot.key(for: version) else {
@@ -2633,7 +2681,7 @@ enum ResourceSecretPreparation {
     }
 
     static func candidate(
-        for subscription: Subscription, snapshot: VaultKeySession.Snapshot
+        for subscription: Subscription, snapshot: VaultKeySession.Snapshot?
     ) throws -> ResourceSecretPreparationCandidate? {
         var fields: [String: String] = [:]
         func include(_ name: String, _ value: String?) throws {
@@ -2655,7 +2703,7 @@ enum ResourceSecretPreparation {
     }
 
     static func candidate(
-        for card: FinancialCard, snapshot: VaultKeySession.Snapshot
+        for card: FinancialCard, snapshot: VaultKeySession.Snapshot?
     ) throws -> ResourceSecretPreparationCandidate? {
         var fields: [String: String] = [:]
         func include(_ name: String, _ value: String?, storedField: String? = nil) throws {
@@ -2675,7 +2723,7 @@ enum ResourceSecretPreparation {
     }
 
     static func candidate(
-        for institution: Institution, snapshot: VaultKeySession.Snapshot
+        for institution: Institution, snapshot: VaultKeySession.Snapshot?
     ) throws -> ResourceSecretPreparationCandidate? {
         var fields: [String: String] = [:]
         func include(_ name: String, _ value: String?) throws {
@@ -2761,13 +2809,94 @@ struct VaultMigrationReport: Equatable {
 }
 
 struct VaultRotationResult {
-    let recoveryCode: String
     let report: VaultMigrationReport
     let completed: Bool
 }
 
+enum VaultRecoveryMethod {
+    case password(String)
+    case generatedKey(String)
+
+    static func acceptsPassword(_ password: String) -> Bool {
+        let normalized = password.lowercased().filter { $0.isLetter || $0.isNumber }
+        let predictable = ["password", "123456", "qwerty", "letmein", "correcthorsebatterystaple"]
+        return password.count >= 16 && password.utf8.count <= 1024
+            && Set(normalized).count >= 8
+            && !predictable.contains(where: { normalized.contains($0) })
+    }
+
+    func wrap(_ key: SymmetricKey, context: VaultRecoveryWrapContext) async throws -> String {
+        switch self {
+        case .password(let password):
+            return try await VaultCryptography.wrapVaultKeyWithPassword(key, password: password, context: context)
+        case .generatedKey(let code):
+            return try VaultCryptography.wrapVaultKeyForRecovery(key, recoveryCode: code, context: context).wrappedKey
+        }
+    }
+}
+
 final class VaultService: @unchecked Sendable {
     static let shared = VaultService()
+
+    func requireProtectedSaveAccess(for userID: UUID) async throws -> VaultKeySession.Snapshot {
+        if VaultKeySession.shared.snapshot(for: userID) == nil {
+            await restoreSessionIfAvailable(for: userID)
+        }
+        guard let snapshot = VaultKeySession.shared.snapshot(for: userID) else {
+            throw ProtectedResourceSaveError.vaultAccessRequired
+        }
+        return snapshot
+    }
+
+    private struct ProtectedSaveParams<Record: Encodable>: Encodable {
+        let p_resource_type: String
+        let p_record: Record
+        let p_insert: Bool
+        let p_owner_account_key_version: Int
+        let p_owner_wrapped_resource_key: String
+        let p_encrypted_fields: [String: String]
+        let p_actor_device_id: UUID
+        let p_key_confirmation: String
+    }
+
+    func saveProtected<Record: Encodable>(
+        _ candidate: ResourceSecretPreparationCandidate, record: Record, insert: Bool,
+        snapshot: VaultKeySession.Snapshot
+    ) async throws {
+        let session = try await client.auth.refreshSession()
+        guard session.user.id == snapshot.userID else { throw CancellationError() }
+        let resource = ResourceKeyContext(
+            ownerUserID: snapshot.userID, resourceType: candidate.resourceType,
+            resourceID: candidate.resourceID, keyVersion: 1
+        )
+        let resourceKey = SymmetricKey(size: .bits256)
+        let ownerContext = ResourceOwnerWrapContext(resource: resource, accountKeyVersion: snapshot.keyVersion)
+        let wrap = try VaultCryptography.wrapResourceKeyForOwner(resourceKey, using: snapshot.key, context: ownerContext)
+        let readbackKey = try VaultCryptography.unwrapResourceKeyForOwner(wrap, using: snapshot.key, context: ownerContext)
+        var encrypted: [String: String] = [:]
+        for (field, plaintext) in candidate.plaintextFields {
+            let context = ResourceSecretFieldContext(resource: resource, fieldName: field)
+            let envelope = try VaultCryptography.encryptResourceSecret(plaintext, using: resourceKey, context: context)
+            guard try VaultCryptography.decryptResourceSecret(envelope, using: readbackKey, context: context) == plaintext else {
+                throw ResourceSecretPreparationError.verificationFailed
+            }
+            encrypted[field] = envelope
+        }
+        do {
+            try await client.rpc("miloom_save_owned_protected_resource", params: ProtectedSaveParams(
+                p_resource_type: resource.resourceType, p_record: record, p_insert: insert,
+                p_owner_account_key_version: snapshot.keyVersion, p_owner_wrapped_resource_key: wrap,
+                p_encrypted_fields: encrypted, p_actor_device_id: snapshot.deviceID,
+                p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+            )).execute()
+        } catch let error as PostgrestError where error.message == "TRUSTED_OWNER_DEVICE_REQUIRED" {
+            if (try? await overview())?.metadata?.rotationStatus == "migrating" {
+                throw ProtectedResourceSaveError.rotationPending
+            }
+            VaultKeySession.shared.discard(for: snapshot.userID)
+            throw ProtectedResourceSaveError.vaultAccessRequired
+        }
+    }
 
     private var client: SupabaseClient { SupabaseService.shared.client }
 
@@ -2815,15 +2944,14 @@ final class VaultService: @unchecked Sendable {
                 )
                 keys[transition.fromKeyVersion] = previous
             }
+            guard try await client.auth.session.user.id == userID else { return }
+            try await bindCurrentSession(deviceID: device.deviceID, key: key)
+            guard try await client.auth.session.user.id == userID else { return }
             VaultKeySession.shared.install(
                 userID: userID,
                 deviceID: device.deviceID,
                 currentKeyVersion: wrap.keyVersion,
                 keys: keys
-            )
-            try await bindCurrentSession(
-                deviceID: device.deviceID,
-                key: key
             )
         } catch {
             AppDiagnostics.failure("vault", "restore_device_key", error: error)
@@ -2839,14 +2967,19 @@ final class VaultService: @unchecked Sendable {
             .eq("user_id", value: userID)
             .limit(1)
             .execute().value
-        guard metadata.first != nil else {
-            VaultKeySession.shared.clear()
+        guard let vault = metadata.first else {
+            VaultKeySession.shared.discard(for: userID)
             return VaultOverview(metadata: nil, devices: [], currentDevice: nil, isUnlocked: false, auditEvents: [])
         }
         let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
         let devices = try await listDevices()
-        await restoreSessionIfAvailable(for: userID)
         let current = currentDevice(in: devices, identity: identity)
+        if current?.status == "approved" {
+            VaultKeySession.shared.discard(for: userID, unlessKeyVersion: vault.currentKeyVersion)
+            await restoreSessionIfAvailable(for: userID)
+        } else {
+            VaultKeySession.shared.discard(for: userID)
+        }
         let auditEvents: [VaultAuditEventRecord] = try await client
             .from("vault_audit_events")
             .select("id,actor_device_id,target_device_id,event_type,created_at")
@@ -2855,7 +2988,7 @@ final class VaultService: @unchecked Sendable {
             .limit(20)
             .execute().value
         return VaultOverview(
-            metadata: metadata.first,
+            metadata: vault,
             devices: devices,
             currentDevice: current,
             isUnlocked: VaultKeySession.shared.snapshot(for: userID) != nil,
@@ -2863,27 +2996,26 @@ final class VaultService: @unchecked Sendable {
         )
     }
 
-    func bootstrap() async throws -> String {
+    func bootstrap(recovery: VaultRecoveryMethod) async throws {
         let session = try await client.auth.refreshSession()
         let userID = session.user.id
         let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
         let deviceID = UUID()
         let keyVersion = 1
         let vaultKey = SymmetricKey(size: .bits256)
-        let recoveryCode = try VaultCryptography.generateRecoveryCode()
         let deviceEnvelope = try VaultCryptography.wrapVaultKey(
             vaultKey,
             for: identity.publicKeys.agreementPublicKey,
             context: VaultKeyWrapContext(ownerUserID: userID, recipientDeviceID: deviceID, keyVersion: keyVersion)
         )
-        let recoveryEnvelope = try VaultCryptography.wrapVaultKeyForRecovery(
+        let recoveryWrap = try await recovery.wrap(
             vaultKey,
-            recoveryCode: recoveryCode,
             context: VaultRecoveryWrapContext(ownerUserID: userID, keyVersion: keyVersion)
         )
         let confirmation = VaultCryptography.keyConfirmation(for: vaultKey)
 
         struct Params: Encodable {
+            let p_expected_user_id: UUID
             let p_device_id: UUID
             let p_device_label: String
             let p_platform: String
@@ -2895,6 +3027,7 @@ final class VaultService: @unchecked Sendable {
             let p_key_confirmation: String
         }
         let params = Params(
+            p_expected_user_id: userID,
             p_device_id: deviceID,
             p_device_label: deviceLabel,
             p_platform: "ios",
@@ -2902,13 +3035,13 @@ final class VaultService: @unchecked Sendable {
             p_signing_public_key: identity.publicKeys.signingPublicKey,
             p_ephemeral_public_key: deviceEnvelope.ephemeralPublicKey,
             p_wrapped_vault_key: deviceEnvelope.wrappedKey,
-            p_wrapped_recovery_key: recoveryEnvelope.wrappedKey,
+            p_wrapped_recovery_key: recoveryWrap,
             p_key_confirmation: confirmation
         )
-        try await client.rpc("miloom_bootstrap_account_vault_v2", params: params).execute()
-        VaultKeySession.shared.install(userID: userID, deviceID: deviceID, keyVersion: keyVersion, key: vaultKey)
+        try await client.rpc("miloom_bootstrap_account_vault_for_user", params: params).execute()
         try await bindCurrentSession(deviceID: deviceID, key: vaultKey)
-        return recoveryCode
+        guard try await client.auth.session.user.id == userID else { throw CancellationError() }
+        VaultKeySession.shared.install(userID: userID, deviceID: deviceID, keyVersion: keyVersion, key: vaultKey)
     }
 
     func registerCurrentDevice() async throws {
@@ -3030,19 +3163,8 @@ final class VaultService: @unchecked Sendable {
             .from("account_vaults").select("user_id,current_key_version,rotation_status,previous_key_version")
             .eq("user_id", value: userID).limit(1).execute().value
         guard let vault = metadata.first else { throw VaultCryptographyError.invalidEnvelope }
-        let wraps: [VaultRecoveryWrapRecord] = try await client
-            .from("vault_recovery_key_wraps")
-            .select("key_version,wrapped_key")
-            .eq("user_id", value: userID)
-            .eq("key_version", value: vault.currentKeyVersion)
-            .is("revoked_at", value: nil)
-            .limit(1).execute().value
-        guard let wrap = wraps.first else { throw VaultCryptographyError.invalidEnvelope }
-        let vaultKey = try VaultCryptography.unwrapVaultKeyFromRecovery(
-            VaultRecoveryKeyWrapEnvelope(version: 1, keyVersion: wrap.keyVersion, wrappedKey: wrap.wrappedKey),
-            recoveryCode: code.trimmingCharacters(in: .whitespacesAndNewlines),
-            context: VaultRecoveryWrapContext(ownerUserID: userID, keyVersion: wrap.keyVersion)
-        )
+        let wrap = try await recoveryWrap(userID: userID, keyVersion: vault.currentKeyVersion)
+        let vaultKey = try await unlockRecoveryWrap(wrap, input: code, userID: userID)
         let deviceEnvelope = try VaultCryptography.wrapVaultKey(
             vaultKey,
             for: identity.publicKeys.agreementPublicKey,
@@ -3071,7 +3193,7 @@ final class VaultService: @unchecked Sendable {
         _ = try requireSnapshot(for: userID)
     }
 
-    func revokeAndRotate(device target: VaultDeviceRecord) async throws -> VaultRotationResult {
+    func revokeAndRotate(device target: VaultDeviceRecord, recoveryInput: String) async throws -> VaultRotationResult {
         let session = try await client.auth.refreshSession()
         let userID = session.user.id
         guard target.status == "approved",
@@ -3108,10 +3230,16 @@ final class VaultService: @unchecked Sendable {
                 wrapped_key: envelope.wrappedKey
             ))
         }
-        let recoveryCode = try VaultCryptography.generateRecoveryCode()
-        let recovery = try VaultCryptography.wrapVaultKeyForRecovery(
+        let currentRecovery = try await recoveryWrap(userID: userID, keyVersion: snapshot.keyVersion)
+        let recoveredKey = try await unlockRecoveryWrap(currentRecovery, input: recoveryInput, userID: userID)
+        guard VaultCryptography.keyConfirmation(for: recoveredKey) == VaultCryptography.keyConfirmation(for: snapshot.key) else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        let method: VaultRecoveryMethod = currentRecovery.wrappedKey.hasPrefix(VaultCryptography.passwordWrapPrefix)
+            ? .password(recoveryInput)
+            : .generatedKey(recoveryInput.trimmingCharacters(in: .whitespacesAndNewlines))
+        let recovery = try await method.wrap(
             newKey,
-            recoveryCode: recoveryCode,
             context: VaultRecoveryWrapContext(ownerUserID: userID, keyVersion: newVersion)
         )
         let transition = try VaultCryptography.wrapPreviousVaultKey(
@@ -3128,16 +3256,18 @@ final class VaultService: @unchecked Sendable {
             let p_new_key_confirmation: String
             let p_current_key_confirmation: String
             let p_wrapped_previous_key: String
+            let p_expected_recovery_wrap_id: UUID
         }
-        try await client.rpc("miloom_revoke_vault_device_and_rotate", params: Params(
+        try await client.rpc("miloom_revoke_vault_device_and_rotate_with_recovery", params: Params(
             p_actor_device_id: snapshot.deviceID,
             p_revoked_device_id: target.deviceID,
             p_new_key_version: newVersion,
             p_device_wraps: deviceWraps,
-            p_wrapped_recovery_key: recovery.wrappedKey,
+            p_wrapped_recovery_key: recovery,
             p_new_key_confirmation: VaultCryptography.keyConfirmation(for: newKey),
             p_current_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key),
-            p_wrapped_previous_key: transition
+            p_wrapped_previous_key: transition,
+            p_expected_recovery_wrap_id: currentRecovery.id
         )).execute()
 
         var keys = snapshot.keys
@@ -3155,7 +3285,7 @@ final class VaultService: @unchecked Sendable {
         )
         let completed = report.failedRecords == 0 && report.remainingOldVaultFields == 0
         if completed { try await completeRotation(snapshot: rotatedSnapshot) }
-        return VaultRotationResult(recoveryCode: recoveryCode, report: report, completed: completed)
+        return VaultRotationResult(report: report, completed: completed)
     }
 
     func cancelPendingDevice(_ target: VaultDeviceRecord) async throws {
@@ -3176,13 +3306,11 @@ final class VaultService: @unchecked Sendable {
         )).execute()
     }
 
-    func rotateRecoveryCode() async throws -> String {
+    func replaceRecoveryMethod(_ method: VaultRecoveryMethod) async throws {
         let session = try await client.auth.refreshSession()
         let snapshot = try requireSnapshot(for: session.user.id)
-        let code = try VaultCryptography.generateRecoveryCode()
-        let recovery = try VaultCryptography.wrapVaultKeyForRecovery(
+        let recovery = try await method.wrap(
             snapshot.key,
-            recoveryCode: code,
             context: VaultRecoveryWrapContext(ownerUserID: session.user.id, keyVersion: snapshot.keyVersion)
         )
         struct Params: Encodable {
@@ -3194,14 +3322,34 @@ final class VaultService: @unchecked Sendable {
         try await client.rpc("miloom_rotate_vault_recovery", params: Params(
             p_actor_device_id: snapshot.deviceID,
             p_key_version: snapshot.keyVersion,
-            p_wrapped_recovery_key: recovery.wrappedKey,
+            p_wrapped_recovery_key: recovery,
             p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
         )).execute()
-        return code
+    }
+
+    private func recoveryWrap(userID: UUID, keyVersion: Int) async throws -> VaultRecoveryWrapRecord {
+        let records: [VaultRecoveryWrapRecord] = try await client
+            .from("vault_recovery_key_wraps").select("id,key_version,wrapped_key")
+            .eq("user_id", value: userID).eq("key_version", value: keyVersion)
+            .is("revoked_at", value: nil).limit(1).execute().value
+        guard let record = records.first else { throw VaultCryptographyError.invalidEnvelope }
+        return record
+    }
+
+    private func unlockRecoveryWrap(_ wrap: VaultRecoveryWrapRecord, input: String, userID: UUID) async throws -> SymmetricKey {
+        let context = VaultRecoveryWrapContext(ownerUserID: userID, keyVersion: wrap.keyVersion)
+        if wrap.wrappedKey.hasPrefix(VaultCryptography.passwordWrapPrefix) {
+            return try await VaultCryptography.unwrapVaultKeyWithPassword(wrap.wrappedKey, password: input, context: context)
+        }
+        return try VaultCryptography.unwrapVaultKeyFromRecovery(
+            VaultRecoveryKeyWrapEnvelope(version: 1, keyVersion: wrap.keyVersion, wrappedKey: wrap.wrappedKey),
+            recoveryCode: input.trimmingCharacters(in: .whitespacesAndNewlines), context: context
+        )
     }
 
     func resumeRotation() async throws -> VaultMigrationReport {
-        let userID = try await client.auth.session.user.id
+        let userID = try await client.auth.refreshSession().user.id
+        _ = try await overview()
         let snapshot = try requireSnapshot(for: userID)
         guard let previousVersion = snapshot.keys.keys.filter({ $0 < snapshot.keyVersion }).max() else {
             throw VaultCryptographyError.invalidKeyVersion
@@ -3255,9 +3403,6 @@ final class VaultService: @unchecked Sendable {
     }
 
     func rotateLockedResourceSecret(_ displayed: LockedResourceSecret) async throws {
-        try await confirmResourceSecretPresence(
-            reason: "Replace the locked credential key for \(displayed.resourceTitle ?? displayed.resourceType)."
-        )
         let session = try await client.auth.refreshSession()
         let snapshot = try requireSnapshot(for: session.user.id)
         let current = try await listLockedResourceSecrets()
@@ -3388,69 +3533,56 @@ final class VaultService: @unchecked Sendable {
         }
     }
 
-    func resourceSecretAccessStatus(type: String, id: UUID) async throws -> String {
+    func resourceSecretAccessStatus(type: String, id: UUID) async throws -> ResourceSecretAccessStatus {
         let session = try await client.auth.refreshSession()
+        await restoreSessionIfAvailable(for: session.user.id)
         struct Params: Encodable {
             let p_resource_type: String
             let p_resource_id: UUID
             let p_device_id: UUID?
         }
         let rows: [ResourceSecretAccessStatus] = try await client.rpc(
-            "miloom_resource_secret_access_status", params: Params(
+            "miloom_resource_credential_status", params: Params(
                 p_resource_type: type, p_resource_id: id,
                 p_device_id: VaultKeySession.shared.snapshot(for: session.user.id)?.deviceID
             )
         ).execute().value
         guard rows.count == 1 else { throw ResourceSecretRevealError.unavailable }
-        return rows[0].status
-    }
-
-    func requestResourceSecretAccess(type: String, id: UUID) async throws {
-        let session = try await client.auth.refreshSession()
-        let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: session.user.id)
-        let devices = try await listDevices()
-        guard let device = currentDevice(in: devices, identity: identity),
-              device.status == "approved" else {
-            throw ResourceSecretRevealError.deviceNeedsApproval
-        }
-        struct Params: Encodable {
-            let p_resource_type: String
-            let p_resource_id: UUID
-            let p_recipient_device_id: UUID
-        }
-        try await client.rpc("miloom_request_resource_secret_access", params: Params(
-            p_resource_type: type, p_resource_id: id,
-            p_recipient_device_id: device.deviceID
-        )).execute()
+        return rows[0]
     }
 
     /// Reveal only one exact resource after device presence. Callers must keep
     /// the returned plaintext in ephemeral UI state and clear it on dismissal.
     func revealResourceSecret(
         type: String, id: UUID, expectedOwnerUserID: UUID
-    ) async throws -> [String: String] {
+    ) async throws -> RevealedResourceCredentials {
         try await confirmResourceSecretPresence(
             reason: "Reveal credentials for this Miloom resource."
         )
         let material = try await loadResourceSecretMaterial(
             type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
         )
-        do { return try material.plaintextFields() }
-        catch { throw ResourceSecretRevealError.invalidSecret }
+        do {
+            return try RevealedResourceCredentials(
+                fields: material.plaintextFields(), keyVersion: material.resource.keyVersion,
+                ciphertext: material.encryptedFields
+            )
+        } catch { throw ResourceSecretRevealError.invalidSecret }
     }
 
     /// The caller sends the complete edited field set; only resource-bound
     /// ciphertext crosses the network. Optimistic compare rejects stale edits.
     func updateResourceSecret(
         type: String, id: UUID, expectedOwnerUserID: UUID,
-        plaintextFields: [String: String]
+        plaintextFields: [String: String], previous: RevealedResourceCredentials
     ) async throws {
-        try await confirmResourceSecretPresence(
-            reason: "Save the encrypted credentials for this Miloom resource."
-        )
         let material = try await loadResourceSecretMaterial(
             type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
         )
+        guard previous.keyVersion == material.resource.keyVersion,
+              previous.ciphertext == material.encryptedFields else {
+            throw ResourceSecretUpdateError.changed
+        }
         let allowed: Set<String>
         switch type {
         case "institution":
@@ -3462,8 +3594,7 @@ final class VaultService: @unchecked Sendable {
         default:
             throw ResourceSecretUpdateError.invalidFields
         }
-        guard !plaintextFields.isEmpty,
-              Set(plaintextFields.keys).isSubset(of: allowed),
+        guard Set(plaintextFields.keys).isSubset(of: allowed),
               !plaintextFields.values.contains(where: { $0.isEmpty }) else {
             throw ResourceSecretUpdateError.invalidFields
         }
@@ -3493,13 +3624,19 @@ final class VaultService: @unchecked Sendable {
             let p_new_encrypted_fields: [String: String]
             let p_actor_device_id: UUID
         }
-        try await client.rpc("miloom_update_resource_secret", params: Params(
-            p_resource_type: type, p_resource_id: id,
-            p_key_version: material.resource.keyVersion,
-            p_expected_encrypted_fields: material.encryptedFields,
-            p_new_encrypted_fields: encrypted,
-            p_actor_device_id: material.deviceID
-        )).execute()
+        do {
+            try await client.rpc("miloom_update_resource_secret", params: Params(
+                p_resource_type: type, p_resource_id: id,
+                p_key_version: material.resource.keyVersion,
+                p_expected_encrypted_fields: material.encryptedFields,
+                p_new_encrypted_fields: encrypted,
+                p_actor_device_id: material.deviceID
+            )).execute()
+        } catch let error as PostgrestError where error.message == "RESOURCE_SECRET_CHANGED" {
+            throw ResourceSecretUpdateError.changed
+        } catch let error as PostgrestError where error.message == "RESOURCE_SECRET_ACCESS_NOT_GRANTED" {
+            throw ResourceSecretUpdateError.accessChanged
+        }
         do {
             let readback = try await loadResourceSecretMaterial(
                 type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
@@ -3540,7 +3677,7 @@ final class VaultService: @unchecked Sendable {
             let snapshot = try requireSnapshot(for: session.user.id)
             guard let record = try await ownerResourceSecret(
                 type: type, id: id, snapshot: snapshot
-            ), record.state == "active", !record.encryptedFields.isEmpty else {
+            ), record.state == "active" else {
                 throw ResourceSecretRevealError.unavailable
             }
             do {
@@ -3586,8 +3723,7 @@ final class VaultService: @unchecked Sendable {
         ).execute().value
         guard records.count <= 1, let record = records.first,
               record.ownerUserID == expectedOwnerUserID,
-              record.resourceType == type, record.resourceID == id,
-              !record.encryptedFields.isEmpty else {
+              record.resourceType == type, record.resourceID == id else {
             throw ResourceSecretRevealError.unavailable
         }
         let resource = ResourceKeyContext(
@@ -3616,17 +3752,7 @@ final class VaultService: @unchecked Sendable {
         }
     }
 
-    func approveResourceSecretRequest(_ displayedRequest: ResourceSecretAccessRequest) async throws {
-        try await confirmResourceSecretPresence(
-            reason: "Approve credential access for one trusted collaborator device."
-        )
-        let session = try await client.auth.refreshSession()
-        let snapshot = try requireSnapshot(for: session.user.id)
-        let pending = try await listPendingResourceSecretRequests()
-        guard let request = pending.first(where: { $0.id == displayedRequest.id }),
-              request == displayedRequest else {
-            throw ResourceSecretGrantError.staleRequest
-        }
+    private func deliverResourceKey(_ request: ResourceSecretAccessRequest, snapshot: VaultKeySession.Snapshot) async throws {
         struct SecretParams: Encodable {
             let p_resource_type: String
             let p_resource_id: UUID
@@ -3647,7 +3773,6 @@ final class VaultService: @unchecked Sendable {
               secret.resourceType == request.resourceType,
               secret.resourceID == request.resourceID,
               secret.keyVersion == request.keyVersion,
-              !secret.encryptedFields.isEmpty,
               let accountKey = snapshot.key(for: secret.ownerAccountKeyVersion) else {
             throw ResourceSecretGrantError.staleRequest
         }
@@ -3698,6 +3823,38 @@ final class VaultService: @unchecked Sendable {
             p_ephemeral_public_key: wrap.ephemeralPublicKey,
             p_wrapped_resource_key: wrap.wrappedKey
         )).execute()
+    }
+
+    func deliverPendingCredentials(for userID: UUID) async {
+        guard let snapshot = VaultKeySession.shared.snapshot(for: userID) else { return }
+        do {
+            let session = try await client.auth.refreshSession()
+            guard session.user.id == userID, !Task.isCancelled else { return }
+            struct Params: Encodable {
+                let p_actor_device_id: UUID
+                let p_key_confirmation: String
+            }
+            try await client.rpc("miloom_queue_resource_key_deliveries", params: Params(
+                p_actor_device_id: snapshot.deviceID,
+                p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+            )).execute()
+            for locked in try await listLockedResourceSecrets().prefix(5) {
+                try Task.checkCancellation()
+                do { try await rotateLockedResourceSecret(locked) }
+                catch { AppDiagnostics.failure("vault", "refresh_resource_key", error: error) }
+            }
+            for request in try await listPendingResourceSecretRequests().prefix(50) {
+                try Task.checkCancellation()
+                do { try await deliverResourceKey(request, snapshot: snapshot) }
+                catch { AppDiagnostics.failure("vault", "deliver_resource_key", error: error) }
+            }
+        } catch let error as PostgrestError where error.code == "PGRST202" {
+            // An older backend cannot queue credentials automatically.
+        } catch is CancellationError {
+            return
+        } catch {
+            AppDiagnostics.failure("vault", "sync_shared_credentials", error: error)
+        }
     }
 
     func prepareOwnedResourceSecrets() async throws -> ResourceSecretPreparationReport {
@@ -3846,8 +4003,7 @@ final class VaultService: @unchecked Sendable {
     private func plaintextFields(
         in record: OwnerResourceSecretRecord, snapshot: VaultKeySession.Snapshot
     ) throws -> [String: String] {
-        guard let accountKey = snapshot.key(for: record.ownerAccountKeyVersion),
-              !record.encryptedFields.isEmpty else {
+        guard let accountKey = snapshot.key(for: record.ownerAccountKeyVersion) else {
             throw ResourceSecretPreparationError.verificationFailed
         }
         let resource = ResourceKeyContext(
@@ -4191,6 +4347,71 @@ struct VaultDeviceIdentity {
 }
 
 enum VaultCryptography {
+    static let passwordWrapPrefix = "pbkdf2-sha256:"
+    private static let passwordWrapIterations: UInt32 = 600_000
+
+    static func wrapVaultKeyWithPassword(
+        _ key: SymmetricKey, password: String, context: VaultRecoveryWrapContext
+    ) async throws -> String {
+        var salt = Data(count: 16)
+        let status = salt.withUnsafeMutableBytes { bytes in
+            SecRandomCopyBytes(kSecRandomDefault, bytes.count, bytes.baseAddress!)
+        }
+        guard status == errSecSuccess else { throw VaultCryptographyError.randomGenerationFailed }
+        let metadata = "\(passwordWrapPrefix)v1:\(passwordWrapIterations):\(salt.base64EncodedString())"
+        let wrappingKey = try await recoveryPasswordKey(password, salt: salt)
+        let box = try AES.GCM.seal(
+            key.withUnsafeBytes { Data($0) }, using: wrappingKey,
+            authenticating: context.authenticatedData + Data(metadata.utf8)
+        )
+        guard let combined = box.combined else { throw VaultCryptographyError.invalidEnvelope }
+        return "\(metadata):\(combined.base64EncodedString())"
+    }
+
+    static func unwrapVaultKeyWithPassword(
+        _ wrap: String, password: String, context: VaultRecoveryWrapContext
+    ) async throws -> SymmetricKey {
+        let parts = wrap.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 5, parts[0] == "pbkdf2-sha256", parts[1] == "v1",
+              parts[2] == String(passwordWrapIterations),
+              let salt = Data(base64Encoded: String(parts[3])), salt.count == 16,
+              let combined = Data(base64Encoded: String(parts[4])), combined.count == 60 else {
+            throw VaultCryptographyError.invalidEnvelope
+        }
+        let key = try await recoveryPasswordKey(password, salt: salt)
+        do {
+            let bytes = try AES.GCM.open(
+                AES.GCM.SealedBox(combined: combined), using: key,
+                authenticating: context.authenticatedData + Data(parts.prefix(4).joined(separator: ":").utf8)
+            )
+            return SymmetricKey(data: bytes)
+        } catch {
+            throw VaultCryptographyError.authenticationFailed
+        }
+    }
+
+    private static func recoveryPasswordKey(_ password: String, salt: Data) async throws -> SymmetricKey {
+        let input = Array(password.precomposedStringWithCanonicalMapping.utf8)
+        guard !input.isEmpty, input.count <= 1024 else { throw VaultCryptographyError.authenticationFailed }
+        return try await Task.detached(priority: .userInitiated) {
+            var derived = Data(count: 32)
+            let result = derived.withUnsafeMutableBytes { output in
+                salt.withUnsafeBytes { saltBytes in
+                    input.withUnsafeBytes { passwordBytes in
+                        CCKeyDerivationPBKDF(
+                            CCPBKDFAlgorithm(kCCPBKDF2),
+                            passwordBytes.bindMemory(to: Int8.self).baseAddress, passwordBytes.count,
+                            saltBytes.bindMemory(to: UInt8.self).baseAddress, saltBytes.count,
+                            CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256), passwordWrapIterations,
+                            output.bindMemory(to: UInt8.self).baseAddress, output.count
+                        )
+                    }
+                }
+            }
+            guard result == kCCSuccess else { throw VaultCryptographyError.authenticationFailed }
+            return SymmetricKey(data: derived)
+        }.value
+    }
     static let fieldEnvelopePrefix = SecurityService.vaultEnvelopePrefix
     private static let deviceWrapSalt = Data("miloom-device-wrap-v1".utf8)
     private static let recoveryWrapSalt = Data("miloom-recovery-wrap-v1".utf8)

@@ -67,6 +67,7 @@ struct Institution: Identifiable, Codable, Hashable {
     var username: String?
     var email: String?
     var password: String?
+    var hasScopedCredentials: Bool? = nil
     var twoFactor: String?
     var accountsData: [InstitutionAccount]
     var lastSyncedAt: Date?
@@ -81,6 +82,7 @@ struct Institution: Identifiable, Codable, Hashable {
         case username
         case email
         case password
+        case hasScopedCredentials = "has_scoped_credentials"
         case twoFactor = "two_factor"
         case accountsData = "accounts_data"
         case lastSyncedAt = "last_synced_at"

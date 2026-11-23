@@ -15,6 +15,7 @@ struct EditInstitutionSheet: View {
     @State private var resourceCredentialStatus = "checking"
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var showingVaultAccess = false
     
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
@@ -203,6 +204,23 @@ struct EditInstitutionSheet: View {
 
     @State private var showLoanHUD = false
     @State private var loanDraft: Loan? = nil
+
+    @MainActor
+    private func save() {
+        guard !isSaving else { return }
+        isSaving = true
+        Task { @MainActor in
+            defer { isSaving = false }
+            do {
+                try await vm.saveInstitutionConfirmed(institution, appState: appState)
+                dismiss()
+            } catch ProtectedResourceSaveError.vaultAccessRequired {
+                showingVaultAccess = true
+            } catch {
+                saveError = ResourceSaveFailure.message(for: error, resource: "bank")
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -565,19 +583,7 @@ struct EditInstitutionSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
-                        Button(isSaving ? "Saving…" : "Save") {
-                            guard !isSaving else { return }
-                            isSaving = true
-                            Task { @MainActor in
-                                defer { isSaving = false }
-                                do {
-                                    try await vm.saveInstitutionConfirmed(institution, appState: appState)
-                                    dismiss()
-                                } catch {
-                                    saveError = ResourceSaveFailure.message(for: error, resource: "bank")
-                                }
-                            }
-                        }
+                        Button(isSaving ? "Saving…" : "Save", action: save)
                         .disabled(isSaving)
                         .fontWeight(.semibold)
                         .tint(isDirty ? .green : nil)
@@ -585,6 +591,7 @@ struct EditInstitutionSheet: View {
                 }
             }
             .interactiveDismissDisabled(isNew || isSaving)
+            .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: save))
             .alert("Bank Not Saved", isPresented: Binding(
                 get: { saveError != nil }, set: { if !$0 { saveError = nil } }
             )) {
@@ -602,6 +609,7 @@ struct EditInstitutionSheet: View {
                     institutionName: institution.name.isEmpty ? "Institution" : institution.name,
                     institutionId: institution.id,
                     availableCards: appState.cards.filter { $0.companyId == institution.companyId },
+                    canEnterProtectedDetails: canAccessCredentials,
                     companyId: institution.companyId,
                     vm: vm,
                     onSave: {
@@ -612,9 +620,6 @@ struct EditInstitutionSheet: View {
                             accs.append(accountDraft)
                         }
                         institution.accounts = accs
-                        if !isNew {
-                            vm.saveInstitution(institution, appState: appState)
-                        }
                         showAccountHUD = false
                     },
                     onCancel: { showAccountHUD = false },

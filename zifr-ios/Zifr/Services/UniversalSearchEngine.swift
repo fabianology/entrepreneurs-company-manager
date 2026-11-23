@@ -31,7 +31,7 @@ struct SearchRecord: Identifiable, Hashable, Sendable {
             }
         }
     }
-    enum Credential: String, Sendable { case none, available, locked }
+    enum Credential: String, Sendable { case none, available, locked, vault }
     let id: String
     let kind: Kind
     let modelID: UUID
@@ -427,7 +427,7 @@ struct UniversalSearchIndex: Sendable {
             var r = make(.card, card.id, card.companyId, card.name,
                          [card.institutionName ?? "", card.network, card.type, last4.isEmpty ? "" : "•••• \(last4)", card.status].filter { !$0.isEmpty }.joined(separator: " · "),
                          [card.cardHolder, card.login, card.notes].compactMap { $0 }.joined(separator: " "))
-            r.last4 = last4; r.login = redactor.clean(card.login ?? ""); r.credential = credential(card.password); r.date = card.expiresAt
+            r.last4 = last4; r.login = redactor.clean(card.login ?? ""); r.credential = card.hasScopedCredentials == true ? .vault : credential(card.password); r.date = card.expiresAt
             r.amount = SearchText.decimal(card.balance)
             r.balanceCategory = SearchBalanceCategory.accountType(card.type)
             r.balanceAliases = ["card:\(card.id.uuidString)"]
@@ -471,7 +471,7 @@ struct UniversalSearchIndex: Sendable {
         for institution in institutions {
             var bank = make(.institution, institution.id, institution.companyId, institution.name,
                             institution.isDisconnected ? "Bank connection needs attention" : "Bank", [institution.username, institution.email, institution.loginUrl].compactMap { $0 }.joined(separator: " "))
-            bank.login = redactor.clean(institution.username ?? institution.email ?? ""); bank.credential = credential(institution.password)
+            bank.login = redactor.clean(institution.username ?? institution.email ?? ""); bank.credential = institution.hasScopedCredentials == true ? .vault : credential(institution.password)
             bank.lastSyncedAt = institution.lastSyncedAt
             bank.website = institution.loginUrl.map(redactor.clean)
             bank.financialFacts = ["accountCount": String(institution.accounts.count), "bankConnection": institution.isDisconnected ? "Needs attention" : "Connected"]
@@ -591,7 +591,7 @@ struct UniversalSearchIndex: Sendable {
             r.website = sub.website.map(redactor.clean)
             r.safeDetails = ["website": redactor.clean(sub.website ?? ""), "notes": redactor.clean(sub.notes ?? ""),
                 "purpose": redactor.clean(sub.notes ?? ""), "paymentMethod": redactor.clean(sub.paymentMethod ?? "")]
-            r.login = redactor.clean(sub.loginId ?? ""); r.credential = credential(sub.password)
+            r.login = redactor.clean(sub.loginId ?? ""); r.credential = sub.hasScopedCredentials == true ? .vault : credential(sub.password)
             r.date = sub.nextRenewalAt ?? sub.nextRenewal.flatMap { SearchText.date($0) }; r.dueDate = r.date
             r.activeService = !["cancelled", "canceled", "paused"].contains(sub.status.lowercased())
             if let base = ExecutiveBriefingSnapshot.monthlyCost(sub), base.isFinite { r.monthlyCost = SearchText.decimal(base) }

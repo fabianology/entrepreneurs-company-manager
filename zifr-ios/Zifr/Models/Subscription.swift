@@ -445,6 +445,7 @@ struct Subscription: Identifiable, Codable, Hashable {
     var website: String?
     var loginId: String?
     var password: String?
+    var hasScopedCredentials: Bool? = nil
     var twoFactorAuth: String
     var recoveryMethod: String?
     var notes: String?
@@ -476,6 +477,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         self.website = try container.decodeIfPresent(String.self, forKey: .website)
         self.loginId = try container.decodeIfPresent(String.self, forKey: .loginId)
         self.password = try container.decodeIfPresent(String.self, forKey: .password)
+        self.hasScopedCredentials = try container.decodeIfPresent(Bool.self, forKey: .hasScopedCredentials)
         self.twoFactorAuth = try container.decodeIfPresent(String.self, forKey: .twoFactorAuth) ?? "None"
         self.recoveryMethod = try container.decodeIfPresent(String.self, forKey: .recoveryMethod)
         self.notes = try container.decodeIfPresent(String.self, forKey: .notes)
@@ -522,6 +524,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         case website
         case loginId = "login_id"
         case password
+        case hasScopedCredentials = "has_scoped_credentials"
         case twoFactorAuth = "two_factor_auth"
         case recoveryMethod = "recovery_method"
         case notes

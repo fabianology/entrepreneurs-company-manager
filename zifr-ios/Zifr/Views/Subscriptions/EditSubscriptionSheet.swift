@@ -15,6 +15,7 @@ struct EditSubscriptionSheet: View {
     @State private var resourceCredentialStatus = "checking"
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var showingVaultAccess = false
     @State private var showDelete = false
     @State private var showShareSheet = false
     
@@ -323,6 +324,24 @@ struct EditSubscriptionSheet: View {
         }
     }
 
+    @MainActor
+    private func save() {
+        guard !isSaving else { return }
+        isSaving = true
+        Task { @MainActor in
+            defer { isSaving = false }
+            do {
+                sub = try await vm.saveSubscriptionConfirmed(sub, appState: appState)
+                onSave?()
+                dismiss()
+            } catch ProtectedResourceSaveError.vaultAccessRequired {
+                showingVaultAccess = true
+            } catch {
+                saveError = ResourceSaveFailure.message(for: error, resource: "service")
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -628,20 +647,7 @@ struct EditSubscriptionSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
-                        Button(isSaving ? "Saving…" : "Save") {
-                            guard !isSaving else { return }
-                            isSaving = true
-                            Task { @MainActor in
-                                defer { isSaving = false }
-                                do {
-                                    sub = try await vm.saveSubscriptionConfirmed(sub, appState: appState)
-                                    onSave?()
-                                    dismiss()
-                                } catch {
-                                    saveError = ResourceSaveFailure.message(for: error, resource: "service")
-                                }
-                            }
-                        }
+                        Button(isSaving ? "Saving…" : "Save", action: save)
                         .fontWeight(.semibold)
                         .tint(isDirty ? .green : nil)
                         .disabled(isSaving || sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -649,6 +655,7 @@ struct EditSubscriptionSheet: View {
                 }
             }
             .interactiveDismissDisabled(isNew || isSaving)
+            .modifier(VaultAccessPrompt(isPresented: $showingVaultAccess, onReady: save))
             .alert("Service Not Saved", isPresented: Binding(
                 get: { saveError != nil }, set: { if !$0 { saveError = nil } }
             )) {
