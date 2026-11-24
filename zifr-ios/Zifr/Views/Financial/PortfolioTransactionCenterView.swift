@@ -1105,7 +1105,6 @@ struct PortfolioTransactionCenterView: View {
                 portraitTransactionsTitle
                 transactionSections
             }
-            .refreshable { await syncAndRefresh() }
         } else {
             ScrollView {
                 transactionSections
@@ -1113,7 +1112,6 @@ struct PortfolioTransactionCenterView: View {
                     .padding(.top, 12)
                     .padding(.bottom, 36)
             }
-            .refreshable { await syncAndRefresh() }
         }
     }
 
@@ -1152,6 +1150,7 @@ struct PortfolioTransactionCenterView: View {
                 }
             }
         }
+        .background { CashFlowPullToRefresh { await syncAndRefresh() } }
     }
 
     @ToolbarContentBuilder
@@ -1161,14 +1160,14 @@ struct PortfolioTransactionCenterView: View {
                 Task { await syncAndRefresh() }
             } label: {
                 if isSyncing {
-                    ProgressView().tint(Color.zifrGold)
+                    ReportLoadingArtwork(width: 32)
                 } else {
                     Image(systemName: "arrow.clockwise")
                         .foregroundStyle(Color.zifrGold)
                 }
             }
             .disabled(isSyncing)
-            .accessibilityLabel("Sync available transactions")
+            .accessibilityLabel(isSyncing ? "Syncing transactions" : "Sync available transactions")
         }
         ToolbarItem(placement: .principal) {
             Text("Transactions")
@@ -1971,7 +1970,7 @@ struct PortfolioTransactionCenterView: View {
 
     private func loadingState(_ message: String) -> some View {
         VStack(spacing: 16) {
-            ProgressView().tint(Color.zifrGold).scaleEffect(1.3)
+            ReportLoadingArtwork()
             Text(message)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)

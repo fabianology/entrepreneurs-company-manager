@@ -54,7 +54,8 @@ struct OwnerHealthBriefingDashboard: View {
                 onShowReminders: { showingReminders = true },
                 onExploreConnections: onExploreConnections,
                 onOpenResource: onOpenHealthResource,
-                onOpenUrgent: openUrgent
+                onOpenUrgent: openUrgent,
+                isFetchingRecords: appState.isLoading && !snapshot.isLoaded
             )
         }
         .onAppear { keepScopeAvailable() }
@@ -197,6 +198,8 @@ private struct ExecutiveBriefingReceipt: View {
         financials.reduce(0) { $0 + $1.insight.records.count }
     }
 
+    var isFetchingRecords = false
+
     private var accountCount: Int {
         snapshot.institutions.reduce(0) { $0 + $1.accounts.count } + snapshot.cards.count + snapshot.loans.count
     }
@@ -210,6 +213,10 @@ private struct ExecutiveBriefingReceipt: View {
             receiptHeader
             dashedDivider
             selectors
+            if isFetchingRecords {
+                ReportLoadingArtwork()
+                    .frame(maxWidth: .infinity)
+            }
             Text(snapshot.coverage)
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(BriefingReceiptTheme.fadedInk)
@@ -1650,6 +1657,7 @@ struct DuoInlineBriefingView: View {
                         DuoBriefingPlaceholder(
                             message: store.preparationError ?? "Preparing your brief…",
                             isLoading: store.preparationError == nil,
+                            animate: isActive,
                             actionTitle: "Try Again",
                             action: { store.retryRevision += 1 }
                         )
@@ -1781,6 +1789,7 @@ private struct DuoReceiptReveal: ViewModifier {
 struct DuoBriefingPlaceholder: View {
     let message: String
     var isLoading = false
+    var animate = true
     var actionTitle = "Open Executive Briefing"
     let action: () -> Void
 
@@ -1789,7 +1798,7 @@ struct DuoBriefingPlaceholder: View {
             Text("EXECUTIVE BRIEFING")
                 .font(.system(.headline, design: .monospaced).weight(.bold))
             Divider()
-            if isLoading { ProgressView().tint(BriefingReceiptTheme.gold) }
+            if isLoading { ReportLoadingArtwork(active: animate) }
             Text(message)
                 .font(.system(.callout, design: .monospaced))
                 .multilineTextAlignment(.center)
