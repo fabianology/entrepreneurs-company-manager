@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OwnerHealthBriefingDashboard: View {
     @Environment(AppState.self) private var appState
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     @Bindable var vm: AppViewModel
     @State private var selectedScope: OwnerBriefingScope = .personal
     @State private var financialMonth: CashFlowMonth = .current
@@ -55,7 +56,8 @@ struct OwnerHealthBriefingDashboard: View {
                 onExploreConnections: onExploreConnections,
                 onOpenResource: onOpenHealthResource,
                 onOpenUrgent: openUrgent,
-                isFetchingRecords: appState.isLoading && !snapshot.isLoaded
+                showsLoadingArtwork: (UIDevice.current.userInterfaceIdiom != .phone || duoLayout.isDuoDevice)
+                    && appState.isLoading && !snapshot.isLoaded
             )
         }
         .onAppear { keepScopeAvailable() }
@@ -198,7 +200,7 @@ private struct ExecutiveBriefingReceipt: View {
         financials.reduce(0) { $0 + $1.insight.records.count }
     }
 
-    var isFetchingRecords = false
+    var showsLoadingArtwork = false
 
     private var accountCount: Int {
         snapshot.institutions.reduce(0) { $0 + $1.accounts.count } + snapshot.cards.count + snapshot.loans.count
@@ -213,7 +215,7 @@ private struct ExecutiveBriefingReceipt: View {
             receiptHeader
             dashedDivider
             selectors
-            if isFetchingRecords {
+            if showsLoadingArtwork {
                 ReportLoadingArtwork()
                     .frame(maxWidth: .infinity)
             }
