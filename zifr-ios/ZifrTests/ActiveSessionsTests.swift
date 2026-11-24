@@ -1733,3 +1733,130 @@ final class PortfolioCacheTests: XCTestCase {
         XCTAssertTrue(saved)
     }
 }
+
+@MainActor
+final class CompanyStartupTests: XCTestCase {
+    func testFirstReadRecoversWithoutPullToRefreshAndAcceptsAnEmptyPortfolio() async {
+        let state = AppState()
+        var attempts = 0
+        var waits: [Duration] = []
+        await CompanyStartup.refresh(isCurrent: { true }, receivedCompanies: { state.hasReceivedCompanyList }, wait: {
+            waits.append($0)
+        }, load: {
+            attempts += 1
+            if attempts == 2 {
+                state.companies = []
+                state.hasReceivedCompanyList = true
+            }
+        })
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(waits, [.seconds(2)])
+    }
+
+    func testRetryStopsIfAccountLocksOrAConcurrentRefreshSucceeds() async {
+        for lock in [true, false] {
+            var unlocked = true
+            var received = false
+            var attempts = 0
+            await CompanyStartup.refresh(isCurrent: { unlocked }, receivedCompanies: { received }, wait: { _ in
+                unlocked = !lock
+                received = !lock
+            }, load: { attempts += 1 })
+            XCTAssertEqual(attempts, 1)
+        }
+    }
+
+    func testLogoDecodesFromPostgRESTBinaryAndCacheJSON() throws {
+        let logo = Data([255, 216, 255])
+        let company = Company(userId: UUID(), logoData: logo)
+        let encoded = try JSONEncoder().encode(company)
+        XCTAssertEqual(try JSONDecoder().decode(Company.self, from: encoded).logoData, logo)
+        var record = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        for representation in ["\\x2f396a2f", "\\xffd8ff"] {
+            record["logo_data"] = representation
+            let data = try JSONSerialization.data(withJSONObject: record)
+            XCTAssertEqual(try JSONDecoder().decode(Company.self, from: data).logoData, logo)
+        }
+    }
+
+    func testCompanyCardsPublishBeforeLogosAndRejectSupersededImages() {
+        let state = AppState()
+        let card = Company(userId: UUID(), name: "Example")
+        var image = card
+        image.logoData = Data([1, 2, 3])
+        state.publishCompanyCards([card])
+        XCTAssertEqual(state.companies, [card])
+        state.applyCompanyLogos([image])
+        XCTAssertEqual(state.companies, [image])
+        state.publishCompanyCards([card])
+        XCTAssertEqual(state.companies, [image])
+
+        var revised = card
+        revised.lastModified = card.lastModified.addingTimeInterval(10)
+        state.publishCompanyCards([revised])
+        state.applyCompanyLogos([image])
+        XCTAssertEqual(state.companies, [revised])
+        var wrongOwner = revised
+        wrongOwner.userId = UUID()
+        wrongOwner.logoData = Data([4])
+        state.applyCompanyLogos([wrongOwner])
+        XCTAssertEqual(state.companies, [revised])
+        state.publishCompanyCards([])
+        state.applyCompanyLogos([image])
+        XCTAssertTrue(state.companies.isEmpty)
+    }
+
+    func testCardCacheWorksBeforeDetailsAndIsScopedToTheOwnerAndGeneration() async throws {
+        let owner = UUID()
+        let other = UUID()
+        let owned = Company(userId: owner, name: "Owned")
+        let shared = Company(userId: other, name: "Shared")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let key = SymmetricKey(size: .bits256)
+        let cache = PortfolioCache(directory: directory, key: { _, _ in key }, deleteKey: { _ in })
+        let generation = await cache.generation(for: owner)
+        let totals = CompanyCardCounts.owned(companies: [owned, shared], userID: owner,
+                                             institutions: [], services: [], documents: [])
+        XCTAssertEqual(totals, [owned.id: CompanyCardCounts()])
+        try await cache.saveCardCounts(totals, for: owner, generation: generation)
+        let savedCounts = try await cache.loadCardCounts(for: owner)
+        let expiredCounts = try await cache.loadCardCounts(for: owner, now: Date().addingTimeInterval(8 * 86400))
+        XCTAssertEqual(savedCounts, totals)
+        XCTAssertNil(expiredCounts)
+        let state = AppState()
+        state.portfolioUserID = owner
+        XCTAssertNil(state.cardCount(.services, for: owned, live: 0))
+        state.savedCardCounts = [owned.id: CompanyCardCounts(financial: 1, services: 3, documents: 2)]
+        XCTAssertEqual(state.cardCount(.services, for: owned, live: 0), 3)
+        state.readyCardSections.insert(.services)
+        XCTAssertEqual(state.cardCount(.services, for: owned, live: 0), 0)
+        XCTAssertEqual(state.cardCount(.financial, for: owned, live: 0), 1)
+        XCTAssertNil(state.cardCount(.financial, for: shared, live: 0))
+
+        try await cache.saveCompanies([shared, owned], for: owner, generation: generation)
+        var logoRow = owned
+        logoRow.logoData = Data([1, 2, 3])
+        try await cache.saveCompanies([logoRow, shared], for: owner, generation: generation, file: .logos)
+        let savedLogos = try await cache.loadCompanies(for: owner, file: .logos)
+        XCTAssertEqual(savedLogos, [logoRow])
+        let restored = try await cache.loadCompanies(for: owner)
+        let wrongAccount = try await cache.loadCompanies(for: other)
+        let expired = try await cache.loadCompanies(for: owner, now: Date().addingTimeInterval(8 * 86400))
+        XCTAssertEqual(restored, [owned])
+        XCTAssertNil(wrongAccount)
+        XCTAssertNil(expired)
+        try await cache.saveCompanies([shared], for: owner, generation: generation)
+        let noOwnedCompanies = try await cache.loadCompanies(for: owner)
+        XCTAssertEqual(noOwnedCompanies, [])
+        await cache.remove(for: owner)
+        try await cache.saveCompanies([owned], for: owner, generation: generation)
+        try await cache.saveCardCounts(totals, for: owner, generation: generation)
+        let removedCounts = try await cache.loadCardCounts(for: owner)
+        XCTAssertNil(removedCounts)
+        let removedLogos = try await cache.loadCompanies(for: owner, file: .logos)
+        XCTAssertNil(removedLogos)
+        let afterSignOut = try await cache.loadCompanies(for: owner)
+        XCTAssertNil(afterSignOut)
+    }
+}

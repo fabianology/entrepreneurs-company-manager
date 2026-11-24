@@ -52,6 +52,41 @@ final class AppState {
     var isShowingSavedPortfolio = false
     var hasLoadedCompanies = false
     var hasLoadedCompanyContent = false
+    @ObservationIgnored var companyLogoTask: Task<Void, Never>?
+
+    func publishCompanyCards(_ cards: [Company]) {
+        let previous = Dictionary(companies.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        companies = cards.map { card in
+            guard card.logoData == nil, let saved = previous[card.id],
+                  saved.userId == card.userId, saved.lastModified == card.lastModified else { return card }
+            var result = card
+            result.logoData = saved.logoData
+            return result
+        }
+    }
+
+    func applyCompanyLogos(_ rows: [Company]) {
+        let logos = Dictionary(rows.compactMap { row in
+            row.logoData.map { (row.id, (row.userId, row.lastModified, $0)) }
+        }, uniquingKeysWith: { first, _ in first })
+        for index in companies.indices {
+            let card = companies[index]
+            guard card.logoData == nil, let (owner, modified, data) = logos[card.id],
+                  card.userId == owner, card.lastModified == modified else { continue }
+            companies[index].logoData = data
+        }
+    }
+
+    var readyCardSections = Set<CompanyCardSection>()
+    var savedCardCounts: [UUID: CompanyCardCounts] = [:]
+
+    func cardCount(_ section: CompanyCardSection, for company: Company, live: Int) -> Int? {
+        if readyCardSections.contains(section) || live > 0 { return live }
+        guard company.userId == portfolioUserID else { return nil }
+        return savedCardCounts[company.id]?[section]
+    }
+
+    var hasReceivedCompanyList = false
     var hasLoadedPortfolio: Bool = false { didSet { searchRevision &+= 1 } }
     
     var isLoading: Bool = false
@@ -191,9 +226,14 @@ final class AppState {
     }
 
     func clearSearchSession(keepingPortfolio: Bool = false) {
+        companyLogoTask?.cancel()
+        companyLogoTask = nil
+        readyCardSections.removeAll()
+        savedCardCounts.removeAll()
         portfolioLoadID = UUID()
         portfolioLoadingUserID = nil
         isLoading = false
+        hasReceivedCompanyList = false
         if !keepingPortfolio {
             portfolioUserID = nil
             isShowingSavedPortfolio = false
@@ -211,11 +251,12 @@ final class AppState {
     /// Restore only into the matching authenticated load, before server data has
     /// arrived. This deliberately leaves search/history marked incomplete.
     @discardableResult
-    func restoreSavedPortfolio(_ snapshot: PortfolioSnapshot, loadID: UUID) -> Bool {
+    func restoreSavedPortfolio(_ snapshot: PortfolioSnapshot, loadID: UUID, keepingCompanyList: Bool = false) -> Bool {
         guard portfolioLoadID == loadID, portfolioUserID == snapshot.userID,
-              !hasLoadedCompanies, !snapshot.companies.isEmpty,
+              !hasReceivedCompanyList, !snapshot.companies.isEmpty,
+              !hasLoadedCompanies || (keepingCompanyList && Set(companies.map(\.id)) == Set(snapshot.companies.map(\.id))),
               snapshot.isValid(for: snapshot.userID, now: Date()) else { return false }
-        companies = snapshot.companies
+        if !keepingCompanyList { companies = snapshot.companies }
         subscriptions = snapshot.subscriptions.map { SubscriptionRenewalScheduler.normalized($0) }
         institutions = snapshot.institutions
         cards = snapshot.cards

@@ -208,21 +208,66 @@ class DataRepository {
     // environment; Transaction's custom decoder safely leaves it nil when omitted.
     private static let transactionColumns = "id,user_id,company_id,institution_id,plaid_transaction_id,account_id,canonical_account_id,amount,currency,date,authorized_date,name,merchant_name,merchant_website,merchant_logo_url,payment_channel,personal_finance_primary,personal_finance_detailed,personal_finance_confidence,category,pending"
 
-    private func fetchCompanies() async -> Result<[Company], Error> {
+    private static let companyCardColumns = "id,user_id,name,structure,company_description,color_hex,website,last_modified,last_viewed"
+
+    @MainActor
+    private func loadCompanyLogos(appState: AppState, userID: UUID, loadID: UUID, generation: UUID) {
+        appState.companyLogoTask?.cancel()
+        let cards = appState.companies
+        guard !cards.isEmpty else { return }
+        appState.companyLogoTask = Task(priority: .utility) {
+            let cached = (try? await PortfolioCache.shared.loadCompanies(for: userID, file: .logos)) ?? []
+            guard !Task.isCancelled, appState.portfolioLoadID == loadID,
+                  client.auth.currentSession?.user.id == userID else { return }
+            let versions = Dictionary(uniqueKeysWithValues: cards.map { ($0.id, $0.lastModified) })
+            var verified = cached.filter { versions[$0.id] == $0.lastModified }
+            appState.applyCompanyLogos(verified)
+            let known = Set(verified.map(\.id))
+            verified.append(contentsOf: cards.filter { $0.userId == userID && $0.logoData != nil && !known.contains($0.id) })
+            let missing = cards.filter { $0.logoData == nil && !known.contains($0.id) }.map(\.id)
+            guard !missing.isEmpty else { return }
+            do {
+                // Bound each PostgREST URL even on a large portfolio.
+                for start in stride(from: 0, to: missing.count, by: 64) {
+                    let batch = Array(missing[start..<min(start + 64, missing.count)])
+                    guard !Task.isCancelled, appState.portfolioLoadID == loadID,
+                          client.auth.currentSession?.user.id == userID else { return }
+                    let rows: [Company] = try await client.from("companies")
+                        .select(Self.companyCardColumns + ",logo_data")
+                        .in("id", values: batch)
+                        .retry(enabled: false)
+                        .execute().value
+                    guard !Task.isCancelled, appState.portfolioLoadID == loadID,
+                          client.auth.currentSession?.user.id == userID else { return }
+                    appState.applyCompanyLogos(rows)
+                    verified.append(contentsOf: rows.filter { $0.userId == userID })
+                }
+                try await PortfolioCache.shared.saveCompanies(verified, for: userID, generation: generation, file: .logos)
+            } catch {
+                if !Task.isCancelled { AppDiagnostics.failure("data", "fetch_company_logos", error: error) }
+            }
+        }
+    }
+
+    private func fetchCompanies(for userID: UUID) async -> Result<[Company], Error> {
         var lastError: Error?
 
         for attempt in 0...Self.companyRetryDelays.count {
             do {
+                try Task.checkCancellation()
+                guard try await client.auth.session.user.id == userID else { throw CancellationError() }
                 let companies: [Company] = try await client
                     .from("companies")
-                    .select()
+                    .select(Self.companyCardColumns)
                     .execute()
                     .value
                 return .success(companies)
             } catch {
+                if Task.isCancelled || error is CancellationError { return .failure(CancellationError()) }
                 lastError = error
                 guard attempt < Self.companyRetryDelays.count else { break }
-                try? await Task.sleep(for: Self.companyRetryDelays[attempt])
+                do { try await Task.sleep(for: Self.companyRetryDelays[attempt]) }
+                catch { return .failure(error) }
             }
         }
 
@@ -385,15 +430,26 @@ class DataRepository {
     }
 
     @MainActor
-    func fetchAllData(appState: AppState, force: Bool = false) async {
+    func fetchAllData(appState: AppState, force: Bool = false, expectedUserID: UUID? = nil) async {
         let loadStartedAt = Date()
         // Restoring a saved portfolio must not wait behind a token refresh.
-        guard let loadingUserID = client.auth.currentSession?.user.id else { return }
+        guard !Task.isCancelled else { return }
+        if let expectedUserID, let previousUserID = appState.portfolioUserID, previousUserID != expectedUserID {
+            appState.clearPortfolio()
+        }
+        guard let loadingUserID = client.auth.currentSession?.user.id,
+              expectedUserID == nil || expectedUserID == loadingUserID else {
+            if expectedUserID != nil {
+                appState.portfolioLoadIssue = "Waiting for your signed-in session to load companies."
+            }
+            return
+        }
         if !force && appState.isLoading && appState.portfolioLoadingUserID == loadingUserID { return }
         if appState.portfolioUserID != loadingUserID {
             appState.clearPortfolio()
         }
         let loadID = UUID()
+        appState.companyLogoTask?.cancel()
         appState.portfolioLoadID = loadID
         appState.portfolioLoadingUserID = loadingUserID
         appState.isLoading = true
@@ -406,40 +462,53 @@ class DataRepository {
         }
         let cacheGeneration = await PortfolioCache.shared.generation(for: loadingUserID)
         guard primary.isCurrent else { return }
-        if !appState.hasLoadedCompanies {
-            let restoreStartedAt = Date()
+        let needsRestore = !appState.hasLoadedCompanies
+        async let companyRead = primary.load("companies", operation: {
+            try await self.fetchCompanies(for: loadingUserID).get()
+        }, publish: { state, companies in
+            state.publishCompanyCards(companies)
+            state.hasLoadedCompanies = true
+            state.hasReceivedCompanyList = true
+            AppDiagnostics.duration("data", "live_company_list_visible", seconds: Date().timeIntervalSince(loadStartedAt))
+        })
+        if needsRestore {
             do {
-                if let snapshot = try await PortfolioCache.shared.load(for: loadingUserID), primary.isCurrent,
-                   appState.restoreSavedPortfolio(snapshot, loadID: loadID) {
+                let saved = try await PortfolioCache.shared.loadCompanies(for: loadingUserID)
+                guard primary.isCurrent else { return }
+                let counts = try? await PortfolioCache.shared.loadCardCounts(for: loadingUserID)
+                guard primary.isCurrent else { return }
+                appState.savedCardCounts = counts ?? [:]
+                if !appState.hasReceivedCompanyList, let saved, !saved.isEmpty {
+                    appState.companies = saved
+                    appState.hasLoadedCompanies = true
+                    appState.isShowingSavedPortfolio = true
+                    AppDiagnostics.duration("data", "saved_company_list_visible", seconds: Date().timeIntervalSince(loadStartedAt))
+                }
+                // An empty newer list invalidates the companies in an older full snapshot.
+                if !appState.hasReceivedCompanyList, saved?.isEmpty != true,
+                   let snapshot = try await PortfolioCache.shared.load(for: loadingUserID), primary.isCurrent,
+                   appState.restoreSavedPortfolio(snapshot, loadID: loadID, keepingCompanyList: saved != nil) {
                     decryptPortfolioSecrets(appState: appState)
-                    AppDiagnostics.duration("data", "saved_portfolio_visible", seconds: Date().timeIntervalSince(restoreStartedAt))
                 }
             } catch {
                 AppDiagnostics.failure("data", "restore_saved_portfolio", error: error)
             }
         }
+        let fetchedCompanies = await companyRead
         guard primary.isCurrent else { return }
-        do {
-            guard try await client.auth.session.user.id == loadingUserID, primary.isCurrent else { return }
-        } catch {
-            guard primary.isCurrent else { return }
-            appState.portfolioLoadIssue = "Could not refresh your companies. Check your connection and pull down to try again."
-            AppDiagnostics.failure("data", "refresh_portfolio_session", error: error)
-            return
+        if let fetchedCompanies {
+            do { try await PortfolioCache.shared.saveCompanies(fetchedCompanies, for: loadingUserID, generation: cacheGeneration) }
+            catch { AppDiagnostics.failure("data", "save_company_list", error: error) }
+        } else {
+            // While launching, retry companies before starting unrelated requests.
+            guard appState.hasReceivedCompanyList, (try? await client.auth.session.user.id) == loadingUserID else { return }
         }
+        guard primary.isCurrent else { return }
         let searchLoadFailures = PortfolioLoadFailures()
-
-        // Start all visible content together. Secondary history and intelligence
-        // requests start only after these sections are usable, avoiding launch contention.
-        async let fCompanies: [Company]? = primary.load("companies", operation: {
-            try await self.fetchCompanies().get()
-        }, publish: { state, companies in
-            state.companies = companies
-            state.hasLoadedCompanies = true
-        })
         async let fSubscriptions: [Subscription]? = primary.load("services", operation: {
             try await self.fetchVisibleSubscriptions()
         }, publish: { state, subscriptions in
+            state.readyCardSections.insert(.services)
             state.subscriptions = subscriptions.map { subscription in
                 var value = SubscriptionRenewalScheduler.normalized(subscription)
                 value.password = SecurityService.shared.decrypt(value.password, context: self.vaultContext(owner: value.userId, type: "subscription", id: value.id, field: "password"))
@@ -449,8 +518,25 @@ class DataRepository {
         async let fInstitutions: [Institution]? = primary.load("bank accounts", operation: {
             try await self.fetchVisibleInstitutions()
         }, publish: { state, institutions in
+            state.readyCardSections.insert(.financial)
             state.institutions = institutions.map { self.decryptInstitutionSecrets($0) }
         })
+        async let fDocuments: [CompanyDocument]? = primary.load("documents", operation: {
+            try await self.client.from("company_documents").select().execute().value
+        }, publish: { state, documents in
+            state.documents = documents
+            state.readyCardSections.insert(.documents)
+        })
+        let (fetchedSubscriptions, fetchedInstitutions, fetchedDocuments) = await (fSubscriptions, fInstitutions, fDocuments)
+        guard primary.isCurrent else { return }
+        if let fetchedSubscriptions, let fetchedInstitutions, let fetchedDocuments {
+            let totals = CompanyCardCounts.owned(companies: appState.companies, userID: loadingUserID,
+                                                 institutions: fetchedInstitutions, services: fetchedSubscriptions, documents: fetchedDocuments)
+            do { try await PortfolioCache.shared.saveCardCounts(totals, for: loadingUserID, generation: cacheGeneration) }
+            catch { AppDiagnostics.failure("data", "save_card_counts", error: error) }
+            guard primary.isCurrent else { return }
+        }
+
         async let fCards: [FinancialCard]? = primary.load("cards", operation: {
             try await self.fetchVisibleCards()
         }, publish: { state, cards in
@@ -463,14 +549,11 @@ class DataRepository {
         async let fLoans: [Loan]? = primary.load("loans", operation: {
             try await self.fetchLoanSnapshots()
         }, publish: { $0.loans = $1 })
-        async let fDocuments: [CompanyDocument]? = primary.load("documents", operation: {
-            try await self.client.from("company_documents").select().execute().value
-        }, publish: { $0.documents = $1 })
         async let fShares: [ResourceShare]? = primary.load("sharing permissions", operation: {
             try await self.client.from("resource_shares").select().execute().value
         }, publish: { $0.resourceShares = $1 })
 
-        let (fetchedCompanies, fetchedSubscriptions, fetchedInstitutions, fetchedCards, fetchedLoans, fetchedDocuments, fetchedShares) = await (fCompanies, fSubscriptions, fInstitutions, fCards, fLoans, fDocuments, fShares)
+        let (fetchedCards, fetchedLoans, fetchedShares) = await (fCards, fLoans, fShares)
         guard primary.isCurrent else { return }
         appState.hasLoadedCompanyContent = true
         AppDiagnostics.duration("data", "company_content_ready", seconds: Date().timeIntervalSince(loadStartedAt))
@@ -502,6 +585,9 @@ class DataRepository {
         async let fActivity: [ActivityLog] = measure("activity_logs") { await searchLoad("activity", failures: searchLoadFailures) { try await client.from("activity_logs").select().order("created_at", ascending: false).execute().value } }
         async let fNotifications: [AppNotification] = measure("app_notifications") { await searchLoad("notifications", failures: searchLoadFailures) { try await client.from("app_notifications").select().order("created_at", ascending: false).execute().value } }
         async let fPrefs: [UserPreferences] = measure("user_preferences") { await searchLoad("preferences", failures: searchLoadFailures) { try await client.from("user_preferences").select().execute().value } }
+        let (fetchedActivityLogs, fetchedNotifications, fetchedPreferences) = await (fActivity, fNotifications, fPrefs)
+        guard primary.isCurrent else { return }
+
         async let fAlertRules: [AlertRule] = measure("alert_rules") { await safeFetchAlertRules() }
         async let fPlaidItems: [PlaidItemSummary] = measure("plaid_items") {
             (try? await client
@@ -511,8 +597,9 @@ class DataRepository {
                 .value) ?? []
         }
         async let fConnections: [ResourceConnection] = measure("resource_connections") { await searchLoad("connections", failures: searchLoadFailures) { try await client.from("resource_connections").select().execute().value } }
-        async let fObligations: [PortfolioObligation] = measure("obligations") { await searchLoad("reminders", failures: searchLoadFailures) { try await client.from("obligations").select().order("due_at", ascending: true).execute().value } }
-        async let fObligationRefresh = refreshMyObligations()
+        let (fetchedAlertRules, fetchedPlaidItems, fetchedConnections) = await (fAlertRules, fPlaidItems, fConnections)
+        guard primary.isCurrent else { return }
+
         async let fTransactions = measure("transactions") { await searchLoad("transactions", failures: searchLoadFailures) { try await fetchTransactions() } }
         async let fTransactionOverrides: [TransactionOverride] = measure("transaction_overrides") {
             await searchLoad("transaction classifications", failures: searchLoadFailures) { try await client
@@ -523,23 +610,15 @@ class DataRepository {
                 .from("plaid_transaction_category_rules").select().execute().value }
         }
         
-        let fetchedPlaidItems = await fPlaidItems
-        let fetchedActivityLogs = await fActivity
-        let fetchedNotifications = await fNotifications
-        let fetchedPreferences = await fPrefs
-        let fetchedAlertRules = await fAlertRules
-        let fetchedConnections = await fConnections
-        let initiallyFetchedObligations = await fObligations
-        let obligationRefreshSucceeded = await fObligationRefresh
-        let fetchedObligations: [PortfolioObligation]
-        if obligationRefreshSucceeded {
-            fetchedObligations = (try? await client.from("obligations").select().order("due_at", ascending: true).execute().value) ?? initiallyFetchedObligations
-        } else {
-            fetchedObligations = initiallyFetchedObligations
-        }
         let transactions = await fTransactions
         let transactionOverrides = await fTransactionOverrides
         let transactionCategoryRules = await fTransactionCategoryRules
+        guard primary.isCurrent else { return }
+        _ = await refreshMyObligations()
+        guard primary.isCurrent else { return }
+        let fetchedObligations: [PortfolioObligation] = await searchLoad("reminders", failures: searchLoadFailures) {
+            try await client.from("obligations").select().order("due_at", ascending: true).execute().value
+        }
         
         await vaultRestore
         guard primary.isCurrent else { return }
@@ -563,6 +642,9 @@ class DataRepository {
             appState.portfolioLoadIssue = ([appState.portfolioLoadIssue].compactMap { $0 } + ["Could not load: " + unavailable.joined(separator: ", ") + ". Search and totals may be incomplete."]).joined(separator: " ")
         }
         appState.hasLoadedPortfolio = true
+        if appState.hasReceivedCompanyList {
+            loadCompanyLogos(appState: appState, userID: loadingUserID, loadID: loadID, generation: cacheGeneration)
+        }
         AppDiagnostics.duration("data", "portfolio_ready", seconds: Date().timeIntervalSince(loadStartedAt))
 
         // Keep next-due dates current in Supabase. A failed background write does
@@ -825,6 +907,12 @@ class DataRepository {
     func insertCompany(_ company: Company) async throws {
         try await client.from("companies").insert(company).execute()
     }
+    func markCompanyViewed(_ id: UUID, at date: Date) async throws {
+        let rows: [MutationReceipt] = try await client.from("companies")
+            .update(["last_viewed": date]).eq("id", value: id).select("id").execute().value
+        try requireUpdatedRow(rows, resource: "company")
+    }
+
     func updateCompany(_ company: Company) async throws {
         let session = try? await client.auth.session
         let rows: [MutationReceipt] = try await client.from("companies")

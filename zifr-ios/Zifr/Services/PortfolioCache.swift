@@ -59,6 +59,59 @@ struct PortfolioSnapshot: Codable {
     }
 }
 
+/// Persist owner cards independently so a failed detail request cannot leave
+/// the next launch without a company list. Shared access is rechecked online.
+enum CompanyCardSection: Hashable { case financial, services, documents }
+
+struct CompanyCardCounts: Codable, Equatable {
+    var financial = 0
+    var services = 0
+    var documents = 0
+
+    subscript(section: CompanyCardSection) -> Int {
+        switch section {
+        case .financial: return financial
+        case .services: return services
+        case .documents: return documents
+        }
+    }
+
+    static func owned(companies: [Company], userID: UUID, institutions: [Institution],
+                      services: [Subscription], documents: [CompanyDocument]) -> [UUID: Self] {
+        var result = Dictionary(uniqueKeysWithValues: companies.filter { $0.userId == userID }.map { ($0.id, Self()) })
+        // A mixed-owner total would disclose shared records after access changes.
+        for row in institutions {
+            if row.userId == userID { result[row.companyId]?.financial += 1 }
+            else { result.removeValue(forKey: row.companyId) }
+        }
+        for row in services {
+            if row.userId == userID { result[row.companyId]?.services += 1 }
+            else { result.removeValue(forKey: row.companyId) }
+        }
+        for row in documents {
+            if row.userId == userID { result[row.companyId]?.documents += 1 }
+            else { result.removeValue(forKey: row.companyId) }
+        }
+        return result
+    }
+}
+
+private struct SavedCardCounts: Codable {
+    let savedAt: Date
+    let totals: [UUID: CompanyCardCounts]
+}
+
+private struct SavedCompanyList: Codable {
+    let userID: UUID
+    let savedAt: Date
+    let companies: [Company]
+}
+
+enum CompanyCacheFile: String {
+    case companies
+    case logos
+}
+
 /// All disk/crypto work is serialized off the main actor. A per-account Keychain
 /// key and authenticated account ID prevent snapshots crossing account boundaries.
 actor PortfolioCache {
@@ -90,27 +143,64 @@ actor PortfolioCache {
         directory.appendingPathComponent(userID.uuidString).appendingPathExtension("encrypted")
     }
 
-    private func context(for userID: UUID) -> Data {
-        Data("miloom.portfolio.v1|\(userID.uuidString)".utf8)
+    private func companyListURL(for userID: UUID, file: CompanyCacheFile) -> URL {
+        directory.appendingPathComponent(userID.uuidString + "." + file.rawValue + ".encrypted")
     }
 
     func load(for userID: UUID, now: Date = Date()) throws -> PortfolioSnapshot? {
-        let url = fileURL(for: userID)
+        let snapshot: PortfolioSnapshot? = try read(userID, url: fileURL(for: userID), domain: "portfolio")
+        return snapshot?.isValid(for: userID, now: now) == true ? snapshot : nil
+    }
+
+    func loadCompanies(for userID: UUID, file: CompanyCacheFile = .companies, now: Date = Date()) throws -> [Company]? {
+        guard let list: SavedCompanyList = try read(userID, url: companyListURL(for: userID, file: file), domain: file.rawValue),
+              list.userID == userID, (-300...PortfolioSnapshot.maximumAge).contains(now.timeIntervalSince(list.savedAt)),
+              list.companies.allSatisfy({ $0.userId == userID }) else { return nil }
+        return list.companies
+    }
+
+    func saveCompanies(_ companies: [Company], for userID: UUID, generation: UUID, file: CompanyCacheFile = .companies) throws {
+        let list = SavedCompanyList(userID: userID, savedAt: Date(), companies: companies.filter { $0.userId == userID })
+        _ = try write(list, for: userID, generation: generation, url: companyListURL(for: userID, file: file), domain: file.rawValue)
+    }
+
+    private func countsURL(_ userID: UUID) -> URL {
+        directory.appendingPathComponent(userID.uuidString + ".counts.encrypted")
+    }
+
+    func loadCardCounts(for userID: UUID, now: Date = Date()) throws -> [UUID: CompanyCardCounts]? {
+        guard let saved: SavedCardCounts = try read(userID, url: countsURL(userID), domain: "counts"),
+              (-300...PortfolioSnapshot.maximumAge).contains(now.timeIntervalSince(saved.savedAt)) else { return nil }
+        return saved.totals
+    }
+
+    func saveCardCounts(_ totals: [UUID: CompanyCardCounts], for userID: UUID, generation: UUID) throws {
+        _ = try write(SavedCardCounts(savedAt: Date(), totals: totals), for: userID, generation: generation,
+                      url: countsURL(userID), domain: "counts")
+    }
+
+    private func context(_ domain: String, userID: UUID) -> Data {
+        Data("miloom.\(domain).v1|\(userID.uuidString)".utf8)
+    }
+
+    private func read<T: Decodable>(_ userID: UUID, url: URL, domain: String) throws -> T? {
         guard FileManager.default.fileExists(atPath: url.path),
               let key = try key(userID, false) else { return nil }
         let sealed = try AES.GCM.SealedBox(combined: Data(contentsOf: url))
-        let data = try AES.GCM.open(sealed, using: key, authenticating: context(for: userID))
-        let snapshot = try JSONDecoder().decode(PortfolioSnapshot.self, from: data)
-        guard snapshot.isValid(for: userID, now: now) else { return nil }
-        return snapshot
+        let data = try AES.GCM.open(sealed, using: key, authenticating: context(domain, userID: userID))
+        return try JSONDecoder().decode(T.self, from: data)
     }
 
     @discardableResult
     func save(_ snapshot: PortfolioSnapshot, generation: UUID) throws -> Bool {
-        guard generations[snapshot.userID] == generation,
-              let key = try key(snapshot.userID, true) else { return false }
-        let data = try JSONEncoder().encode(snapshot)
-        let sealed = try AES.GCM.seal(data, using: key, authenticating: context(for: snapshot.userID))
+        try write(snapshot, for: snapshot.userID, generation: generation, url: fileURL(for: snapshot.userID), domain: "portfolio")
+    }
+
+    private func write<T: Encodable>(_ value: T, for userID: UUID, generation: UUID, url: URL, domain: String) throws -> Bool {
+        guard generations[userID] == generation,
+              let key = try key(userID, true) else { return false }
+        let data = try JSONEncoder().encode(value)
+        let sealed = try AES.GCM.seal(data, using: key, authenticating: context(domain, userID: userID))
         guard let encrypted = sealed.combined else { return false }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
                                                attributes: [.protectionKey: FileProtectionType.complete])
@@ -118,7 +208,7 @@ actor PortfolioCache {
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         try excludedDirectory.setResourceValues(values)
-        try encrypted.write(to: fileURL(for: snapshot.userID), options: [.atomic, .completeFileProtection])
+        try encrypted.write(to: url, options: [.atomic, .completeFileProtection])
         return true
     }
 
@@ -126,6 +216,9 @@ actor PortfolioCache {
         // Reject a delayed pre-sign-out save even if it reaches this actor later.
         generations[userID] = UUID()
         try? FileManager.default.removeItem(at: fileURL(for: userID))
+        try? FileManager.default.removeItem(at: companyListURL(for: userID, file: .companies))
+        try? FileManager.default.removeItem(at: companyListURL(for: userID, file: .logos))
+        try? FileManager.default.removeItem(at: countsURL(userID))
         deleteKey(userID)
     }
 }

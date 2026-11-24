@@ -190,14 +190,6 @@ struct DashboardView: View {
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .scrollIndicators(.hidden)
-            .task {
-                // Fallback for OAuth/root-view timing: the dashboard should never
-                // remain on its placeholder simply because the first auth callback
-                // arrived before the app-level loader attached.
-                if !appState.hasLoadedCompanies {
-                    await DataRepository.shared.fetchAllData(appState: appState)
-                }
-            }
             .onAppear {
                 onboardingState.evaluateState(appState: appState)
             }
@@ -1027,9 +1019,9 @@ struct DashboardView: View {
 
         CompanyCardView(
             company: company,
-            institutionsCount: iCount,
-            subscriptionsCount: sCount,
-            docsCount: dCount,
+            institutionsCount: appState.cardCount(.financial, for: company, live: iCount),
+            subscriptionsCount: appState.cardCount(.services, for: company, live: sCount),
+            docsCount: appState.cardCount(.documents, for: company, live: dCount),
             onEdit: { editingCompany = company },
             canEdit: canEdit,
             onShare: isSharedWithMe ? nil : { companyToShare = company },
