@@ -472,6 +472,83 @@ private struct InboxSectionPicker: UIViewRepresentable {
     }
 }
 
+private struct InboxAlertDetails: View {
+    let notification: AppNotification
+    let receivedTime: String
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.calendar) private var calendar
+    @Environment(\.timeZone) private var timeZone
+
+    var body: some View {
+        let payment = InboxScheduledPayment(notification, timeZone: timeZone)
+        let subject = HStack(spacing: 6) {
+            Text(payment?.name ?? notification.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+            if !notification.isRead {
+                Circle().fill(Color.zifrGold).frame(width: 6, height: 6)
+                    .accessibilityHidden(true)
+            }
+        }
+        let subtitle = Group {
+            if let payment {
+                Text("\(payment.kind) · \(payment.date, format: .dateTime.month(.abbreviated).day().year())")
+            } else {
+                Text(notification.body)
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(Color.white.opacity(notification.isRead ? 0.64 : 0.78))
+        let timing = Group {
+            if let payment {
+                TimelineView(.everyMinute) { clock in
+                    countdown(payment.daysUntil(from: clock.date, calendar: calendar))
+                }
+                .font(.caption.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(Color.zifrGold)
+                .fixedSize(horizontal: true, vertical: false)
+            } else if !receivedTime.isEmpty {
+                Text(receivedTime)
+                    .font(.caption)
+                    .foregroundStyle(Color.white.opacity(0.62))
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
+            if dynamicTypeSize.isAccessibilitySize {
+                subject
+                subtitle
+                timing
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    subject
+                    Spacer(minLength: 0)
+                    timing
+                }
+                subtitle
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(notification.isRead ? "" : "Unread")
+    }
+
+    private func countdown(_ days: Int) -> Text {
+        switch days {
+        case 0: Text("Today")
+        case 1: Text("Tomorrow")
+        case -1: Text("Yesterday")
+        case 2...: Text("In \(days) days")
+        default: Text("\(-days) days ago")
+        }
+    }
+}
+
 struct NotificationInboxView: View {
     enum Presentation {
         case sheet, duoDrawer
@@ -508,6 +585,7 @@ struct NotificationInboxView: View {
                     .padding(.top, 24)
                     .frame(maxWidth: .infinity)
                     .presentationDragIndicator(.visible)
+                    .accessibilityAction(.escape) { dismiss() }
                     .presentationBackground {
                         DuoGlassReportStyle.tile
                             .opacity(0.86)
@@ -557,9 +635,6 @@ struct NotificationInboxView: View {
                     Spacer(minLength: 0)
                     inboxActions
                         .accessibilityLabel("Inbox actions")
-                    if presentation == .sheet {
-                        closeButton
-                    }
                 }
 
                 InboxSectionPicker(selection: $section)
@@ -581,25 +656,6 @@ struct NotificationInboxView: View {
                 }
             }
         }
-    }
-
-    @ViewBuilder
-    private var closeButton: some View {
-        Button {
-            dismiss()
-        } label: {
-            let icon = Image(systemName: "xmark")
-                .font(.system(size: 16, weight: .semibold))
-                .frame(width: 44, height: 44)
-
-            if #available(iOS 26, *) {
-                icon.glassEffect(.regular.interactive(), in: .circle)
-            } else {
-                icon.background(.thinMaterial, in: Circle())
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Close Inbox")
     }
 
     private var empty: (icon: String, message: String)? {
@@ -654,6 +710,11 @@ struct NotificationInboxView: View {
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
+            }
+            if presentation == .sheet {
+                Divider()
+                Button("Close Inbox") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -788,33 +849,7 @@ struct NotificationInboxView: View {
             let row = HStack(alignment: .top, spacing: 14) {
                 rowIcon(notificationIcon(notification), tint: notificationTint(notification))
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 7) {
-                        Text(notification.title)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.leading)
-                        if !notification.isRead {
-                            Circle().fill(Color.zifrGold).frame(width: 6, height: 6)
-                        }
-                        Spacer(minLength: 4)
-                        Text(relativeDate(notification.createdAt))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.35))
-                    }
-
-                    Text(notification.body)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.white.opacity(notification.isRead ? 0.55 : 0.78))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
-
-                    if notification.route != nil {
-                        Label("Open", systemImage: "arrow.up.right")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color.zifrGold)
-                    }
-                }
+                InboxAlertDetails(notification: notification, receivedTime: relativeDate(notification.createdAt))
             }
             rowChrome(row)
         }
