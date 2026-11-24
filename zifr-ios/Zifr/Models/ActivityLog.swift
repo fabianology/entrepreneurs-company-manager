@@ -10,6 +10,7 @@ struct ActivityLog: Identifiable, Codable, Hashable {
     var resourceType: String?
     var isRead: Bool = false
     var createdAt: Date = Date()
+    var inboxDismissedAt: Date? = nil
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -21,5 +22,6 @@ struct ActivityLog: Identifiable, Codable, Hashable {
         case resourceType = "resource_type"
         case isRead = "is_read"
         case createdAt = "created_at"
+        case inboxDismissedAt = "inbox_dismissed_at"
     }
 }

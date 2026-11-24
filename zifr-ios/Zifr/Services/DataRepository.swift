@@ -583,7 +583,7 @@ class DataRepository {
         // the existing vault checks. Restore alongside the secondary requests.
         async let vaultRestore: Void = VaultService.shared.restoreSessionIfAvailable(for: loadingUserID)
         async let fActivity: [ActivityLog] = measure("activity_logs") { await searchLoad("activity", failures: searchLoadFailures) { try await client.from("activity_logs").select().order("created_at", ascending: false).execute().value } }
-        async let fNotifications: [AppNotification] = measure("app_notifications") { await searchLoad("notifications", failures: searchLoadFailures) { try await client.from("app_notifications").select().order("created_at", ascending: false).execute().value } }
+        async let fNotifications: [AppNotification] = measure("app_notifications") { await searchLoad("notifications", failures: searchLoadFailures) { try await self.fetchNotifications() } }
         async let fPrefs: [UserPreferences] = measure("user_preferences") { await searchLoad("preferences", failures: searchLoadFailures) { try await client.from("user_preferences").select().execute().value } }
         let (fetchedActivityLogs, fetchedNotifications, fetchedPreferences) = await (fActivity, fNotifications, fPrefs)
         guard primary.isCurrent else { return }
@@ -1727,11 +1727,11 @@ class DataRepository {
 
     // MARK: - Notification Inbox
     func fetchNotifications() async throws -> [AppNotification] {
-        try await client.from("app_notifications")
+        let response = try await client.from("app_notifications")
             .select()
             .order("created_at", ascending: false)
             .execute()
-            .value
+        return try InboxDates.decode([AppNotification].self, from: response.data)
     }
 
     @MainActor
@@ -1753,16 +1753,19 @@ class DataRepository {
             .execute()
     }
 
-    func deleteExpiredPaymentAlerts(_ ids: [UUID], for userID: UUID) async throws {
-        guard !ids.isEmpty, try await client.auth.session.user.id == userID else { throw CancellationError() }
-        try Task.checkCancellation()
-        try await client.from("app_notifications")
-            .delete()
-            .eq("user_id", value: userID)
-            .eq("notification_type", value: "portfolio_alert")
-            .in("resource_type", values: ["subscription", "loan"])
-            .in("id", values: ids)
-            .execute()
+    func fetchInboxContext() async throws -> InboxContext {
+        let response = try await client.rpc("miloom_inbox_context").execute()
+        return try InboxDates.decode(InboxContext.self, from: response.data)
+    }
+
+    func fetchInboxActivity() async throws -> [ActivityLog] {
+        let response = try await client.rpc("miloom_inbox_activity").execute()
+        return try InboxDates.decode([ActivityLog].self, from: response.data)
+    }
+
+    func dismissInboxActivity(_ id: UUID) async throws {
+        struct Params: Encodable { let p_activity_id: UUID }
+        try await client.rpc("miloom_dismiss_inbox_activity", params: Params(p_activity_id: id)).execute()
     }
 
     func markAllNotificationsRead() async throws {
@@ -1952,7 +1955,8 @@ class DataRepository {
     }
 
     func fetchIncomingInvitations() async throws -> [IncomingResourceInvitation] {
-        try await client.rpc("miloom_list_my_invitations").execute().value
+        let response = try await client.rpc("miloom_list_my_invitations").execute()
+        return try InboxDates.decode([IncomingResourceInvitation].self, from: response.data)
     }
 
     func previewInvitation(token: String) async throws -> IncomingResourceInvitation {
