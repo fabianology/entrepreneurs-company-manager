@@ -3573,6 +3573,20 @@ final class VaultService: @unchecked Sendable {
         )).execute().value
     }
 
+    func removeRevokedDeviceFromList(_ deviceID: UUID, for userID: UUID) async throws {
+        let session = try await client.auth.refreshSession()
+        guard session.user.id == userID else { throw CancellationError() }
+        let snapshot = try requireSnapshot(for: userID)
+        struct Params: Encodable {
+            let p_actor_device_id: UUID
+            let p_target_device_id: UUID
+        }
+        try await client.rpc("miloom_remove_revoked_vault_device_from_list", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_target_device_id: deviceID
+        )).execute()
+    }
+
     func listPendingResourceSecretRequests() async throws -> [ResourceSecretAccessRequest] {
         let session = try await client.auth.refreshSession()
         let snapshot = try requireSnapshot(for: session.user.id)
