@@ -327,11 +327,29 @@ final class AppState {
         openObligations.filter { $0.severity != .info }.count
     }
 
+    private var inboxAgePolicy: InboxAgePolicy {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = userPreferences?.timezone.flatMap(TimeZone.init(identifier:)) ?? .current
+        return InboxAgePolicy(now: Date(), calendar: calendar)
+    }
+
     var unreadNotificationCount: Int {
-        notifications.filter { !$0.isRead }.count
+        let age = inboxAgePolicy
+        let disconnected = Set(institutions.filter(\.isDisconnected).map(\.id))
+            .union(plaidItems.filter(\.requiresReconnect).compactMap(\.institutionId))
+        return notifications.lazy.filter { notice in
+            guard !notice.isRead else { return false }
+            if InboxTopic.alert(notice, metadata: nil) == .connections,
+               let id = notice.resourceId, disconnected.contains(id) { return false }
+            let due = InboxScheduledPayment.deadline(notice, metadata: nil, timeZone: age.calendar.timeZone)
+            return age.placement(for: due ?? notice.createdAt, scheduled: due != nil) == .current
+        }.count
     }
 
     var unreadInboxCount: Int {
-        unreadNotificationCount + activityLogs.filter { !$0.isRead }.count
+        let age = inboxAgePolicy
+        return unreadNotificationCount + activityLogs.lazy.filter {
+            !$0.isRead && $0.inboxDismissedAt == nil && age.placement(for: $0.createdAt) == .current
+        }.count
     }
 }

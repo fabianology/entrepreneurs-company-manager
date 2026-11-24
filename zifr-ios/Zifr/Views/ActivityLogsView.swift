@@ -449,13 +449,15 @@ private struct InboxOlderMessagesButton: View {
 private struct InboxAlertDetails: View {
     let notification: AppNotification
     let receivedTime: String
+    var dueOn: String?
+    var actionLabel: String?
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.calendar) private var calendar
     @Environment(\.timeZone) private var timeZone
 
     var body: some View {
-        let payment = InboxScheduledPayment(notification, timeZone: timeZone)
+        let payment = InboxScheduledPayment(notification, timeZone: timeZone, dueOn: dueOn)
         let subject = HStack(spacing: 6) {
             Text(payment?.name ?? notification.title)
                 .font(.subheadline.weight(.semibold))
@@ -503,6 +505,11 @@ private struct InboxAlertDetails: View {
                     timing
                 }
                 subtitle
+            }
+            if let actionLabel {
+                Text(actionLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.zifrGold)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -785,13 +792,15 @@ struct NotificationInboxView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
     @Environment(\.timeZone) private var timeZone
-    @Environment(\.calendar) private var calendar
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var expandedSubscriptionAlertID: UUID?
-    @State private var showsOlderMessages = false
+    @State private var expandedHistory: Set<InboxSection> = []
     @State private var currentDate = Date()
-    @State private var isRemovingExpiredAlerts = false
+    @State private var inboxRefreshID = UUID()
+    @State private var inboxContext: InboxContext?
+    @State private var inboxActivity: [ActivityLog]?
+    @State private var localOutcomes: [InboxInvitationOutcome] = []
     @State private var section: InboxSection = .alerts
     @State private var updatingRows: Set<UUID> = []
     @State private var errorMessage: String?
@@ -802,21 +811,207 @@ struct NotificationInboxView: View {
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
     private var alertCalendar: Calendar {
-        var value = calendar
-        value.timeZone = timeZone
+        var value = Calendar(identifier: .gregorian)
+        let configured = inboxContext?.timeZone ?? appState.userPreferences?.timezone
+        value.timeZone = configured.flatMap(TimeZone.init(identifier:)) ?? timeZone
         return value
     }
 
-    private func unreadCount(for timeline: InboxAlertTimeline) -> Int {
+    private var liveBankIssues: [Institution] {
+        let broken = Set(appState.plaidItems.filter(\.requiresReconnect).compactMap(\.institutionId))
+        return appState.institutions.filter { $0.isDisconnected || broken.contains($0.id) }
+    }
+
+    private var alertMetadata: [UUID: InboxAlertMetadata] {
+        Dictionary((inboxContext?.alerts ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    private var activityRecords: [ActivityLog] { inboxActivity ?? appState.activityLogs }
+
+    private var timeline: InboxTimeline {
+        let agedInvites = incomingInvitations.filter { $0.expiresAt <= currentDate }.map {
+            InboxInvitationOutcome(invitation: $0, outcome: .expired, at: $0.expiresAt)
+        }
+        let outcomes = (inboxContext?.inviteHistory ?? []) + localOutcomes + agedInvites
+        let history = Dictionary(outcomes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return InboxTimeline(
+            notifications: appState.notifications, invitations: incomingInvitations, history: Array(history.values),
+            activity: activityRecords, banks: liveBankIssues, metadata: alertMetadata,
+            age: InboxAgePolicy(now: currentDate, calendar: alertCalendar)
+        )
+    }
+
+    private func unreadCount(for timeline: InboxTimeline) -> Int {
         switch section {
-        case .alerts: timeline.unreadCount
-        case .invitations: incomingInvitations.count
-        case .activity: appState.activityLogs.filter { !$0.isRead }.count
+        case .alerts: timeline.alertUnreadCount
+        case .invitations: timeline.pendingInvites.count
+        case .activity: timeline.recentActivity.filter { !$0.isRead }.count
         }
     }
 
+    @ViewBuilder
+    private func inboxSections(_ timeline: InboxTimeline) -> some View {
+        switch section {
+        case .alerts:
+            if !timeline.reconnect.isEmpty || !timeline.attention.isEmpty {
+                inboxSectionHeading("Needs attention")
+                ForEach(timeline.reconnect) { bank in
+                    bankIssueRow(bank)
+                }
+                alertRows(timeline.attention)
+            }
+            if !timeline.upcoming.isEmpty {
+                inboxSectionHeading("Upcoming")
+                alertRows(timeline.upcoming)
+            }
+            if !timeline.recentAlerts.isEmpty {
+                if !timeline.upcoming.isEmpty || !timeline.reconnect.isEmpty || !timeline.attention.isEmpty {
+                    inboxSectionHeading("Recent")
+                }
+                alertRows(timeline.recentAlerts)
+            }
+            olderMessages(timeline.olderAlerts, rows: alertRows)
+        case .invitations:
+            ForEach(timeline.pendingInvites) { invitation in
+                invitationRow(invitation)
+            }
+            if !timeline.recentInvites.isEmpty {
+                inboxSectionHeading("Recent outcomes")
+                invitationOutcomes(timeline.recentInvites)
+            }
+            olderMessages(timeline.olderInvites, rows: invitationOutcomes)
+        case .activity:
+            activityRows(timeline.recentActivity)
+            olderMessages(timeline.olderActivity, rows: activityRows)
+        }
+    }
+
+    private func emptySection(_ timeline: InboxTimeline) -> (icon: String, message: String)? {
+        switch section {
+        case .alerts:
+            let empty = timeline.reconnect.isEmpty && timeline.attention.isEmpty && timeline.upcoming.isEmpty
+                && timeline.recentAlerts.isEmpty && timeline.olderAlerts.isEmpty
+            return empty ? ("bell.slash", "No alerts yet") : nil
+        case .invitations:
+            let empty = timeline.pendingInvites.isEmpty && timeline.recentInvites.isEmpty && timeline.olderInvites.isEmpty
+            return empty ? ("person.crop.circle.badge.checkmark", "No pending invitations") : nil
+        case .activity:
+            return timeline.recentActivity.isEmpty && timeline.olderActivity.isEmpty
+                ? ("clock.arrow.circlepath", "No activity yet") : nil
+        }
+    }
+
+    private func inboxSectionHeading(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.66))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 8)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder
+    private func olderMessages<Row, Rows: View>(
+        _ groups: [InboxHistoryGroup<Row>], @ViewBuilder rows: @escaping ([Row]) -> Rows
+    ) -> some View {
+        if !groups.isEmpty {
+            let tab = section
+            InboxOlderMessagesButton(isExpanded: Binding(
+                get: { expandedHistory.contains(tab) },
+                set: { expanded in
+                    if expanded { expandedHistory.insert(tab) }
+                    else { expandedHistory.remove(tab) }
+                }
+            ))
+            .padding(.top, 8)
+            if expandedHistory.contains(tab) {
+                ForEach(groups) { group in
+                    inboxSectionHeading(group.topic.rawValue)
+                    rows(group.rows)
+                }
+            }
+        }
+    }
+
+    private func invitationOutcomes(_ outcomes: [InboxInvitationOutcome]) -> some View {
+        ForEach(outcomes) { outcome in
+            VStack(alignment: .leading, spacing: 4) {
+                Text(outcome.subject)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                let details = [outcome.outcome.topic.rawValue, outcome.role, outcome.inviterEmail]
+                    .compactMap { $0 }.filter { !$0.isEmpty }
+                Text(details.joined(separator: " · "))
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.68))
+                Text(outcome.occurredAt, format: .dateTime.month(.abbreviated).day())
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func bankIssueRow(_ bank: Institution) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "building.columns")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(inboxRowIconTint)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(bank.name).font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                Text("Bank connection needs attention")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.68))
+                if bank.userId == appState.portfolioUserID,
+                   appState.plaidItems.contains(where: { $0.institutionId == bank.id && $0.representsLinkedInstitution }) {
+                    PlaidLinkButton(companyId: bank.companyId, institutionId: bank.id,
+                                    buttonText: "Reconnect", isReconnect: true) { _, _, _ in
+                        Task { await refreshBankAfterReconnect(bank.id) }
+                    }
+                    .frame(maxWidth: 180)
+                } else {
+                    Button("Review connection") { openInboxRoute(.institution(bank.id)) }
+                        .buttonStyle(.plain)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.zifrGold)
+                        .frame(minHeight: 44, alignment: .leading)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 8)
+    }
+
+    @MainActor
+    private func refreshBankAfterReconnect(_ id: UUID) async {
+        do {
+            try await PlaidService.shared.syncLatestAvailableData(institutionId: id)
+            await DataRepository.shared.fetchAllData(appState: appState)
+        } catch {
+            errorMessage = "The bank connection updated, but its latest balance couldn’t be loaded. Try refreshing."
+            await DataRepository.shared.fetchAllData(appState: appState)
+        }
+    }
+
+    private func actionLabel(for notification: AppNotification) -> String? {
+        guard notification.route != nil else { return nil }
+        switch InboxTopic.alert(notification, metadata: alertMetadata[notification.id]) {
+        case .briefings: return "Open briefing"
+        case .balances:
+            if notification.notificationType == "transaction_review" { return "Review transactions" }
+            return notification.resourceType == "transaction" ? "Review transaction" : "Review account"
+        case .connections: return "Review connection"
+        case .security: return "Review details"
+        default: return nil
+        }
+    }
+
+
     var body: some View {
-        let timeline = InboxAlertTimeline(appState.notifications, now: currentDate, calendar: alertCalendar)
+        let timeline = self.timeline
         let unreadCount = unreadCount(for: timeline)
         ZStack {
             Color.zifrCard.ignoresSafeArea()
@@ -833,26 +1028,26 @@ struct NotificationInboxView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
 
-                Group {
-                    switch section {
-                    case .alerts: alertList(timeline)
-                    case .invitations: invitationList
-                    case .activity: activityList
-                    }
-                }
+                inboxList(timeline)
             }
         }
         .presentationDragIndicator(isPad ? .visible : .automatic)
         .accessibilityAction(.escape) { dismiss() }
-        .task {
-            try? await refreshAlerts()
-            await refreshInvitations()
+        .environment(\.timeZone, alertCalendar.timeZone)
+        .task(id: appState.portfolioUserID) {
+            inboxContext = nil
+            inboxActivity = nil
+            incomingInvitations = []
+            localOutcomes = []
+            expandedHistory = []
+            await refreshInbox()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-            refreshAlertDate()
-        }
+        .task(id: alertCalendar.timeZone) { await watchInboxCalendar() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { refreshAlertDate() }
+            if phase == .active {
+                currentDate = Date()
+                Task { await refreshInbox() }
+            }
         }
         .confirmationDialog(
             "Decline Invitation?",
@@ -932,24 +1127,11 @@ struct NotificationInboxView: View {
                     .disabled(unreadCount == 0)
                 }
 
-                if section != .activity {
-                    Button {
-                        Task {
-                            if section == .alerts {
-                                do {
-                                    try await refreshAlerts()
-                                } catch {
-                                    errorMessage = error.localizedDescription
-                                }
-                            } else {
-                                await refreshInvitations()
-                            }
-                        }
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
+                Button {
+                    Task { await refreshInbox(reportError: true) }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
-
                 if isPad {
                     Divider()
                     Button("Close Inbox") { dismiss() }
@@ -982,87 +1164,55 @@ struct NotificationInboxView: View {
     }
 
     @ViewBuilder
-    private func alertList(_ timeline: InboxAlertTimeline) -> some View {
-        if timeline.current.isEmpty && timeline.older.isEmpty {
-            emptyState(icon: "bell.slash", message: "No alerts yet")
+    private func inboxList(_ timeline: InboxTimeline) -> some View {
+        if let empty = emptySection(timeline) {
+            emptyState(icon: empty.icon, message: empty.message)
         } else {
             ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(timeline.current) { notification in
-                        notificationRow(notification)
-                    }
-                    if !timeline.older.isEmpty {
-                        InboxOlderMessagesButton(isExpanded: $showsOlderMessages)
-                        if showsOlderMessages {
-                            ForEach(timeline.older) { notification in
-                                notificationRow(notification)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .padding(.bottom, 32)
+                LazyVStack(spacing: 12) { inboxSections(timeline) }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .padding(.bottom, 32)
             }
-            .refreshable {
-                try? await refreshAlerts()
-            }
+            .refreshable { await refreshInbox() }
         }
     }
 
-    @ViewBuilder
-    private var activityList: some View {
-        if appState.activityLogs.isEmpty {
-            emptyState(icon: "clock.arrow.circlepath", message: "No activity yet")
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(appState.activityLogs) { log in
-                        if isPad {
-                            MessageRowView(log: log, vm: vm, showsMarkReadButton: false)
-                                .contentShape(Rectangle())
-                                .modifier(InboxRowActions(
-                                    isRead: log.isRead,
-                                    markRead: { Task { await setActivityRead(log, read: true) } },
-                                    markUnread: { Task { await setActivityRead(log, read: false) } },
-                                    delete: { Task { await deleteActivity(log) } }
-                                ))
-                        } else {
-                            MessageRowView(log: log, vm: vm)
-                                .contextMenu {
-                                    Button {
-                                        Task { await setActivityRead(log, read: !log.isRead) }
-                                    } label: {
-                                        Label(log.isRead ? "Mark Unread" : "Mark Read",
-                                              systemImage: log.isRead ? "envelope.badge" : "envelope.open")
-                                    }
-                                }
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .padding(.bottom, 32)
-            }
-        }
+    private func alertRows(_ notifications: [AppNotification]) -> some View {
+        ForEach(notifications) { notificationRow($0) }
     }
 
-    @ViewBuilder
-    private var invitationList: some View {
-        if incomingInvitations.isEmpty {
-            emptyState(icon: "person.crop.circle.badge.checkmark", message: "No pending invitations")
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(incomingInvitations) { invitation in
-                        invitationRow(invitation)
+    private func activityRows(_ logs: [ActivityLog]) -> some View {
+        ForEach(logs) { log in
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(log.message)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white)
+                    if !log.isRead {
+                        Circle().fill(Color.zifrGold).frame(width: 5, height: 5).accessibilityHidden(true)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .padding(.bottom, 32)
+                HStack(spacing: 8) {
+                    if !log.actorEmail.isEmpty {
+                        Text(log.actorEmail)
+                    }
+                    Text(log.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                }
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.64))
             }
-            .refreshable { await refreshInvitations() }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+            .accessibilityValue(log.isRead ? "" : "Unread")
+            .modifier(InboxRowActions(
+                isRead: log.isRead,
+                markRead: { Task { await setActivityRead(log, read: true) } },
+                markUnread: { Task { await setActivityRead(log, read: false) } },
+                delete: { Task { await deleteActivity(log) } }
+            ))
         }
     }
 
@@ -1085,10 +1235,13 @@ struct NotificationInboxView: View {
                     Text(invitation.companyTitle)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.52))
-                    Text("Invited by \(invitation.inviterEmail) as \(invitation.role)")
+                    Text("Invited by \(invitation.inviterEmail)")
                         .font(.system(size: 12))
                         .foregroundStyle(Color.white.opacity(0.68))
                         .fixedSize(horizontal: false, vertical: true)
+                    Text("Expires \(invitation.expiresAt.formatted(.dateTime.month(.abbreviated).day().hour().minute()))")
+                        .font(.caption)
+                        .foregroundStyle(Color.zifrGold)
                 }
 
                 Spacer(minLength: 0)
@@ -1157,7 +1310,7 @@ struct NotificationInboxView: View {
                     .foregroundStyle(notificationTint(notification))
                     .frame(width: 18)
                     .accessibilityHidden(true)
-                InboxAlertDetails(notification: notification, receivedTime: "")
+                InboxAlertDetails(notification: notification, receivedTime: "", dueOn: alertMetadata[notification.id]?.dueOn)
                 Image(systemName: expanded ? "chevron.up" : "chevron.down")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.72))
@@ -1203,7 +1356,7 @@ struct NotificationInboxView: View {
     @ViewBuilder
     private func notificationRow(_ notification: AppNotification) -> some View {
         if isPad, notification.resourceType == "subscription",
-           let payment = InboxScheduledPayment(notification, timeZone: timeZone) {
+           let payment = InboxScheduledPayment(notification, timeZone: alertCalendar.timeZone, dueOn: alertMetadata[notification.id]?.dueOn) {
             subscriptionAlertRow(notification, payment: payment)
         } else {
             standardNotificationRow(notification)
@@ -1223,7 +1376,8 @@ struct NotificationInboxView: View {
             }
 
             if isPad {
-                InboxAlertDetails(notification: notification, receivedTime: relativeDate(notification.createdAt))
+                InboxAlertDetails(notification: notification, receivedTime: relativeDate(notification.createdAt),
+                              dueOn: alertMetadata[notification.id]?.dueOn, actionLabel: actionLabel(for: notification))
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 7) {
@@ -1310,45 +1464,51 @@ struct NotificationInboxView: View {
             await setNotification(notification, read: true)
         }
         guard let route = notification.route else { return }
+        openInboxRoute(route)
+    }
+
+    private func openInboxRoute(_ route: NotificationRoute) {
         onOpenRoute(route)
         dismiss()
     }
 
     @MainActor
-    private func refreshAlerts() async throws {
-        try await DataRepository.shared.refreshNotifications(appState: appState)
+    private func refreshInbox(reportError: Bool = false) async {
         currentDate = Date()
-        await removeExpiredAlerts()
+        guard let userID = appState.portfolioUserID else { return }
+        let refreshID = UUID()
+        inboxRefreshID = refreshID
+        async let notifications = try? DataRepository.shared.fetchNotifications()
+        async let invites = try? DataRepository.shared.fetchIncomingInvitations()
+        async let context = try? DataRepository.shared.fetchInboxContext()
+        async let activity = try? DataRepository.shared.fetchInboxActivity()
+        let (newNotifications, newInvites, newContext, newActivity) = await (notifications, invites, context, activity)
+        guard !Task.isCancelled, appState.portfolioUserID == userID, inboxRefreshID == refreshID else { return }
+
+        if let newNotifications { appState.notifications = newNotifications }
+        if let newInvites { incomingInvitations = newInvites }
+        if let newContext { inboxContext = newContext }
+        if let newActivity { inboxActivity = newActivity }
+        let refreshFailed = switch section {
+        case .alerts: newNotifications == nil
+        case .invitations: newInvites == nil
+        case .activity: newActivity == nil && inboxContext != nil
+        }
+        if reportError && refreshFailed { errorMessage = "This Inbox tab couldn’t be refreshed." }
     }
 
     @MainActor
-    private func refreshAlertDate() {
-        currentDate = Date()
-        Task { await removeExpiredAlerts() }
-    }
-
-    @MainActor
-    private func removeExpiredAlerts() async {
-        guard !isRemovingExpiredAlerts, let userID = appState.portfolioUserID else { return }
-        let timeline = InboxAlertTimeline(appState.notifications, now: currentDate, calendar: alertCalendar)
-        let ids = timeline.expired.filter { $0.userId == userID }.map(\.id)
-        guard !ids.isEmpty else { return }
-
-        isRemovingExpiredAlerts = true
-        defer { isRemovingExpiredAlerts = false }
-        let batchSize = 100
-        for start in stride(from: 0, to: ids.count, by: batchSize) {
-            guard appState.portfolioUserID == userID, !Task.isCancelled else { return }
-            let batch = Array(ids[start..<min(start + batchSize, ids.count)])
+    private func watchInboxCalendar() async {
+        while !Task.isCancelled {
+            let now = Date()
+            let calendar = alertCalendar
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else { return }
             do {
-                try await DataRepository.shared.deleteExpiredPaymentAlerts(batch, for: userID)
-                guard appState.portfolioUserID == userID else { return }
-                let removed = Set(batch)
-                appState.notifications.removeAll { $0.userId == userID && removed.contains($0.id) }
+                try await Task.sleep(for: .seconds(max(1, nextDay.timeIntervalSince(now))))
             } catch {
-                // Expired rows stay hidden. Opening or refreshing the Inbox can retry.
                 return
             }
+            await refreshInbox()
         }
     }
 
@@ -1365,7 +1525,7 @@ struct NotificationInboxView: View {
 
     @MainActor
     private func setActivityRead(_ log: ActivityLog, read: Bool) async {
-        guard appState.activityLogs.contains(where: { $0.id == log.id && $0.isRead != read }) else { return }
+        guard activityRecords.contains(where: { $0.id == log.id && $0.isRead != read }) else { return }
         await updateInbox(id: log.id) {
             if read {
                 try await DataRepository.shared.markActivityLogRead(log.id)
@@ -1374,6 +1534,9 @@ struct NotificationInboxView: View {
             }
             if let index = appState.activityLogs.firstIndex(where: { $0.id == log.id }) {
                 appState.activityLogs[index].isRead = read
+            }
+            if let index = inboxActivity?.firstIndex(where: { $0.id == log.id }) {
+                inboxActivity?[index].isRead = read
             }
         }
     }
@@ -1389,8 +1552,13 @@ struct NotificationInboxView: View {
     @MainActor
     private func deleteActivity(_ log: ActivityLog) async {
         await updateInbox(id: log.id) {
-            try await DataRepository.shared.deleteActivityLog(log.id)
-            withAnimation { appState.activityLogs.removeAll { $0.id == log.id } }
+            try await DataRepository.shared.dismissInboxActivity(log.id)
+            withAnimation {
+                if let index = appState.activityLogs.firstIndex(where: { $0.id == log.id }) {
+                    appState.activityLogs[index].inboxDismissedAt = Date()
+                }
+                inboxActivity?.removeAll { $0.id == log.id }
+            }
         }
     }
 
@@ -1412,6 +1580,11 @@ struct NotificationInboxView: View {
                 for index in appState.activityLogs.indices where ids.contains(appState.activityLogs[index].id) {
                     appState.activityLogs[index].isRead = true
                 }
+                inboxActivity = inboxActivity?.map { log in
+                    var updated = log
+                    updated.isRead = true
+                    return updated
+                }
             }
         }
     }
@@ -1422,17 +1595,9 @@ struct NotificationInboxView: View {
         defer { if let id { updatingRows.remove(id) } }
         do {
             try await update()
+            inboxRefreshID = UUID()
         } catch {
             errorMessage = error.localizedDescription
-        }
-    }
-
-    @MainActor
-    private func refreshInvitations() async {
-        do {
-            incomingInvitations = try await DataRepository.shared.fetchIncomingInvitations()
-        } catch {
-            errorMessage = "Invitations couldn’t be loaded. Please try again."
         }
     }
 
@@ -1443,7 +1608,10 @@ struct NotificationInboxView: View {
         do {
             _ = try await DataRepository.shared.acceptInvitation(id: invitation.id)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            await refreshInvitations()
+            incomingInvitations.removeAll { $0.id == invitation.id }
+            localOutcomes.removeAll { $0.id == invitation.id }
+            localOutcomes.append(InboxInvitationOutcome(invitation: invitation, outcome: .accepted, at: Date()))
+            await refreshInbox()
             await DataRepository.shared.fetchAllData(appState: appState)
         } catch {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -1459,7 +1627,10 @@ struct NotificationInboxView: View {
         do {
             try await DataRepository.shared.declineInvitation(id: invitation.id)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            await refreshInvitations()
+            incomingInvitations.removeAll { $0.id == invitation.id }
+            localOutcomes.removeAll { $0.id == invitation.id }
+            localOutcomes.append(InboxInvitationOutcome(invitation: invitation, outcome: .declined, at: Date()))
+            await refreshInbox()
         } catch {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             errorMessage = "The invitation couldn’t be declined. Please try again."
