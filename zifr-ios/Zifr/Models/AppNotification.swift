@@ -30,6 +30,47 @@ enum NotificationRoute: Hashable {
     }
 }
 
+// The inbox payload retains the scheduled day in the alert body. A resource's next
+// payment can roll forward while this particular alert is still in the inbox.
+struct InboxScheduledPayment {
+    let name: String
+    let kind: String
+    let date: Date
+
+    init?(_ notification: AppNotification, timeZone: TimeZone) {
+        guard notification.notificationType == "portfolio_alert" else { return nil }
+
+        let separator: String
+        switch notification.resourceType {
+        case "subscription":
+            kind = "Subscription payment"
+            separator = " is scheduled for "
+        case "loan":
+            kind = "Loan payment"
+            separator = " has a payment scheduled for "
+        default:
+            return nil
+        }
+
+        let body = notification.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard body.last == ".", let range = body.range(of: separator, options: .backwards) else { return nil }
+        let subject = body[..<range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+        let day = body[range.upperBound...].dropLast()
+        let strategy = Date.ParseStrategy(
+            format: "\(year: .defaultDigits)-\(month: .twoDigits)-\(day: .twoDigits)",
+            locale: Locale(identifier: "en_US_POSIX"), timeZone: timeZone, isLenient: false
+        )
+        guard !subject.isEmpty, day.wholeMatch(of: #/[0-9]{4}-[0-9]{2}-[0-9]{2}/#) != nil,
+              let date = try? Date(String(day), strategy: strategy) else { return nil }
+        self.name = subject
+        self.date = date
+    }
+
+    func daysUntil(from now: Date, calendar: Calendar) -> Int {
+        calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+    }
+}
+
 struct AppNotification: Identifiable, Codable {
     var id: UUID
     var userId: UUID

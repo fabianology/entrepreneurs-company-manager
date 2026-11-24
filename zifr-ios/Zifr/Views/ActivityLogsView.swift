@@ -394,6 +394,83 @@ private enum InboxSection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private struct InboxAlertDetails: View {
+    let notification: AppNotification
+    let receivedTime: String
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.calendar) private var calendar
+    @Environment(\.timeZone) private var timeZone
+
+    var body: some View {
+        let payment = InboxScheduledPayment(notification, timeZone: timeZone)
+        let subject = HStack(spacing: 6) {
+            Text(payment?.name ?? notification.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+            if !notification.isRead {
+                Circle().fill(Color.zifrGold).frame(width: 6, height: 6)
+                    .accessibilityHidden(true)
+            }
+        }
+        let subtitle = Group {
+            if let payment {
+                Text("\(payment.kind) · \(payment.date, format: .dateTime.month(.abbreviated).day().year())")
+            } else {
+                Text(notification.body)
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(Color.white.opacity(notification.isRead ? 0.64 : 0.78))
+        let timing = Group {
+            if let payment {
+                TimelineView(.everyMinute) { clock in
+                    countdown(payment.daysUntil(from: clock.date, calendar: calendar))
+                }
+                .font(.caption.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(Color.zifrGold)
+                .fixedSize(horizontal: true, vertical: false)
+            } else if !receivedTime.isEmpty {
+                Text(receivedTime)
+                    .font(.caption)
+                    .foregroundStyle(Color.white.opacity(0.62))
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
+            if dynamicTypeSize.isAccessibilitySize {
+                subject
+                subtitle
+                timing
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    subject
+                    Spacer(minLength: 0)
+                    timing
+                }
+                subtitle
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(notification.isRead ? "" : "Unread")
+    }
+
+    private func countdown(_ days: Int) -> Text {
+        switch days {
+        case 0: Text("Today")
+        case 1: Text("Tomorrow")
+        case -1: Text("Yesterday")
+        case 2...: Text("In \(days) days")
+        default: Text("\(-days) days ago")
+        }
+    }
+}
+
 struct NotificationInboxView: View {
     @Bindable var vm: AppViewModel
     let onOpenRoute: (NotificationRoute) -> Void
@@ -405,6 +482,8 @@ struct NotificationInboxView: View {
     @State private var incomingInvitations: [IncomingResourceInvitation] = []
     @State private var invitationInProgress: UUID?
     @State private var decliningInvitation: IncomingResourceInvitation?
+
+    private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
     private var unreadCount: Int {
         switch section {
@@ -439,6 +518,8 @@ struct NotificationInboxView: View {
                 }
             }
         }
+        .presentationDragIndicator(isPad ? .visible : .automatic)
+        .accessibilityAction(.escape) { dismiss() }
         .task {
             try? await DataRepository.shared.refreshNotifications(appState: appState)
             await refreshInvitations()
@@ -471,30 +552,42 @@ struct NotificationInboxView: View {
 
     private var header: some View {
         HStack {
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.9))
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Color.black.opacity(0.70)))
-                    .background(.regularMaterial, in: Circle())
-                    .overlay(Circle().stroke(.vaultOutline, lineWidth: 1.5))
-            }
+            if isPad {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Inbox")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(inboxCountLabel)
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.68))
+                }
+            } else {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.9))
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.black.opacity(0.70)))
+                        .background(.regularMaterial, in: Circle())
+                        .overlay(Circle().stroke(.vaultOutline, lineWidth: 1.5))
+                }
 
-            Spacer()
+                Spacer()
 
-            VStack(spacing: 3) {
-                Text("INBOX")
-                    .font(.system(size: 10, weight: .black))
-                    .tracking(2)
-                    .foregroundStyle(Color.white.opacity(0.65))
-                Text(inboxCountLabel)
-                    .font(.system(size: 8, weight: .bold))
-                    .tracking(1)
-                    .foregroundStyle(Color.zifrGold)
+                VStack(spacing: 3) {
+                    Text("INBOX")
+                        .font(.system(size: 10, weight: .black))
+                        .tracking(2)
+                        .foregroundStyle(Color.white.opacity(0.65))
+                    Text(inboxCountLabel)
+                        .font(.system(size: 8, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(Color.zifrGold)
+                }
             }
 
             Spacer()
@@ -526,6 +619,12 @@ struct NotificationInboxView: View {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
                 }
+
+                if isPad {
+                    Divider()
+                    Button("Close Inbox") { dismiss() }
+                        .keyboardShortcut(.cancelAction)
+                }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 20, weight: .semibold))
@@ -535,6 +634,7 @@ struct NotificationInboxView: View {
                     .background(.regularMaterial, in: Circle())
                     .overlay(Circle().stroke(.vaultOutline, lineWidth: 1.5))
             }
+            .accessibilityLabel("Inbox actions")
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
@@ -542,6 +642,9 @@ struct NotificationInboxView: View {
     }
 
     private var inboxCountLabel: String {
+        if isPad {
+            return section == .invitations ? "\(unreadCount) pending" : "\(unreadCount) unread"
+        }
         if section == .invitations {
             return unreadCount == 1 ? "1 PENDING" : "\(unreadCount) PENDING"
         }
@@ -698,35 +801,40 @@ struct NotificationInboxView: View {
                         .foregroundStyle(notificationTint(notification))
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 7) {
-                        Text(notification.title)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.leading)
-                        if !notification.isRead {
-                            Circle().fill(Color.zifrGold).frame(width: 6, height: 6)
+                if isPad {
+                    InboxAlertDetails(notification: notification, receivedTime: relativeDate(notification.createdAt))
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 7) {
+                            Text(notification.title)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.leading)
+                            if !notification.isRead {
+                                Circle().fill(Color.zifrGold).frame(width: 6, height: 6)
+                            }
+                            Spacer(minLength: 4)
+                            Text(relativeDate(notification.createdAt))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.35))
                         }
-                        Spacer(minLength: 4)
-                        Text(relativeDate(notification.createdAt))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.35))
-                    }
 
-                    Text(notification.body)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.white.opacity(notification.isRead ? 0.55 : 0.78))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
+                        Text(notification.body)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.white.opacity(notification.isRead ? 0.55 : 0.78))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
 
-                    if notification.route != nil {
-                        Label("Open", systemImage: "arrow.up.right")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color.zifrGold)
+                        if notification.route != nil {
+                            Label("Open", systemImage: "arrow.up.right")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color.zifrGold)
+                        }
                     }
                 }
             }
             .padding(16)
+            .contentShape(Rectangle())
             .background(Color.black.opacity(0.70))
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))

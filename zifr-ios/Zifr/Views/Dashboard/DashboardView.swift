@@ -1199,6 +1199,7 @@ struct DashboardView: View {
                                 .offset(x: 3, y: -2)
                         }
                     }
+                    .contentShape(UIDevice.current.userInterfaceIdiom == .pad ? .interaction : [], Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Notification inbox")
