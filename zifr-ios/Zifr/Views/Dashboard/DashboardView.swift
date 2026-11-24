@@ -490,14 +490,6 @@ struct DashboardView: View {
 
     private var portfolioLifecyclePanels: some View {
         portfolioPanels
-            .task {
-                // Fallback for OAuth/root-view timing: the dashboard should never
-                // remain on its placeholder simply because the first auth callback
-                // arrived before the app-level loader attached.
-                if appState.companies.isEmpty {
-                    await DataRepository.shared.fetchAllData(appState: appState)
-                }
-            }
             .onAppear {
                 onboardingState.evaluateState(appState: appState)
             }
@@ -528,7 +520,7 @@ struct DashboardView: View {
                 }
             }
             .refreshable {
-                await DataRepository.shared.fetchAllData(appState: appState)
+                await DataRepository.shared.fetchAllData(appState: appState, force: true)
             }
             .confirmationDialog(
                 companyToDelete?.userId != currentUserId ? "Leave Company" : "Delete Company",
@@ -813,9 +805,17 @@ struct DashboardView: View {
 
     private func entityList(isDuoExpanded: Bool = false) -> some View {
                     List {
+                        if companies.isEmpty && !appState.hasLoadedCompanies && appState.portfolioLoadIssue == nil && !onboardingState.isTutorialActive {
+                            ProgressView("Loading your companies…")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 48)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
+
                         if let loadIssue = appState.portfolioLoadIssue {
                             Button {
-                                Task { await DataRepository.shared.fetchAllData(appState: appState) }
+                                Task { await DataRepository.shared.fetchAllData(appState: appState, force: true) }
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
@@ -851,7 +851,7 @@ struct DashboardView: View {
 
                         // Add company button / empty state placeholder under the dummy company
                         Group {
-                            if companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
+                            if (companies.isEmpty && appState.hasLoadedCompanies) || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
                                 // Un-blurred only while the tutorial is actively running.
                                 if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
                                     // Tutorial in progress: show demo card fully visible
@@ -1355,9 +1355,9 @@ struct DashboardView: View {
 
         CompanyCardView(
             company: company,
-            institutionsCount: iCount,
-            subscriptionsCount: sCount,
-            docsCount: dCount,
+            institutionsCount: appState.cardCount(.financial, for: company, live: iCount),
+            subscriptionsCount: appState.cardCount(.services, for: company, live: sCount),
+            docsCount: appState.cardCount(.documents, for: company, live: dCount),
             onEdit: { editingCompany = company },
             canEdit: canEdit,
             onShare: isDuoDevice || isSharedWithMe ? nil : { companyToShare = company },

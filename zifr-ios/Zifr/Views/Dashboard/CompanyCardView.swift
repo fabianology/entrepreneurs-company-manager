@@ -3,9 +3,9 @@ import SwiftUI
 /// The company card displayed on the Dashboard — mirrors CiFr mobile app layout exactly.
 struct CompanyCardView: View {
     let company: Company
-    let institutionsCount: Int
-    let subscriptionsCount: Int
-    let docsCount: Int
+    let institutionsCount: Int?
+    let subscriptionsCount: Int?
+    let docsCount: Int?
     let onEdit: () -> Void
     var canEdit: Bool = true
     var onShare: (() -> Void)? = nil
@@ -23,9 +23,9 @@ struct CompanyCardView: View {
 
     init(
         company: Company, 
-        institutionsCount: Int, 
-        subscriptionsCount: Int, 
-        docsCount: Int, 
+        institutionsCount: Int?,
+        subscriptionsCount: Int?,
+        docsCount: Int?,
         onEdit: @escaping () -> Void, 
         canEdit: Bool = true,
         onShare: (() -> Void)? = nil,
@@ -233,14 +233,14 @@ struct CompanyCardView: View {
         )
     }
 
-    private func statusItem(icon: String, title: String, count: Int, color: Color) -> some View {
+    private func statusItem(icon: String, title: String, count: Int?, color: Color) -> some View {
         VStack(spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(color)
                 
-                Text("\(count)")
+                Text(count.map(String.init) ?? "–")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
             }

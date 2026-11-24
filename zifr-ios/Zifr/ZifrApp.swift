@@ -50,6 +50,10 @@ struct ZifrApp: App {
     @State private var pendingInvitationToken: String?
     @State private var deferredInvitationToken: String?
 
+    private var unlockedUserID: UUID? {
+        authViewModel.isAuthenticated ? authViewModel.currentUser?.id : nil
+    }
+
     init() {
         // MARK: - Global UI Styling
         UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(hex: "#223E5A")
@@ -60,7 +64,7 @@ struct ZifrApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
+            ZStack {
                 if authViewModel.isAuthenticated {
                     RootView()
                 } else {
@@ -79,17 +83,17 @@ struct ZifrApp: App {
                 StoreService.shared.startListening(accessController: accessController)
                 await authViewModel.checkSession()
             }
-            .task(id: authViewModel.isAuthenticated) {
-                guard authViewModel.isAuthenticated else { return }
-
-                // A task keyed to authentication runs for both a restored session and
-                // a fresh OAuth login. An onChange handler can be replaced as the root
-                // view switches from LoginView to RootView and miss that first load.
+            .task(id: unlockedUserID) { @MainActor in
+                guard let userID = unlockedUserID else { return }
                 async let accessRefresh: Void = accessController.refresh()
-                async let dataRefresh: Void = DataRepository.shared.fetchAllData(appState: appState)
                 async let pushRegistration: Void = PushNotificationService.shared.registerPendingTokenIfNeeded()
 
-                await dataRefresh
+                await CompanyStartup.refresh(
+                    isCurrent: { unlockedUserID == userID },
+                    receivedCompanies: { appState.portfolioUserID == userID && appState.hasReceivedCompanyList },
+                    load: { await DataRepository.shared.fetchAllData(appState: appState, expectedUserID: userID) }
+                )
+                guard !Task.isCancelled, unlockedUserID == userID else { return }
                 try? await DataRepository.shared.refreshBusinessExpenses(appState: appState)
                 await accessRefresh
                 appState.entitlementSnapshot = accessController.effectiveSnapshot
@@ -136,10 +140,12 @@ struct ZifrApp: App {
             }
             .onChange(of: authViewModel.isAuthenticated) { wasAuthenticated, isAuthenticated in
                 if wasAuthenticated && !isAuthenticated {
-                    appState.clearSearchSession()
-                    appState.clearBusinessExpenses()
                     if authViewModel.currentUser == nil {
+                        appState.clearPortfolio()
                         notificationRouter.clear()
+                    } else {
+                        appState.clearSearchSession()
+                        appState.clearBusinessExpenses()
                     }
                 }
             }
@@ -214,6 +220,27 @@ struct ZifrApp: App {
                 Text(appState.error ?? "An unknown error occurred.")
             }
             .modifier(MiloomDuoWindow())
+        }
+    }
+}
+
+/// The app owns the launch request across navigation and window layout changes.
+/// A session that is still restoring, or an interrupted first read, gets another
+/// attempt without a pull gesture. An authoritative empty list is a success.
+@MainActor
+enum CompanyStartup {
+    static func refresh(
+        isCurrent: () -> Bool, receivedCompanies: () -> Bool,
+        wait: (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        load: () async -> Void
+    ) async {
+        var delaySeconds = 2
+        while !Task.isCancelled && isCurrent() {
+            await load()
+            guard !Task.isCancelled, isCurrent(), !receivedCompanies() else { return }
+            do { try await wait(.seconds(delaySeconds)) } catch { return }
+            guard !receivedCompanies() else { return }
+            delaySeconds = min(delaySeconds * 2, 30)
         }
     }
 }
