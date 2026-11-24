@@ -728,6 +728,23 @@ private enum VaultPresenceError: LocalizedError {
     }
 }
 
+private enum VaultDeviceName {
+    static let maximumLength = 80
+
+    static func validated(_ input: String) -> String? {
+        let name = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (1...maximumLength).contains(name.unicodeScalars.count),
+              !name.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) else {
+            return nil
+        }
+        return name
+    }
+
+    static func legacyKey(deviceID: UUID, userID: UUID) -> String {
+        "vault.deviceName.\(userID.uuidString).\(deviceID.uuidString)"
+    }
+}
+
 @MainActor
 @Observable
 private final class VaultSecurityController {
@@ -741,7 +758,9 @@ private final class VaultSecurityController {
     var isInitialized: Bool { overview?.metadata != nil }
     var isUnlocked: Bool { overview?.isUnlocked == true }
     var currentDevice: VaultDeviceRecord? { overview?.currentDevice }
+
     func load() async {
+        guard !isLoading, activeOperation == nil else { return }
         isLoading = true
         errorMessage = nil
         defer {
@@ -749,10 +768,41 @@ private final class VaultSecurityController {
             hasLoaded = true
         }
         do {
-            overview = try await VaultService.shared.overview()
+            let latest = try await VaultService.shared.overview()
+            overview = await importLocalDeviceNames(into: latest)
         } catch {
             AppDiagnostics.failure("vault", "load_settings", error: error)
             errorMessage = "Vault security couldn’t be loaded. Check your connection and try again."
+        }
+    }
+
+    private func importLocalDeviceNames(into latest: VaultOverview) async -> VaultOverview {
+        guard latest.isUnlocked, let userID = latest.metadata?.userID else { return latest }
+        var updated = latest
+        let defaults = UserDefaults.standard
+        for device in latest.devices where device.status == "approved" {
+            let key = VaultDeviceName.legacyKey(deviceID: device.id, userID: userID)
+            guard let localName = defaults.string(forKey: key),
+                  let name = VaultDeviceName.validated(localName) else { continue }
+            do {
+                let canonicalName = try await VaultService.shared.renameDevice(
+                    device.id, to: name, for: userID, importIfMissing: true
+                )
+                updated.updateDeviceLabel(canonicalName, for: device.id)
+                defaults.removeObject(forKey: key)
+            } catch {
+                AppDiagnostics.failure("vault", "import_device_name", error: error)
+            }
+        }
+        return updated
+    }
+
+    func rename(_ device: VaultDeviceRecord, to name: String) async {
+        guard let userID = overview?.metadata?.userID else { return }
+        await perform("Saving Device Name…", reason: "Rename a trusted device in Password Vault.") {
+            let savedName = try await VaultService.shared.renameDevice(device.id, to: name, for: userID)
+            self.overview?.updateDeviceLabel(savedName, for: device.id)
+            UserDefaults.standard.removeObject(forKey: VaultDeviceName.legacyKey(deviceID: device.id, userID: userID))
         }
     }
 
@@ -902,6 +952,7 @@ private final class VaultSecurityController {
 struct VaultSecuritySheet: View {
     var onReady: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var controller = VaultSecurityController()
     @State private var choosingRecovery = false
     @State private var useGeneratedKey = false
@@ -951,6 +1002,7 @@ struct VaultSecuritySheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 40)
+                .disabled(controller.isLoading)
             }
             .background(Color(hex: "#1C1C1E"))
             .navigationTitle("Password Vault")
@@ -993,6 +1045,10 @@ struct VaultSecuritySheet: View {
         }
         .task { await controller.load() }
         .refreshable { await controller.load() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, !choosingRecovery, controller.errorMessage == nil else { return }
+            Task { await controller.load() }
+        }
         .sheet(isPresented: $choosingRecovery, onDismiss: clearRecoveryDraft) {
             recoveryChoice
         }
@@ -1102,20 +1158,15 @@ struct VaultSecuritySheet: View {
                             Toggle("I saved this key somewhere safe", isOn: $savedGeneratedKey)
                         }
                     } else {
-                        SecureField("Recovery password", text: $recoveryPassword)
-                            .textContentType(.newPassword)
-                            .privacySensitive()
-                        SecureField("Confirm recovery password", text: $confirmPassword)
-                            .textContentType(.newPassword)
-                            .privacySensitive()
-                        if !confirmPassword.isEmpty && recoveryPassword != confirmPassword {
-                            Text("The passwords don’t match.").foregroundStyle(.orange)
-                        }
+                        VaultRecoveryPasswordField(text: $recoveryPassword)
+                        VaultRecoveryPasswordField(text: $confirmPassword, isConfirmation: true)
                     }
                 } footer: {
-                    Text(useGeneratedKey
-                         ? "Save this key now. You’ll need it if you lose access to your trusted devices."
-                         : "Choose at least 16 characters or a few unrelated words. Spaces are welcome. Avoid common passwords, quotations, and familiar sayings. Use a different password from your Miloom sign-in.")
+                    if useGeneratedKey {
+                        Text("Save this key now. You’ll need it if you lose access to your trusted devices.")
+                    } else {
+                        recoveryPasswordGuidance
+                    }
                 }
                 if let message = controller.errorMessage {
                     Text(message).foregroundStyle(.orange)
@@ -1159,6 +1210,52 @@ struct VaultSecuritySheet: View {
             }
         }
         .interactiveDismissDisabled(controller.activeOperation != nil)
+    }
+
+    private var recoveryPasswordGuidance: some View {
+        let requirements = VaultRecoveryPasswordRequirements(recoveryPassword)
+        let minLength = VaultRecoveryPasswordRequirements.minimumLength
+        let minDistinct = VaultRecoveryPasswordRequirements.minimumDistinctLettersOrDigits
+        let passwordsMatch = !confirmPassword.isEmpty && confirmPassword == recoveryPassword
+
+        return VStack(alignment: .leading, spacing: 6) {
+            recoveryRequirement(
+                requirements.charactersNeeded == 0,
+                requirements.charactersNeeded == 0 ? Text("At least \(minLength) characters")
+                    : Text("Add \(requirements.charactersNeeded.formatted()) more \(requirements.charactersNeeded == 1 ? "character" : "characters") (\(minLength) minimum)")
+            )
+            recoveryRequirement(
+                requirements.distinctLettersOrDigitsNeeded == 0,
+                Text("Use at least \(minDistinct) different letters or digits")
+            )
+            recoveryRequirement(
+                !recoveryPassword.isEmpty && !requirements.containsPredictableSequence,
+                requirements.containsPredictableSequence ? Text("Replace the common phrase or sequence in your password")
+                    : Text("Avoid common phrases and sequences like “123456”")
+            )
+            if requirements.exceedsByteLimit {
+                recoveryRequirement(false, Text("Shorten your password to \(VaultRecoveryPasswordRequirements.maximumByteCount) UTF-8 bytes or fewer"))
+            }
+            recoveryRequirement(
+                passwordsMatch,
+                confirmPassword.isEmpty ? Text("Re-enter your password to confirm it")
+                    : passwordsMatch ? Text("Passwords match") : Text("The passwords don’t match")
+            )
+            Text("Try a few unrelated words. Spaces count toward the length. Use a different password from your Miloom sign-in.")
+                .padding(.top, 4)
+        }
+    }
+
+    private func recoveryRequirement(_ satisfied: Bool, _ title: Text) -> some View {
+        Label {
+            title
+        } icon: {
+            Image(systemName: satisfied ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(satisfied ? Color.green : Color.secondary)
+                .accessibilityHidden(true)
+        }
+        .accessibilityLabel(title)
+        .accessibilityValue(satisfied ? Text("Met") : Text("Required"))
     }
 
     private func clearRecoveryDraft() {
@@ -1252,54 +1349,19 @@ struct VaultSecuritySheet: View {
 
     private var trustedDevicesCard: some View {
         ZifrSheetCard(title: "TRUSTED DEVICES", icon: "laptopcomputer.and.iphone") {
-            VStack(spacing: 0) {
-                ForEach(controller.overview?.devices ?? []) { device in
-                    HStack(spacing: 12) {
-                        Image(systemName: device.id == controller.currentDevice?.id ? "iphone.gen3" : "iphone")
-                            .foregroundStyle(device.status == "approved" ? Color.zifrGold : Color.orange)
-                            .frame(width: 30)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(device.label)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.white)
-                            Text(device.id == controller.currentDevice?.id ? "This device" : device.status.capitalized)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+            if let overview = controller.overview {
+                VStack(spacing: 0) {
+                    ForEach(overview.devices) { device in
+                        VaultDeviceRow(
+                            device: device,
+                            isCurrentDevice: device.id == overview.currentDevice?.id,
+                            onRename: { name in Task { await controller.rename(device, to: name) } },
+                            onApprove: { Task { await controller.approve(device) } },
+                            onRevoke: { revokeDevice = device }
+                        )
+                        if device.id != overview.devices.last?.id {
+                            Divider().background(Color.white.opacity(0.1)).padding(.leading, 42)
                         }
-                        Spacer()
-                        if device.status == "pending" {
-                            HStack(spacing: 8) {
-                                Button("Approve") { Task { await controller.approve(device) } }
-                                    .buttonStyle(.bordered)
-                                    .tint(Color.zifrGold)
-                                    .controlSize(.small)
-                                Button(role: .destructive) { revokeDevice = device } label: {
-                                    Image(systemName: "xmark")
-                                        .frame(width: 30, height: 30)
-                                }
-                                .buttonStyle(.bordered)
-                                .accessibilityLabel("Cancel access request for \(device.label)")
-                            }
-                        } else if device.status == "approved" && device.id != controller.currentDevice?.id {
-                            Button(role: .destructive) { revokeDevice = device } label: {
-                                Image(systemName: "trash")
-                                    .frame(width: 32, height: 32)
-                            }
-                            .buttonStyle(.bordered)
-                            .accessibilityLabel("Revoke \(device.label)")
-                        } else if device.status == "approved" {
-                            Image(systemName: "checkmark.seal.fill")
-                                .foregroundStyle(Color.green)
-                                .accessibilityLabel("Approved")
-                        } else {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.secondary)
-                                .accessibilityLabel("Revoked")
-                        }
-                    }
-                    .frame(minHeight: 56)
-                    if device.id != controller.overview?.devices.last?.id {
-                        Divider().background(Color.white.opacity(0.1)).padding(.leading, 42)
                     }
                 }
             }
@@ -1357,6 +1419,169 @@ struct VaultSecuritySheet: View {
         case "vault_key_rotated", "vault_rotation_completed": return "arrow.triangle.2.circlepath"
         case "device_approved", "recovery_device_approved": return "checkmark.shield.fill"
         default: return "lock.shield.fill"
+        }
+    }
+}
+
+private struct VaultRecoveryPasswordField: View {
+    @Binding var text: String
+    var isConfirmation = false
+    @State private var isVisible = false
+
+    var body: some View {
+        HStack {
+            VaultRecoveryTextInput(
+                title: isConfirmation ? String(localized: "Confirm recovery password") : String(localized: "Recovery password"),
+                text: $text,
+                isSecure: !isVisible
+            )
+            .privacySensitive()
+
+            SecretVisibilityToggle(isVisible: $isVisible)
+                .buttonStyle(.borderless)
+                .accessibilityLabel(isConfirmation
+                                    ? (isVisible ? "Hide confirmation password" : "Show confirmation password")
+                                    : (isVisible ? "Hide recovery password" : "Show recovery password"))
+        }
+    }
+}
+
+private struct VaultRecoveryTextInput: UIViewRepresentable {
+    let title: String
+    @Binding var text: String
+    let isSecure: Bool
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.placeholder = title
+        field.accessibilityLabel = title
+        field.textContentType = .newPassword
+        field.autocapitalizationType = .none
+        field.autocorrectionType = .no
+        field.spellCheckingType = .no
+        field.font = .preferredFont(forTextStyle: .body)
+        field.adjustsFontForContentSizeCategory = true
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        field.addTarget(context.coordinator, action: #selector(Coordinator.textChanged(_:)), for: .editingChanged)
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        context.coordinator.text = $text
+        if field.isSecureTextEntry != isSecure {
+            let selection = field.selectedTextRange.map { range in
+                (field.offset(from: field.beginningOfDocument, to: range.start),
+                 field.offset(from: field.beginningOfDocument, to: range.end))
+            }
+            field.isSecureTextEntry = isSecure
+            if field.isFirstResponder {
+                // Reinsert the existing text so UIKit keeps it on the next keystroke after re-masking.
+                field.text = ""
+                field.insertText(text)
+                if let (start, end) = selection,
+                   let startPosition = field.position(from: field.beginningOfDocument, offset: start),
+                   let endPosition = field.position(from: field.beginningOfDocument, offset: end) {
+                    field.selectedTextRange = field.textRange(from: startPosition, to: endPosition)
+                }
+            }
+        }
+        if field.text != text { field.text = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    final class Coordinator: NSObject {
+        var text: Binding<String>
+
+        init(text: Binding<String>) { self.text = text }
+
+        @objc func textChanged(_ field: UITextField) {
+            guard let value = field.text, value != text.wrappedValue else { return }
+            text.wrappedValue = value
+        }
+    }
+}
+
+private struct VaultDeviceRow: View {
+    let device: VaultDeviceRecord
+    let isCurrentDevice: Bool
+    let onRename: (String) -> Void
+    let onApprove: () -> Void
+    let onRevoke: () -> Void
+
+    @State private var isRenaming = false
+    @State private var nameDraft = ""
+
+    private var validatedName: String? { VaultDeviceName.validated(nameDraft) }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: isCurrentDevice ? "iphone.gen3" : "iphone")
+                .foregroundStyle(device.status == "approved" ? Color.zifrGold : Color.orange)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(device.label)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(isCurrentDevice ? "This device" : device.status.capitalized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if device.status == "pending" {
+                HStack(spacing: 8) {
+                    Button("Approve", action: onApprove)
+                        .buttonStyle(.bordered)
+                        .tint(Color.zifrGold)
+                        .controlSize(.small)
+                    Button(role: .destructive, action: onRevoke) {
+                        Image(systemName: "xmark")
+                            .frame(width: 30, height: 30)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Cancel access request for \(device.label)")
+                }
+            } else if device.status == "approved" {
+                Button {
+                    nameDraft = device.label
+                    isRenaming = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.bordered)
+                .tint(Color.zifrGold)
+                .accessibilityLabel("Rename \(device.label)")
+
+                if isCurrentDevice {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(Color.green)
+                        .accessibilityLabel("Approved")
+                } else {
+                    Button(role: .destructive, action: onRevoke) {
+                        Image(systemName: "trash")
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Revoke \(device.label)")
+                }
+            } else {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Revoked")
+            }
+        }
+        .frame(minHeight: 56)
+        .alert("Rename Device", isPresented: $isRenaming) {
+            TextField("Device name", text: $nameDraft)
+                .textInputAutocapitalization(.words)
+            Button("Save") {
+                if let validatedName { onRename(validatedName) }
+            }
+            .disabled(validatedName == nil || validatedName == device.label)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Use up to \(VaultDeviceName.maximumLength) characters. This name syncs across your trusted devices.")
         }
     }
 }

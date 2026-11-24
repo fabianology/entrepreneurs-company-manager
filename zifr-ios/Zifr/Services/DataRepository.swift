@@ -2404,7 +2404,7 @@ struct VaultAccountMetadata: Decodable {
 
 struct VaultDeviceRecord: Decodable, Identifiable, Equatable {
     let deviceID: UUID
-    let label: String
+    var label: String
     let platform: String
     let agreementPublicKey: String
     let signingPublicKey: String
@@ -2935,10 +2935,19 @@ struct VaultAuditEventRecord: Decodable, Identifiable {
 
 struct VaultOverview {
     let metadata: VaultAccountMetadata?
-    let devices: [VaultDeviceRecord]
-    let currentDevice: VaultDeviceRecord?
+    var devices: [VaultDeviceRecord]
+    var currentDevice: VaultDeviceRecord?
     let isUnlocked: Bool
     let auditEvents: [VaultAuditEventRecord]
+
+    mutating func updateDeviceLabel(_ label: String, for deviceID: UUID) {
+        if let index = devices.firstIndex(where: { $0.id == deviceID }) {
+            devices[index].label = label
+        }
+        if currentDevice?.id == deviceID {
+            currentDevice?.label = label
+        }
+    }
 }
 
 struct VaultMigrationReport: Equatable {
@@ -2953,16 +2962,38 @@ struct VaultRotationResult {
     let completed: Bool
 }
 
+struct VaultRecoveryPasswordRequirements {
+    static let minimumLength = 16
+    static let minimumDistinctLettersOrDigits = 8
+    static let maximumByteCount = 1024
+    private static let predictableSequences = ["password", "123456", "qwerty", "letmein", "correcthorsebatterystaple"]
+
+    let charactersNeeded: Int
+    let distinctLettersOrDigitsNeeded: Int
+    let exceedsByteLimit: Bool
+    let containsPredictableSequence: Bool
+
+    var isSatisfied: Bool {
+        charactersNeeded == 0 && distinctLettersOrDigitsNeeded == 0
+            && !exceedsByteLimit && !containsPredictableSequence
+    }
+
+    init(_ password: String) {
+        let normalized = password.lowercased().filter { $0.isLetter || $0.isNumber }
+        charactersNeeded = max(0, Self.minimumLength - password.count)
+        distinctLettersOrDigitsNeeded = max(0, Self.minimumDistinctLettersOrDigits - Set(normalized).count)
+        exceedsByteLimit = password.utf8.count > Self.maximumByteCount
+            || password.precomposedStringWithCanonicalMapping.utf8.count > Self.maximumByteCount
+        containsPredictableSequence = Self.predictableSequences.contains { normalized.contains($0) }
+    }
+}
+
 enum VaultRecoveryMethod {
     case password(String)
     case generatedKey(String)
 
     static func acceptsPassword(_ password: String) -> Bool {
-        let normalized = password.lowercased().filter { $0.isLetter || $0.isNumber }
-        let predictable = ["password", "123456", "qwerty", "letmein", "correcthorsebatterystaple"]
-        return password.count >= 16 && password.utf8.count <= 1024
-            && Set(normalized).count >= 8
-            && !predictable.contains(where: { normalized.contains($0) })
+        VaultRecoveryPasswordRequirements(password).isSatisfied
     }
 
     func wrap(_ key: SymmetricKey, context: VaultRecoveryWrapContext) async throws -> String {
@@ -3522,6 +3553,24 @@ final class VaultService: @unchecked Sendable {
 
     func listDevices() async throws -> [VaultDeviceRecord] {
         try await client.rpc("miloom_list_vault_devices").execute().value
+    }
+
+    func renameDevice(_ deviceID: UUID, to name: String, for userID: UUID, importIfMissing: Bool = false) async throws -> String {
+        let session = try await client.auth.refreshSession()
+        guard session.user.id == userID else { throw CancellationError() }
+        let snapshot = try requireSnapshot(for: userID)
+        struct Params: Encodable {
+            let p_actor_device_id: UUID
+            let p_target_device_id: UUID
+            let p_name: String
+            let p_import_if_missing: Bool
+        }
+        return try await client.rpc("miloom_rename_vault_device", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_target_device_id: deviceID,
+            p_name: name,
+            p_import_if_missing: importIfMissing
+        )).execute().value
     }
 
     func listPendingResourceSecretRequests() async throws -> [ResourceSecretAccessRequest] {
@@ -4566,7 +4615,9 @@ enum VaultCryptography {
 
     private static func recoveryPasswordKey(_ password: String, salt: Data) async throws -> SymmetricKey {
         let input = Array(password.precomposedStringWithCanonicalMapping.utf8)
-        guard !input.isEmpty, input.count <= 1024 else { throw VaultCryptographyError.authenticationFailed }
+        guard !input.isEmpty, input.count <= VaultRecoveryPasswordRequirements.maximumByteCount else {
+            throw VaultCryptographyError.authenticationFailed
+        }
         return try await Task.detached(priority: .userInitiated) {
             var derived = Data(count: 32)
             let result = derived.withUnsafeMutableBytes { output in
