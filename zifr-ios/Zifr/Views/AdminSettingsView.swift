@@ -847,6 +847,14 @@ private final class VaultSecurityController {
         }
     }
 
+    func deleteRevokedDevice(_ device: VaultDeviceRecord) async {
+        guard device.status == "revoked", let userID = overview?.metadata?.userID else { return }
+        await perform("Deleting Device…", reason: "Delete a revoked device from Trusted Devices.") {
+            try await VaultService.shared.removeRevokedDeviceFromList(device.id, for: userID)
+            self.overview?.devices.removeAll { $0.id == device.id }
+        }
+    }
+
     func setRecovery(_ method: VaultRecoveryMethod, setup: Bool) async {
         await perform(
             setup ? "Setting Up Vault…" : "Updating Recovery…",
@@ -946,6 +954,9 @@ private final class VaultSecurityController {
     }
 
     private func friendlyMessage(for error: Error) -> String {
+        if let error = error as? PostgrestError, error.message == "REVOKED_DEVICE_NOT_FOUND" {
+            return "This device is no longer revoked. Refresh Trusted Devices to see its current status."
+        }
         if let grantError = error as? ResourceSecretGrantError {
             return grantError.localizedDescription
         }
@@ -1003,6 +1014,7 @@ struct VaultSecuritySheet: View {
     @State private var savedGeneratedKey = false
     @State private var revokeDevice: VaultDeviceRecord?
     @State private var revokeRecovery = ""
+    @State private var deviceToDelete: VaultDeviceRecord?
 
     private var canSaveRecovery: Bool {
         if useGeneratedKey { return generatedKey != nil && savedGeneratedKey }
@@ -1120,6 +1132,17 @@ struct VaultSecuritySheet: View {
             Text(revokeDevice?.status == "pending"
                  ? "This device will need to request access again."
                  : "Enter your current vault recovery password or key to keep it in use after removing this device.")
+        }
+        .alert("Delete Revoked Device?", isPresented: Binding(
+            get: { deviceToDelete != nil },
+            set: { if !$0 { deviceToDelete = nil } }
+        ), presenting: deviceToDelete) { device in
+            Button("Delete", role: .destructive) {
+                Task { await controller.deleteRevokedDevice(device) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { device in
+            Text("This removes \(device.label) from Trusted Devices across your account. Its Vault Activity history is kept.")
         }
         .interactiveDismissDisabled(controller.activeOperation != nil)
         .presentationDetents([.fraction(0.9), .large])
@@ -1398,7 +1421,8 @@ struct VaultSecuritySheet: View {
                             isCurrentDevice: device.id == overview.currentDevice?.id,
                             onRename: { name in Task { await controller.rename(device, to: name) } },
                             onApprove: { Task { await controller.approve(device) } },
-                            onRevoke: { revokeDevice = device }
+                            onRevoke: { revokeDevice = device },
+                            onDelete: { deviceToDelete = device }
                         )
                         if device.id != overview.devices.last?.id {
                             Divider().background(Color.white.opacity(0.1)).padding(.leading, 42)
@@ -1549,6 +1573,7 @@ private struct VaultDeviceRow: View {
     let onRename: (String) -> Void
     let onApprove: () -> Void
     let onRevoke: () -> Void
+    let onDelete: () -> Void
 
     @State private var isRenaming = false
     @State private var nameDraft = ""
@@ -1606,10 +1631,11 @@ private struct VaultDeviceRow: View {
                     .buttonStyle(.bordered)
                     .accessibilityLabel("Revoke \(device.label)")
                 }
-            } else {
-                Image(systemName: "minus.circle.fill")
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel("Revoked")
+            } else if device.status == "revoked" {
+                Button("Delete", role: .destructive, action: onDelete)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("Delete \(device.label)")
             }
         }
         .frame(minHeight: 56)
