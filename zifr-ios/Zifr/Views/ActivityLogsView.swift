@@ -289,6 +289,7 @@ private struct MessageFeedback: Identifiable {
 struct MessageRowView: View {
     let log: ActivityLog
     let vm: AppViewModel
+    var showsMarkReadButton = true
     @Environment(AppState.self) private var appState
     
     var body: some View {
@@ -317,7 +318,7 @@ struct MessageRowView: View {
                 .foregroundStyle(Color.white.opacity(log.isRead ? 0.58 : 0.82))
                 .fixedSize(horizontal: false, vertical: true)
             
-            if !log.isRead {
+            if showsMarkReadButton && !log.isRead {
                 HStack {
                     Spacer()
                     Button {
@@ -386,12 +387,63 @@ struct MessageRowView: View {
     }
 }
 
+private let inboxRowIconTint = Color(hex: "#A8D5B8")
+
+private struct InboxRowActions: ViewModifier {
+    let isRead: Bool
+    let markRead: () -> Void
+    let markUnread: () -> Void
+    let delete: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .modifier(ZifrMessageSwipeModifier(
+                onReadToggle: markRead, onDelete: delete, isRead: isRead, markReadOnly: true
+            ))
+            .contextMenu {
+                Button(action: isRead ? markUnread : markRead) {
+                    Label(isRead ? "Mark Unread" : "Mark as Read",
+                          systemImage: isRead ? "envelope.badge" : "envelope.open")
+                }
+                Button(role: .destructive, action: delete) {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+    }
+}
+
 private enum InboxSection: String, CaseIterable, Identifiable {
     case alerts = "Alerts"
     case invitations = "Invites"
     case activity = "Activity"
 
     var id: String { rawValue }
+}
+
+private struct InboxOlderMessagesButton: View {
+    @Binding var isExpanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) { isExpanded.toggle() }
+        } label: {
+            HStack(spacing: 10) {
+                Text("Older messages")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 4)
+                DisclosureStateChevron(isExpanded: isExpanded)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.zifrGold)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+    }
 }
 
 private struct InboxAlertDetails: View {
@@ -425,7 +477,7 @@ private struct InboxAlertDetails: View {
         let timing = Group {
             if let payment {
                 TimelineView(.everyMinute) { clock in
-                    countdown(payment.daysUntil(from: clock.date, calendar: calendar))
+                    countdown(payment.daysUntil(from: clock.date, calendar: localCalendar))
                 }
                 .font(.caption.weight(.medium))
                 .monospacedDigit()
@@ -460,6 +512,12 @@ private struct InboxAlertDetails: View {
         .accessibilityValue(notification.isRead ? "" : "Unread")
     }
 
+    private var localCalendar: Calendar {
+        var value = calendar
+        value.timeZone = timeZone
+        return value
+    }
+
     private func countdown(_ days: Int) -> Text {
         switch days {
         case 0: Text("Today")
@@ -471,13 +529,271 @@ private struct InboxAlertDetails: View {
     }
 }
 
+private struct InboxSubscriptionPaymentDrawer: View {
+    let notification: AppNotification
+    let payment: InboxScheduledPayment
+    let openRoute: (NotificationRoute) -> Void
+
+    @Environment(AppState.self) private var appState
+    @Environment(\.calendar) private var calendar
+    @State private var lastCharge: SearchRecord?
+
+    static let fill = Color(hex: "#20463E")
+
+    private var subscription: Subscription? {
+        guard appState.portfolioUserID == notification.userId,
+              let id = notification.resourceId else { return nil }
+        return appState.subscriptions.first { $0.id == id }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let subscription {
+                let context = funding(for: subscription)
+                let currency = ExecutiveBriefingSnapshot.currency(subscription.currency)
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 12) {
+                        expectedCharge(context, currency: currency)
+                        Spacer(minLength: 4)
+                        coverageLabel(context, currency: currency).fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        expectedCharge(context, currency: currency)
+                        coverageLabel(context, currency: currency)
+                    }
+                }
+
+                if let group = context.group, group.fundingRoute != nil {
+                    fact("Payment account", context.paymentRoute ?? [group.sourceDetail, group.sourceName]
+                        .filter { !$0.isEmpty }.joined(separator: " · "))
+                    if let card = context.paymentRoute {
+                        let account = [group.sourceDetail, group.sourceName].filter { !$0.isEmpty }.joined(separator: " · ")
+                        if account != card { fact("Funding account", account) }
+                    }
+                    if let available = group.availableAmount, context.hasReliableBalance {
+                        fact(group.availableLabel, available.formatted(.currency(code: currency)))
+                    }
+                } else {
+                    fact("Payment account", "Unverified")
+                    if let charge = lastCharge {
+                        let account = charge.accountName
+                        if !account.isEmpty, account != "Unassigned account" {
+                            let bank = charge.safeDetails["institution"] ?? ""
+                            fact("Last charged to", [bank, account].filter { !$0.isEmpty }.joined(separator: " · "))
+                        }
+                    }
+                }
+
+                if !context.matchesAlertSchedule, let renewal = subscription.nextRenewalAt {
+                    fact("Next renewal", renewal.formatted(.dateTime.month(.abbreviated).day().year()))
+                }
+                fact("Auto-pay", autoPay(for: subscription.renew))
+                if let charge = lastCharge, let amount = charge.amount, let day = charge.date {
+                    fact("Last charge", "\(amount.formatted(.currency(code: charge.currency))) · \(day.formatted(.dateTime.month(.abbreviated).day()))")
+                }
+
+                if let reason = context.reason {
+                    Text(reason)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+                if let group = context.group, group.charges.count > 1, context.reason == nil {
+                    Text("Includes \(group.charges.count) saved charges through \(payment.date.formatted(.dateTime.month(.abbreviated).day())).")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+                if let syncedAt = context.group?.balanceSyncedAt {
+                    Text("Balance synced \(syncedAt.formatted(.dateTime.month(.abbreviated).day().hour().minute()))")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+
+                if context.matchesAlertSchedule, let route = context.group?.fundingRoute,
+                   context.reason != nil || context.group?.status == .atRisk {
+                    action("Review payment account", route: route)
+                } else {
+                    action("Open subscription", route: .subscriptionInServices(subscription.id))
+                }
+            } else {
+                Text(appState.isLoading ? "Loading subscription details…" : "Subscription details are unavailable.")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.78))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task(id: appState.searchRevision) { await loadLastCharge() }
+    }
+
+    private func expectedCharge(_ context: InboxSubscriptionFunding, currency: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(context.matchesAlertSchedule ? "Expected charge" : "Saved charge")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.75))
+            Text(context.amount.map { $0.formatted(.currency(code: currency)) } ?? "Unavailable")
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+        }
+        .fixedSize(horizontal: true, vertical: true)
+    }
+
+    private func coverageLabel(_ context: InboxSubscriptionFunding, currency: String) -> some View {
+        let label: String
+        let icon: String
+        let color: Color
+        let conditionalDate = context.matchesAlertSchedule
+            ? ""
+            : " if charged \(payment.date.formatted(.dateTime.month(.abbreviated).day()))"
+        switch context.estimate {
+        case .unknown:
+            label = "Coverage unknown"
+            icon = "questionmark.circle"
+            color = .white.opacity(0.78)
+        case .likelyShort(let shortfall):
+            label = "Likely \(shortfall.formatted(.currency(code: currency))) short\(conditionalDate)"
+            icon = "exclamationmark.circle"
+            color = Color(hex: "#F0BC91")
+        case .tight:
+            label = "Tight\(conditionalDate)"
+            icon = "exclamationmark.circle"
+            color = Color(hex: "#F0BC91")
+        case .likelyCovered:
+            label = "Likely covered\(conditionalDate)"
+            icon = "checkmark.circle"
+            color = .white.opacity(0.92)
+        }
+        return Label(label, systemImage: icon)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(color)
+    }
+
+    private func fact(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Divider().overlay(.white.opacity(0.12))
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(label).foregroundStyle(.white.opacity(0.75)).fixedSize()
+                    Spacer(minLength: 6)
+                    Text(value).multilineTextAlignment(.trailing).fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(label).foregroundStyle(.white.opacity(0.75))
+                    Text(value)
+                }
+            }
+            .font(.footnote)
+            .monospacedDigit()
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func action(_ label: String, route: NotificationRoute) -> some View {
+        VStack(spacing: 0) {
+            Divider().overlay(.white.opacity(0.12))
+            Button { openRoute(route) } label: {
+                HStack(spacing: 8) {
+                    Text(label).font(.footnote.weight(.semibold))
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.zifrGold)
+        }
+    }
+
+    private func autoPay(for setting: String) -> String {
+        switch setting.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "auto", "automatic", "on", "yes": "On · Saved setting"
+        case "manual", "off", "no": "Off · Saved setting"
+        default: "Unknown"
+        }
+    }
+
+    private func funding(for subscription: Subscription) -> InboxSubscriptionFunding {
+        let companyID = appState.localCompanyOverrides[subscription.id.uuidString] ?? subscription.companyId
+        let sameCompanyBanks = appState.institutions(for: companyID)
+        let sameCompanyCards = appState.cards(for: companyID)
+        let companySubscriptions = appState.subscriptions(for: companyID)
+        let bankIDs = Set(sameCompanyBanks.map(\.id))
+        let cardIDs = Set(sameCompanyCards.map(\.id))
+        let subscriptionIDs = Set(companySubscriptions.map(\.id))
+        let plaidID = subscription.plaidAccountId.flatMap { $0.isEmpty ? nil : $0 }
+        let savedID = subscription.paymentMethodId
+
+        // The payment picker supports explicitly selecting an account from another
+        // visible entity. Name-only matching stays within the subscription's entity.
+        let linkedCards = appState.cards.filter { card in
+            (card.id == savedID || (plaidID != nil && card.plaidAccountId == plaidID))
+        }
+        let linkedCardIDs = Set(linkedCards.map(\.id))
+        let linkedBanks = appState.institutions.filter { bank in
+            bank.id == savedID || bank.accounts.contains { account in
+                (plaidID != nil && (account.plaidAccountId == plaidID || account.id == plaidID))
+                    || account.linkedCardId.flatMap(UUID.init(uuidString:)).map(linkedCardIDs.contains) == true
+            }
+        }
+        let linkedMethodIDs = Set(linkedBanks.map(\.id)).union(linkedCardIDs)
+        let relatedSubscriptions = appState.subscriptions.filter { other in
+            !subscriptionIDs.contains(other.id) && (
+                other.paymentMethodId.map(linkedMethodIDs.contains) == true
+                    || (plaidID != nil && other.plaidAccountId == plaidID)
+            )
+        }
+
+        let fundingBanks = sameCompanyBanks + linkedBanks.filter { !bankIDs.contains($0.id) }
+        let fundingCards = sameCompanyCards + linkedCards.filter { !cardIDs.contains($0.id) }
+        let availableMethodIDs = Set(fundingBanks.map(\.id)).union(fundingCards.map(\.id))
+        let projectedSubscriptions = (companySubscriptions + relatedSubscriptions).filter { other in
+            // An old Plaid hint should not pull a charge with an explicit
+            // payment source outside this projection into the balance estimate.
+            other.paymentMethodId.map(availableMethodIDs.contains) ?? true
+        }
+
+        return UpcomingCoverageEngine.inboxFunding(
+            subscription: subscription, payment: payment, subscriptions: projectedSubscriptions,
+            institutions: fundingBanks, cards: fundingCards, plaidItems: appState.plaidItems, calendar: calendar
+        )
+    }
+
+    @MainActor
+    private func loadLastCharge() async {
+        lastCharge = nil
+        guard let subscription, !appState.transactions.isEmpty else { return }
+        let userID = notification.userId
+        guard let index = try? await appState.searchIndexInBackground(for: userID, calendar: calendar) else { return }
+        let id = subscription.id
+        let cutoff = Date()
+        let result = await Task.detached(priority: .utility) {
+            index.latestPostedInboxCharge(subscriptionID: id, before: cutoff)
+        }.value
+        guard !Task.isCancelled, appState.portfolioUserID == userID else { return }
+        lastCharge = result
+    }
+}
+
 struct NotificationInboxView: View {
     @Bindable var vm: AppViewModel
     let onOpenRoute: (NotificationRoute) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(\.timeZone) private var timeZone
+    @Environment(\.calendar) private var calendar
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var expandedSubscriptionAlertID: UUID?
+    @State private var showsOlderMessages = false
+    @State private var currentDate = Date()
+    @State private var isRemovingExpiredAlerts = false
     @State private var section: InboxSection = .alerts
+    @State private var updatingRows: Set<UUID> = []
     @State private var errorMessage: String?
     @State private var incomingInvitations: [IncomingResourceInvitation] = []
     @State private var invitationInProgress: UUID?
@@ -485,20 +801,28 @@ struct NotificationInboxView: View {
 
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
-    private var unreadCount: Int {
+    private var alertCalendar: Calendar {
+        var value = calendar
+        value.timeZone = timeZone
+        return value
+    }
+
+    private func unreadCount(for timeline: InboxAlertTimeline) -> Int {
         switch section {
-        case .alerts: appState.unreadNotificationCount
+        case .alerts: timeline.unreadCount
         case .invitations: incomingInvitations.count
         case .activity: appState.activityLogs.filter { !$0.isRead }.count
         }
     }
 
     var body: some View {
+        let timeline = InboxAlertTimeline(appState.notifications, now: currentDate, calendar: alertCalendar)
+        let unreadCount = unreadCount(for: timeline)
         ZStack {
             Color.zifrCard.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                header
+                header(unreadCount)
 
                 Picker("Inbox section", selection: $section) {
                     ForEach(InboxSection.allCases) { item in
@@ -511,7 +835,7 @@ struct NotificationInboxView: View {
 
                 Group {
                     switch section {
-                    case .alerts: alertList
+                    case .alerts: alertList(timeline)
                     case .invitations: invitationList
                     case .activity: activityList
                     }
@@ -521,8 +845,14 @@ struct NotificationInboxView: View {
         .presentationDragIndicator(isPad ? .visible : .automatic)
         .accessibilityAction(.escape) { dismiss() }
         .task {
-            try? await DataRepository.shared.refreshNotifications(appState: appState)
+            try? await refreshAlerts()
             await refreshInvitations()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            refreshAlertDate()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { refreshAlertDate() }
         }
         .confirmationDialog(
             "Decline Invitation?",
@@ -550,7 +880,7 @@ struct NotificationInboxView: View {
         }
     }
 
-    private var header: some View {
+    private func header(_ unreadCount: Int) -> some View {
         HStack {
             if isPad {
                 VStack(alignment: .leading, spacing: 3) {
@@ -558,7 +888,7 @@ struct NotificationInboxView: View {
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
                         .accessibilityAddTraits(.isHeader)
-                    Text(inboxCountLabel)
+                    Text(inboxCountLabel(unreadCount))
                         .font(.caption)
                         .foregroundStyle(Color.white.opacity(0.68))
                 }
@@ -583,7 +913,7 @@ struct NotificationInboxView: View {
                         .font(.system(size: 10, weight: .black))
                         .tracking(2)
                         .foregroundStyle(Color.white.opacity(0.65))
-                    Text(inboxCountLabel)
+                    Text(inboxCountLabel(unreadCount))
                         .font(.system(size: 8, weight: .bold))
                         .tracking(1)
                         .foregroundStyle(Color.zifrGold)
@@ -607,7 +937,7 @@ struct NotificationInboxView: View {
                         Task {
                             if section == .alerts {
                                 do {
-                                    try await DataRepository.shared.refreshNotifications(appState: appState)
+                                    try await refreshAlerts()
                                 } catch {
                                     errorMessage = error.localizedDescription
                                 }
@@ -641,7 +971,7 @@ struct NotificationInboxView: View {
         .padding(.bottom, 12)
     }
 
-    private var inboxCountLabel: String {
+    private func inboxCountLabel(_ unreadCount: Int) -> String {
         if isPad {
             return section == .invitations ? "\(unreadCount) pending" : "\(unreadCount) unread"
         }
@@ -652,14 +982,22 @@ struct NotificationInboxView: View {
     }
 
     @ViewBuilder
-    private var alertList: some View {
-        if appState.notifications.isEmpty {
+    private func alertList(_ timeline: InboxAlertTimeline) -> some View {
+        if timeline.current.isEmpty && timeline.older.isEmpty {
             emptyState(icon: "bell.slash", message: "No alerts yet")
         } else {
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    ForEach(appState.notifications) { notification in
+                    ForEach(timeline.current) { notification in
                         notificationRow(notification)
+                    }
+                    if !timeline.older.isEmpty {
+                        InboxOlderMessagesButton(isExpanded: $showsOlderMessages)
+                        if showsOlderMessages {
+                            ForEach(timeline.older) { notification in
+                                notificationRow(notification)
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -667,7 +1005,7 @@ struct NotificationInboxView: View {
                 .padding(.bottom, 32)
             }
             .refreshable {
-                try? await DataRepository.shared.refreshNotifications(appState: appState)
+                try? await refreshAlerts()
             }
         }
     }
@@ -680,15 +1018,26 @@ struct NotificationInboxView: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(appState.activityLogs) { log in
-                        MessageRowView(log: log, vm: vm)
-                            .contextMenu {
-                                Button {
-                                    Task { await toggleActivityRead(log) }
-                                } label: {
-                                    Label(log.isRead ? "Mark Unread" : "Mark Read",
-                                          systemImage: log.isRead ? "envelope.badge" : "envelope.open")
+                        if isPad {
+                            MessageRowView(log: log, vm: vm, showsMarkReadButton: false)
+                                .contentShape(Rectangle())
+                                .modifier(InboxRowActions(
+                                    isRead: log.isRead,
+                                    markRead: { Task { await setActivityRead(log, read: true) } },
+                                    markUnread: { Task { await setActivityRead(log, read: false) } },
+                                    delete: { Task { await deleteActivity(log) } }
+                                ))
+                        } else {
+                            MessageRowView(log: log, vm: vm)
+                                .contextMenu {
+                                    Button {
+                                        Task { await setActivityRead(log, read: !log.isRead) }
+                                    } label: {
+                                        Label(log.isRead ? "Mark Unread" : "Mark Read",
+                                              systemImage: log.isRead ? "envelope.badge" : "envelope.open")
+                                    }
                                 }
-                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -722,11 +1071,11 @@ struct NotificationInboxView: View {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color.zifrGold.opacity(0.14))
+                        .fill((isPad ? inboxRowIconTint : Color.zifrGold).opacity(0.14))
                         .frame(width: 42, height: 42)
                     Image(systemName: "person.2.badge.gearshape")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.zifrGold)
+                        .foregroundStyle(isPad ? inboxRowIconTint : Color.zifrGold)
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
@@ -787,70 +1136,159 @@ struct NotificationInboxView: View {
         )
     }
 
-    private func notificationRow(_ notification: AppNotification) -> some View {
-        Button {
-            Task { await open(notification) }
-        } label: {
-            HStack(alignment: .top, spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(notificationTint(notification).opacity(0.16))
-                        .frame(width: 42, height: 42)
-                    Image(systemName: notificationIcon(notification))
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(notificationTint(notification))
+    private func subscriptionAlertRow(_ notification: AppNotification, payment: InboxScheduledPayment) -> some View {
+        let expanded = expandedSubscriptionAlertID == notification.id
+        let radius: CGFloat = 14
+        let fill = InboxSubscriptionPaymentDrawer.fill
+        let shape = RoundedRectangle(cornerRadius: radius)
+        let toggle = {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
+                expandedSubscriptionAlertID = expanded ? nil : notification.id
+            }
+            if !expanded, !notification.isRead {
+                Task { await setNotification(notification, read: true) }
+            }
+        }
+
+        return VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: notificationIcon(notification))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(notificationTint(notification))
+                    .frame(width: 18)
+                    .accessibilityHidden(true)
+                InboxAlertDetails(notification: notification, receivedTime: "")
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .frame(width: 15)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 11)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: toggle)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(expanded ? "Collapses payment details" : "Expands payment details")
+            .accessibilityAction { toggle() }
+            .modifier(InboxRowActions(
+                isRead: notification.isRead,
+                markRead: { Task { await setNotification(notification, read: true) } },
+                markUnread: { Task { await setNotification(notification, read: false) } },
+                delete: { Task { await deleteNotification(notification) } }
+            ))
+
+            if expanded {
+                InboxSubscriptionPaymentDrawer(notification: notification, payment: payment) { route in
+                    onOpenRoute(route)
+                    dismiss()
                 }
+                .padding(.leading, 40)
+                .padding(.trailing, 13)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+                .background(fill, in: .rect(bottomLeadingRadius: radius, bottomTrailingRadius: radius))
+            }
+        }
+        .overlay {
+            if expanded {
+                shape.strokeBorder(fill, lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
 
-                if isPad {
-                    InboxAlertDetails(notification: notification, receivedTime: relativeDate(notification.createdAt))
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 7) {
-                            Text(notification.title)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.white)
-                                .multilineTextAlignment(.leading)
-                            if !notification.isRead {
-                                Circle().fill(Color.zifrGold).frame(width: 6, height: 6)
-                            }
-                            Spacer(minLength: 4)
-                            Text(relativeDate(notification.createdAt))
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.35))
-                        }
+    @ViewBuilder
+    private func notificationRow(_ notification: AppNotification) -> some View {
+        if isPad, notification.resourceType == "subscription",
+           let payment = InboxScheduledPayment(notification, timeZone: timeZone) {
+            subscriptionAlertRow(notification, payment: payment)
+        } else {
+            standardNotificationRow(notification)
+        }
+    }
 
-                        Text(notification.body)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.white.opacity(notification.isRead ? 0.55 : 0.78))
-                            .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder
+    private func standardNotificationRow(_ notification: AppNotification) -> some View {
+        let row = HStack(alignment: .top, spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(notificationTint(notification).opacity(0.16))
+                    .frame(width: 42, height: 42)
+                Image(systemName: notificationIcon(notification))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(notificationTint(notification))
+            }
+
+            if isPad {
+                InboxAlertDetails(notification: notification, receivedTime: relativeDate(notification.createdAt))
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 7) {
+                        Text(notification.title)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
                             .multilineTextAlignment(.leading)
-
-                        if notification.route != nil {
-                            Label("Open", systemImage: "arrow.up.right")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color.zifrGold)
+                        if !notification.isRead {
+                            Circle().fill(Color.zifrGold).frame(width: 6, height: 6)
                         }
+                        Spacer(minLength: 4)
+                        Text(relativeDate(notification.createdAt))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.35))
+                    }
+
+                    Text(notification.body)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.white.opacity(notification.isRead ? 0.55 : 0.78))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+
+                    if notification.route != nil {
+                        Label("Open", systemImage: "arrow.up.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.zifrGold)
                     }
                 }
             }
-            .padding(16)
-            .contentShape(Rectangle())
-            .background(Color.black.opacity(0.70))
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(.vaultOutline, lineWidth: 1.25)
-            )
         }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button {
-                Task { await setNotification(notification, read: !notification.isRead) }
-            } label: {
-                Label(notification.isRead ? "Mark Unread" : "Mark Read",
-                      systemImage: notification.isRead ? "envelope.badge" : "envelope.open")
-            }
+        .padding(16)
+        .contentShape(Rectangle())
+        .background(Color.black.opacity(0.70))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(.vaultOutline, lineWidth: 1.25)
+        )
+
+        let activate: () -> Void = { Task { await open(notification) } }
+        let tappableRow = row
+            .onTapGesture(perform: activate)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { activate() }
+
+        if isPad {
+            tappableRow.modifier(InboxRowActions(
+                isRead: notification.isRead,
+                markRead: { Task { await setNotification(notification, read: true) } },
+                markUnread: { Task { await setNotification(notification, read: false) } },
+                delete: { Task { await deleteNotification(notification) } }
+            ))
+        } else {
+            Button(action: activate) { row }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button {
+                        Task { await setNotification(notification, read: !notification.isRead) }
+                    } label: {
+                        Label(notification.isRead ? "Mark Unread" : "Mark Read",
+                              systemImage: notification.isRead ? "envelope.badge" : "envelope.open")
+                    }
+                }
         }
     }
 
@@ -877,60 +1315,113 @@ struct NotificationInboxView: View {
     }
 
     @MainActor
-    private func setNotification(_ notification: AppNotification, read: Bool) async {
-        guard let index = appState.notifications.firstIndex(where: { $0.id == notification.id }) else { return }
-        let original = appState.notifications[index].isRead
-        appState.notifications[index].isRead = read
-        do {
-            try await DataRepository.shared.markNotificationRead(notification.id, isRead: read)
-        } catch {
-            appState.notifications[index].isRead = original
-            errorMessage = error.localizedDescription
+    private func refreshAlerts() async throws {
+        try await DataRepository.shared.refreshNotifications(appState: appState)
+        currentDate = Date()
+        await removeExpiredAlerts()
+    }
+
+    @MainActor
+    private func refreshAlertDate() {
+        currentDate = Date()
+        Task { await removeExpiredAlerts() }
+    }
+
+    @MainActor
+    private func removeExpiredAlerts() async {
+        guard !isRemovingExpiredAlerts, let userID = appState.portfolioUserID else { return }
+        let timeline = InboxAlertTimeline(appState.notifications, now: currentDate, calendar: alertCalendar)
+        let ids = timeline.expired.filter { $0.userId == userID }.map(\.id)
+        guard !ids.isEmpty else { return }
+
+        isRemovingExpiredAlerts = true
+        defer { isRemovingExpiredAlerts = false }
+        let batchSize = 100
+        for start in stride(from: 0, to: ids.count, by: batchSize) {
+            guard appState.portfolioUserID == userID, !Task.isCancelled else { return }
+            let batch = Array(ids[start..<min(start + batchSize, ids.count)])
+            do {
+                try await DataRepository.shared.deleteExpiredPaymentAlerts(batch, for: userID)
+                guard appState.portfolioUserID == userID else { return }
+                let removed = Set(batch)
+                appState.notifications.removeAll { $0.userId == userID && removed.contains($0.id) }
+            } catch {
+                // Expired rows stay hidden. Opening or refreshing the Inbox can retry.
+                return
+            }
         }
     }
 
     @MainActor
-    private func toggleActivityRead(_ log: ActivityLog) async {
-        guard let index = appState.activityLogs.firstIndex(where: { $0.id == log.id }) else { return }
-        let original = appState.activityLogs[index].isRead
-        appState.activityLogs[index].isRead.toggle()
-        do {
-            if original {
-                try await DataRepository.shared.markActivityLogUnread(log.id)
-            } else {
-                try await DataRepository.shared.markActivityLogRead(log.id)
+    private func setNotification(_ notification: AppNotification, read: Bool) async {
+        guard appState.notifications.contains(where: { $0.id == notification.id && $0.isRead != read }) else { return }
+        await updateInbox(id: notification.id) {
+            try await DataRepository.shared.markNotificationRead(notification.id, isRead: read)
+            if let index = appState.notifications.firstIndex(where: { $0.id == notification.id }) {
+                appState.notifications[index].isRead = read
             }
-        } catch {
-            appState.activityLogs[index].isRead = original
-            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func setActivityRead(_ log: ActivityLog, read: Bool) async {
+        guard appState.activityLogs.contains(where: { $0.id == log.id && $0.isRead != read }) else { return }
+        await updateInbox(id: log.id) {
+            if read {
+                try await DataRepository.shared.markActivityLogRead(log.id)
+            } else {
+                try await DataRepository.shared.markActivityLogUnread(log.id)
+            }
+            if let index = appState.activityLogs.firstIndex(where: { $0.id == log.id }) {
+                appState.activityLogs[index].isRead = read
+            }
+        }
+    }
+
+    @MainActor
+    private func deleteNotification(_ notification: AppNotification) async {
+        await updateInbox(id: notification.id) {
+            try await DataRepository.shared.deleteNotification(notification.id)
+            withAnimation { appState.notifications.removeAll { $0.id == notification.id } }
+        }
+    }
+
+    @MainActor
+    private func deleteActivity(_ log: ActivityLog) async {
+        await updateInbox(id: log.id) {
+            try await DataRepository.shared.deleteActivityLog(log.id)
+            withAnimation { appState.activityLogs.removeAll { $0.id == log.id } }
         }
     }
 
     @MainActor
     private func markAllRead() async {
-        do {
+        await updateInbox {
             switch section {
             case .alerts:
-                let originals = appState.notifications
-                for index in appState.notifications.indices { appState.notifications[index].isRead = true }
-                do {
-                    try await DataRepository.shared.markAllNotificationsRead()
-                } catch {
-                    appState.notifications = originals
-                    throw error
+                let ids = Set(appState.notifications.map(\.id))
+                try await DataRepository.shared.markAllNotificationsRead()
+                for index in appState.notifications.indices where ids.contains(appState.notifications[index].id) {
+                    appState.notifications[index].isRead = true
                 }
             case .invitations:
                 return
             case .activity:
-                let originals = appState.activityLogs
-                for index in appState.activityLogs.indices { appState.activityLogs[index].isRead = true }
-                do {
-                    try await DataRepository.shared.markAllActivityLogsRead()
-                } catch {
-                    appState.activityLogs = originals
-                    throw error
+                let ids = Set(appState.activityLogs.map(\.id))
+                try await DataRepository.shared.markAllActivityLogsRead()
+                for index in appState.activityLogs.indices where ids.contains(appState.activityLogs[index].id) {
+                    appState.activityLogs[index].isRead = true
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func updateInbox(id: UUID? = nil, _ update: @MainActor () async throws -> Void) async {
+        if let id, !updatingRows.insert(id).inserted { return }
+        defer { if let id { updatingRows.remove(id) } }
+        do {
+            try await update()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -989,6 +1480,9 @@ struct NotificationInboxView: View {
     }
 
     private func notificationTint(_ notification: AppNotification) -> Color {
+        if isPad {
+            return notification.notificationType == "owner_briefing" ? .zifrGold : inboxRowIconTint
+        }
         switch notification.resourceType?.lowercased() {
         case "institution", "transaction": return Color(hex: "#1A9CA6")
         case "subscription": return Color(hex: "#4A8FD8")

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SubscriptionListView: View {
     let company: Company
@@ -46,55 +47,48 @@ struct SubscriptionListView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            ScrollViewReader { proxy in
-                Group {
-                    if subscriptions.isEmpty {
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                Spacer().frame(height: hideActionBar ? 82 : 70)
-                                emptyState
-                            }
+            Group {
+                if subscriptions.isEmpty {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            Spacer().frame(height: hideActionBar ? 82 : 70)
+                            emptyState
                         }
-                    } else {
-                        StackedSubscriptionDeckView(
-                            subscriptions: filteredSubscriptions,
-                            allSubscriptions: subscriptions,
-                            institutions: institutions,
-                            cards: cards,
-                            onEdit: { if editableSubscriptionIDs.contains($0.id) { editingSub = $0 } },
-                            onBankTapped: { id in
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                vm.activeTab = .financial
-                                vm.deepLinkModelId = id
-                            },
-                            onSave: { modifiedSub in
-                                if editableSubscriptionIDs.contains(modifiedSub.id) {
-                                    vm.saveSub(modifiedSub, appState: appState)
-                                }
-                            },
-                            selectedServiceFilter: $selectedServiceFilter,
-                            hideActionBar: hideActionBar,
-                            editableSubscriptionIDs: editableSubscriptionIDs,
-                            canAccessCredentials: canAccessCredentials
-                        )
                     }
+                } else {
+                    StackedSubscriptionDeckView(
+                        subscriptions: filteredSubscriptions,
+                        allSubscriptions: subscriptions,
+                        institutions: institutions,
+                        cards: cards,
+                        onEdit: { if editableSubscriptionIDs.contains($0.id) { editingSub = $0 } },
+                        onBankTapped: { id in
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            vm.activeTab = .financial
+                            vm.deepLinkModelId = id
+                        },
+                        onSave: { modifiedSub in
+                            if editableSubscriptionIDs.contains(modifiedSub.id) {
+                                vm.saveSub(modifiedSub, appState: appState)
+                            }
+                        },
+                        selectedServiceFilter: $selectedServiceFilter,
+                        deepLinkModelId: $vm.deepLinkModelId,
+                        hideActionBar: hideActionBar,
+                        editableSubscriptionIDs: editableSubscriptionIDs,
+                        canAccessCredentials: canAccessCredentials
+                    )
                 }
-                .sheet(item: $editingSub) { sub in
-                    EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
-                }
-                .sheet(item: $newSub) { sub in
-                    AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
-                        .presentationDetents([.fraction(0.9), .large])
-                }
-                .onChange(of: vm.deepLinkModelId) { _, newValue in
-                    handleDeepLink(id: newValue, proxy: proxy)
-                }
-                .onAppear {
-                    handleDeepLink(id: vm.deepLinkModelId, proxy: proxy)
-                }
-                .sheet(isPresented: $showShareSheet) {
-                    ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
-                }
+            }
+            .sheet(item: $editingSub) { sub in
+                EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
+            }
+            .sheet(item: $newSub) { sub in
+                AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
+                    .presentationDetents([.fraction(0.9), .large])
+            }
+            .sheet(isPresented: $showShareSheet) {
+                ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
             }
 
             if !hideActionBar && canEdit {
@@ -192,19 +186,6 @@ struct SubscriptionListView: View {
         .padding(.top, 6)
     }
     
-    private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {
-        guard let id = id else { return }
-        if let s = subscriptions.first(where: { $0.id == id }) {
-            selectedServiceFilter = "All"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                    proxy.scrollTo(s.id, anchor: .center)
-                }
-            }
-            vm.deepLinkModelId = nil
-        }
-    }
-
     @State private var dummyNetflix = Subscription(
         userId: UUID(),
         companyId: UUID(),
@@ -294,15 +275,25 @@ struct SubscriptionListView: View {
 }
 
 // MARK: - Card Height Preference Key
+private struct ServiceCardMeasurement: Equatable {
+    let height: CGFloat
+    let revealLevel: CardRevealLevel
+}
+
 private struct CardHeightKey: PreferenceKey {
-    static var defaultValue: [UUID: CGFloat] = [:]
-    static func reduce(value: inout [UUID: CGFloat], nextValue: () -> [UUID: CGFloat]) {
+    static var defaultValue: [UUID: ServiceCardMeasurement] = [:]
+    static func reduce(value: inout [UUID: ServiceCardMeasurement], nextValue: () -> [UUID: ServiceCardMeasurement]) {
         value.merge(nextValue()) { _, new in new }
     }
 }
 
 // MARK: - Stacked Subscription Deck View
-struct StackedSubscriptionDeckView: View {
+private struct ServiceCardFocus: Equatable {
+    let subscriptionID: UUID
+    let requestID = UUID()
+}
+
+private struct StackedSubscriptionDeckView: View {
     let subscriptions: [Subscription]
     let allSubscriptions: [Subscription]
     let institutions: [Institution]
@@ -311,21 +302,42 @@ struct StackedSubscriptionDeckView: View {
     let onBankTapped: (UUID) -> Void
     let onSave: (Subscription) -> Void
     @Binding var selectedServiceFilter: String
+    @Binding var deepLinkModelId: UUID?
     var hideActionBar: Bool = false
     var editableSubscriptionIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
 
+    @State private var focus: ServiceCardFocus?
+
+    private let bottomInset: CGFloat = 120
+    private let filterHeight: CGFloat = 36
+    private let filterSpacing: CGFloat = 18
+
+    private var headerInset: CGFloat { hideActionBar ? 82 : 70 }
+
     var body: some View {
+        GeometryReader { viewport in
+            deck(viewportHeight: viewport.size.height)
+        }
+        .onChange(of: deepLinkModelId, initial: true) { _, id in
+            guard let id, allSubscriptions.contains(where: { $0.id == id }) else { return }
+            selectedServiceFilter = "All"
+            focus = ServiceCardFocus(subscriptionID: id)
+            deepLinkModelId = nil
+        }
+    }
+
+    private func deck(viewportHeight: CGFloat) -> some View {
         ScrollView {
             VStack(spacing: 0) {
-                Spacer().frame(height: hideActionBar ? 82 : 70) // 20pt gap below action bar (50->70) or slider tabs (62->82)
+                Spacer().frame(height: headerInset)
 
                 CustomSegmentedControl(
                     options: ["All", "Bills", "Subscriptions"],
                     selection: $selectedServiceFilter
                 )
                 .padding(.horizontal, 20)
-                .padding(.bottom, 18)
+                .padding(.bottom, filterSpacing)
 
                 if subscriptions.isEmpty {
                     VStack(spacing: 12) {
@@ -358,11 +370,88 @@ struct StackedSubscriptionDeckView: View {
                         canAccessCredentials: canAccessCredentials,
                         isFirstSection: true,
                         showsHeader: false,
-                        bottomPadding: 0
+                        bottomPadding: 0,
+                        focus: focus,
+                        viewportHeight: viewportHeight,
+                        deckTopInset: headerInset + filterHeight + filterSpacing,
+                        deckBottomInset: bottomInset
                     )
                 }
             }
-            .padding(.bottom, 120)
+            .padding(.bottom, bottomInset)
+        }
+    }
+}
+
+// Measure the card itself. The overlapping deck's scroll targets can include
+// the vertical space used to position a card within the stack.
+private struct ServiceCardCenteringView: UIViewRepresentable {
+    let focus: ServiceCardFocus
+
+    func makeUIView(context: Context) -> Marker {
+        let marker = Marker()
+        marker.isUserInteractionEnabled = false
+        marker.accessibilityElementsHidden = true
+        return marker
+    }
+
+    func updateUIView(_ marker: Marker, context: Context) {
+        marker.updateFocus(focus)
+    }
+
+    final class Marker: UIView {
+        private var focus: ServiceCardFocus?
+        private var centeringTask: Task<Void, Never>?
+
+        func updateFocus(_ request: ServiceCardFocus) {
+            guard focus != request else { return }
+            focus = request
+            scheduleCentering()
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            scheduleCentering()
+        }
+
+        private func scheduleCentering() {
+            centeringTask?.cancel()
+            guard focus != nil, window != nil else { return }
+            centeringTask = Task { @MainActor [weak self] in
+                // Recheck after the navigation transition settles. Some layouts
+                // change the scroll view's bounds during the transition.
+                for delay in [0, 80, 240] {
+                    do {
+                        try await Task.sleep(for: .milliseconds(delay))
+                    } catch {
+                        return
+                    }
+                    guard let self, self.window != nil else { return }
+                    guard let scroll = self.enclosingScrollView else { continue }
+                    guard !scroll.isTracking, !scroll.isDragging, !scroll.isDecelerating else { return }
+                    self.centerCard(in: scroll)
+                }
+            }
+        }
+
+        private var enclosingScrollView: UIScrollView? {
+            var ancestor = superview
+            while let view = ancestor, !(view is UIScrollView) {
+                ancestor = view.superview
+            }
+            return ancestor as? UIScrollView
+        }
+
+        private func centerCard(in scroll: UIScrollView) {
+            scroll.layoutIfNeeded()
+            guard bounds.height > 0, scroll.bounds.height > 0 else { return }
+            let rect = convert(bounds, to: scroll)
+            let minY = -scroll.adjustedContentInset.top
+            let maxY = max(minY, scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
+            let targetY = min(maxY, max(minY, rect.midY - scroll.bounds.height / 2))
+            if abs(targetY - scroll.contentOffset.y) > 1 {
+                scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: targetY), animated: false)
+            }
         }
     }
 }
@@ -382,18 +471,45 @@ private struct StackedServiceSection: View {
     let isFirstSection: Bool
     var showsHeader: Bool = true
     var bottomPadding: CGFloat = 28
+    let focus: ServiceCardFocus?
+    let viewportHeight: CGFloat
+    let deckTopInset: CGFloat
+    let deckBottomInset: CGFloat
 
     @Environment(OnboardingStateManager.self) private var onboardingState
 
     @State private var revealLevels: [UUID: CardRevealLevel] = [:]
     @State private var draggingCardId: UUID? = nil
     @State private var dragOffset: CGFloat = 0
-    @State private var cardHeights: [UUID: CGFloat] = [:]
+    @State private var cardMeasurements: [UUID: ServiceCardMeasurement] = [:]
 
     private let collapsedPeekOffset: CGFloat = 71
     private let dragCommitDistance: CGFloat = 24
     private let projectedDragCommitDistance: CGFloat = 64
     private let maximumDragPreview: CGFloat = 28
+
+    private var focusedCardIndex: Int? {
+        guard let focus,
+              let index = services.firstIndex(where: { $0.id == focus.subscriptionID }),
+              revealLevels[focus.subscriptionID] == .full else { return nil }
+        return index
+    }
+
+    private var focusedCardHeight: CGFloat? {
+        guard focusedCardIndex != nil, let focus,
+              let measurement = cardMeasurements[focus.subscriptionID],
+              measurement.revealLevel == .full else { return nil }
+        return measurement.height
+    }
+
+    private var centeringInsets: (top: CGFloat, bottom: CGFloat) {
+        guard let index = focusedCardIndex, let height = focusedCardHeight else { return (0, 0) }
+        let desiredSpace = max(0, (viewportHeight - height) / 2)
+        let spaceBefore = calculateYOffset(forIndex: index)
+        let spaceAfter = max(0, totalStackHeight - spaceBefore - height)
+        return (max(0, desiredSpace - spaceBefore - deckTopInset),
+                max(0, desiredSpace - spaceAfter - deckBottomInset))
+    }
 
     private func level(for sub: Subscription, index: Int) -> CardRevealLevel {
         if let level = revealLevels[sub.id] { return level }
@@ -487,12 +603,21 @@ private struct StackedServiceSection: View {
                     .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 4)
                     .background(
                         GeometryReader { geo in
-                            Color.clear.preference(key: CardHeightKey.self, value: [sub.id: geo.size.height])
+                            Color.clear.preference(
+                                key: CardHeightKey.self,
+                                value: [sub.id: ServiceCardMeasurement(height: geo.size.height, revealLevel: currentLevel)]
+                            )
                         }
                     )
-                    .onPreferenceChange(CardHeightKey.self) { heights in
-                        for (id, height) in heights where cardHeights[id] != height {
-                            cardHeights[id] = height
+                    .onPreferenceChange(CardHeightKey.self) { measurements in
+                        for (id, measurement) in measurements where cardMeasurements[id] != measurement {
+                            cardMeasurements[id] = measurement
+                        }
+                    }
+                    .background {
+                        if let focus, focus.subscriptionID == sub.id, currentLevel == .full,
+                           focusedCardHeight != nil {
+                            ServiceCardCenteringView(focus: focus)
                         }
                     }
                     .offset(y: yOffset)
@@ -505,7 +630,12 @@ private struct StackedServiceSection: View {
             .frame(height: totalStackHeight, alignment: .top)
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, bottomPadding)
+        .padding(.top, centeringInsets.top)
+        .padding(.bottom, bottomPadding + centeringInsets.bottom)
+        .onChange(of: focus, initial: true) { _, request in
+            guard let request, let service = services.first(where: { $0.id == request.subscriptionID }) else { return }
+            expandOnly(service)
+        }
     }
 
     private func calculateYOffset(forIndex index: Int) -> CGFloat {
@@ -517,7 +647,7 @@ private struct StackedServiceSection: View {
             case .headerOnly, .statusRevealed:
                 offset += collapsedPeekOffset
             case .full:
-                offset += cardHeights[sub.id, default: 340] + 8
+                offset += (cardMeasurements[sub.id]?.height ?? 340) + 8
             }
         }
 
@@ -545,7 +675,7 @@ private struct StackedServiceSection: View {
         let lastHeight: CGFloat
         switch lastLvl {
         case .headerOnly, .statusRevealed: lastHeight = 80
-        case .full: lastHeight = cardHeights[lastSub.id, default: 340] + 16
+        case .full: lastHeight = (cardMeasurements[lastSub.id]?.height ?? 340) + 16
         }
 
         return calculateYOffset(forIndex: lastIndex) + lastHeight

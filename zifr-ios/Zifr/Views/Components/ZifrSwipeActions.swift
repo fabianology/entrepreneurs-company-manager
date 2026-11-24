@@ -98,6 +98,9 @@ struct ZifrMessageSwipeModifier: ViewModifier {
     let onReadToggle: () -> Void
     let onDelete: () -> Void
     let isRead: Bool
+    var markReadOnly = false
+
+    private var canSwipeToRead: Bool { !markReadOnly || !isRead }
     @State private var offset: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
 
@@ -110,18 +113,30 @@ struct ZifrMessageSwipeModifier: ViewModifier {
         let rawOffset = offset + dragOffset
         let visibleOffset = rawOffset < -actionWidth
             ? max(-fullSwipeExitOffset, rawOffset)
-            : min(actionWidth, max(-actionWidth, rawOffset))
+            : min(canSwipeToRead ? actionWidth : 0, max(-actionWidth, rawOffset))
 
         return ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(hex: "#315B50"))
-                .opacity(visibleOffset > 0 ? 1 : 0)
+            Color.clear
+                .overlay(alignment: .leading) {
+                    Color(hex: "#315B50").frame(width: max(0, visibleOffset))
+                }
+                .overlay(alignment: .trailing) {
+                    Color(hex: "#7A2E2E").frame(width: max(0, -visibleOffset))
+                }
+                .allowsHitTesting(false)
 
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(hex: "#7A2E2E"))
-                .opacity(visibleOffset < 0 ? 1 : 0)
-
-            HStack(spacing: 0) {
+            if markReadOnly {
+                content
+                    .offset(x: visibleOffset)
+                    .simultaneousGesture(swipe)
+            } else {
+                content
+                    .offset(x: visibleOffset)
+                    .gesture(swipe)
+            }
+        }
+        .overlay(alignment: .leading) {
+            if visibleOffset > 0 {
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -139,11 +154,16 @@ struct ZifrMessageSwipeModifier: ViewModifier {
                     .foregroundStyle(.white)
                     .frame(width: actionWidth)
                     .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-
-                Spacer(minLength: 0)
-
+                .mask(alignment: .leading) { Rectangle().frame(width: visibleOffset) }
+                .allowsHitTesting(visibleOffset >= actionWidth - 1)
+                .accessibilityHidden(visibleOffset < actionWidth - 1)
+            }
+        }
+        .overlay(alignment: .trailing) {
+            if visibleOffset < 0 {
                 Button {
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -161,51 +181,68 @@ struct ZifrMessageSwipeModifier: ViewModifier {
                     .foregroundStyle(.white)
                     .frame(width: actionWidth)
                     .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .mask(alignment: .trailing) { Rectangle().frame(width: -visibleOffset) }
+                .allowsHitTesting(visibleOffset <= -actionWidth + 1)
+                .accessibilityHidden(visibleOffset > -actionWidth + 1)
             }
-            .opacity(abs(visibleOffset) > 1 ? 1 : 0)
-            .allowsHitTesting(abs(visibleOffset) >= actionWidth - 1)
-            .accessibilityHidden(abs(visibleOffset) <= 1)
-            
-            content
-                .offset(x: visibleOffset)
-                .gesture(
-                    DragGesture()
-                        .updating($dragOffset) { value, state, _ in
-                            state = value.translation.width
-                        }
-                        .onEnded { value in
-                            let projectedOffset = offset + value.predictedEndTranslation.width
-                            let completedOffset = offset + value.translation.width
-
-                            if completedOffset <= -fullSwipeThreshold {
-                                UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                                withAnimation(.easeIn(duration: 0.16)) {
-                                    offset = -fullSwipeExitOffset
-                                }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                                    onDelete()
-                                }
-                                return
-                            }
-
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                if offset < 0 {
-                                    offset = value.translation.width > revealThreshold / 2 ? 0 : -actionWidth
-                                } else if offset > 0 {
-                                    offset = value.translation.width < -revealThreshold / 2 ? 0 : actionWidth
-                                } else if projectedOffset < -revealThreshold {
-                                    offset = -actionWidth
-                                } else if projectedOffset > revealThreshold {
-                                    offset = actionWidth
-                                } else {
-                                    offset = 0
-                                }
-                            }
-                        }
-                )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(.rect(cornerRadius: markReadOnly ? 0 : 24))
+        .onChange(of: isRead) { _, read in
+            if markReadOnly && read && offset > 0 { offset = 0 }
+        }
     }
+
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: markReadOnly ? 22 : 10)
+            .updating($dragOffset) { value, state, _ in
+                guard isHorizontal(value) else { return }
+                state = value.translation.width
+            }
+            .onEnded { value in
+                guard isHorizontal(value) else { return }
+                let projectedOffset = offset + value.predictedEndTranslation.width
+                let completedOffset = offset + value.translation.width
+
+                if completedOffset <= -fullSwipeThreshold {
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    if markReadOnly {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { offset = 0 }
+                        onDelete()
+                    } else {
+                        withAnimation(.easeIn(duration: 0.16)) { offset = -fullSwipeExitOffset }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { onDelete() }
+                    }
+                    return
+                }
+
+                if markReadOnly && canSwipeToRead && completedOffset >= fullSwipeThreshold {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { offset = 0 }
+                    onReadToggle()
+                    return
+                }
+
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    if offset < 0 {
+                        offset = value.translation.width > revealThreshold / 2 ? 0 : -actionWidth
+                    } else if offset > 0 {
+                        offset = value.translation.width < -revealThreshold / 2 ? 0 : actionWidth
+                    } else if projectedOffset < -revealThreshold {
+                        offset = -actionWidth
+                    } else if canSwipeToRead && projectedOffset > revealThreshold {
+                        offset = actionWidth
+                    } else {
+                        offset = 0
+                    }
+                }
+            }
+    }
+
+    private func isHorizontal(_ value: DragGesture.Value) -> Bool {
+        !markReadOnly || abs(value.translation.width) > abs(value.translation.height) * 1.3
+    }
+
 }
