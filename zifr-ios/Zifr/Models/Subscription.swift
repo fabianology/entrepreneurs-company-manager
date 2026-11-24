@@ -318,6 +318,11 @@ enum SubscriptionRenewalScheduler {
             let nextDue = nextDueDate(from: sourceDate, cycle: cycle, now: now, calendar: calendar)
             if updated.nextRenewalAt != nextDue {
                 updated.nextRenewalAt = nextDue
+                // Alerts encode the UTC day. Keep the original timestamp when
+                // normalization only moved it to the start of the same local day.
+                if let original = subscription.nextRenewalAt, calendar.isDate(original, inSameDayAs: nextDue) {
+                    updated.renewalBeforeLocalNormalization = subscription.renewalBeforeLocalNormalization ?? original
+                }
                 didChange = true
             }
 
@@ -437,7 +442,12 @@ struct Subscription: Identifiable, Codable, Hashable {
     var paymentMethod: String?
     var paymentMethodId: UUID?
     var nextRenewal: String?
-    var nextRenewalAt: Date?
+    var nextRenewalAt: Date? {
+        didSet {
+            if nextRenewalAt != oldValue { renewalBeforeLocalNormalization = nil }
+        }
+    }
+    fileprivate(set) var renewalBeforeLocalNormalization: Date?
     var renew: String
     var status: String
     var subServicesData: [SubService]

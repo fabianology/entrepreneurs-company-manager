@@ -5,6 +5,7 @@ enum NotificationRoute: Hashable {
     case institution(UUID)
     case transaction(UUID)
     case transactionReview
+    case subscriptionInServices(UUID)
     case resource(ResourceKind, UUID)
 
     init?(pushUserInfo: [AnyHashable: Any]) {
@@ -66,8 +67,65 @@ struct InboxScheduledPayment {
         self.date = date
     }
 
+    func matchesServerDay(_ scheduled: Date, timeZone: TimeZone) -> Bool {
+        let fields: Set<Calendar.Component> = [.year, .month, .day]
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = timeZone
+        let shownDay = gregorian.dateComponents(fields, from: date)
+        // The server derives the alert date from the UTC timestamp.
+        gregorian.timeZone = TimeZone(secondsFromGMT: 0)!
+        return shownDay == gregorian.dateComponents(fields, from: scheduled)
+    }
+
     func daysUntil(from now: Date, calendar: Calendar) -> Int {
         calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+    }
+}
+
+struct InboxAlertTimeline {
+    static let retentionDays = 14
+
+    let current: [AppNotification]
+    let older: [AppNotification]
+    let expired: [AppNotification]
+    let unreadCount: Int
+
+    init(_ notifications: [AppNotification], now: Date, calendar: Calendar) {
+        var upcoming: [(notification: AppNotification, daysUntil: Int)] = []
+        var past: [(notification: AppNotification, daysUntil: Int)] = []
+        var other: [AppNotification] = []
+        var expired: [AppNotification] = []
+        for notification in notifications {
+            guard let payment = InboxScheduledPayment(notification, timeZone: calendar.timeZone) else {
+                other.append(notification)
+                continue
+            }
+            let daysUntil = payment.daysUntil(from: now, calendar: calendar)
+            switch daysUntil {
+            case 0...:
+                upcoming.append((notification, daysUntil))
+            case -Self.retentionDays ..< 0:
+                past.append((notification, daysUntil))
+            default:
+                expired.append(notification)
+            }
+        }
+        upcoming.sort { lhs, rhs in
+            if lhs.daysUntil != rhs.daysUntil { return lhs.daysUntil < rhs.daysUntil }
+            return Self.receivedLater(lhs.notification, than: rhs.notification)
+        }
+        past.sort { lhs, rhs in
+            if lhs.daysUntil != rhs.daysUntil { return lhs.daysUntil > rhs.daysUntil }
+            return Self.receivedLater(lhs.notification, than: rhs.notification)
+        }
+        current = upcoming.map { $0.notification } + other
+        older = past.map { $0.notification }
+        self.expired = expired
+        unreadCount = current.filter { !$0.isRead }.count + older.filter { !$0.isRead }.count
+    }
+
+    private static func receivedLater(_ lhs: AppNotification, than rhs: AppNotification) -> Bool {
+        (lhs.createdAt ?? .distantPast) > (rhs.createdAt ?? .distantPast)
     }
 }
 

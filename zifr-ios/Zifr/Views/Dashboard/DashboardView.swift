@@ -867,9 +867,29 @@ struct DashboardView: View {
             initialTransactionID = nil
             initiallyShowsTransactionReview = true
             showTransactionCenter = true
+        case .subscriptionInServices(let id):
+            openSubscriptionInServices(id)
         case .resource(let kind, let resourceID):
             openHealthResource(kind, resourceID)
         }
+    }
+
+    private func openSubscriptionInServices(_ id: UUID) {
+        guard let subscription = appState.subscriptions.first(where: { $0.id == id }) else {
+            appState.error = "This subscription is no longer available."
+            return
+        }
+        guard let company = appState.companies.first(where: { $0.id == subscription.companyId }) else {
+            // A subscription shared on its own may have no visible company page.
+            selectedSubscription = subscription
+            return
+        }
+
+        vm.selectedCompany = company
+        vm.searchQuery = ""
+        vm.activeTab = .subscriptions
+        vm.deepLinkModelId = id
+        vm.path = NavigationPath([company])
     }
 
     private func openSharedItem(_ share: SharedItem) {

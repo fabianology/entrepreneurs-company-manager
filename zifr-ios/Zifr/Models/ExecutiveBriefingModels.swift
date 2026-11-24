@@ -275,9 +275,36 @@ struct UpcomingCoverageGroup: Identifiable {
     let status: UpcomingCoverageStatus
     let reason: String?
     let paymentRoutes: [String]
+    var fundingRoute: NotificationRoute? = nil
+    var balanceSyncedAt: Date? = nil
 
     var totalDue: Double { charges.reduce(0) { $0 + $1.amount } }
     var difference: Double? { availableAmount.map { $0 - totalDue } }
+}
+
+enum InboxCoverageEstimate {
+    case likelyCovered
+    case tight
+    case likelyShort(Double)
+    case unknown
+}
+
+struct InboxSubscriptionFunding {
+    var amount: Double? = nil
+    var group: UpcomingCoverageGroup? = nil
+    var paymentRoute: String? = nil
+    var matchesAlertSchedule = false
+    var hasReliableBalance = false
+    let reason: String?
+
+    var estimate: InboxCoverageEstimate {
+        guard reason == nil, let group, group.status != .unknown,
+              let remaining = group.difference, remaining.isFinite else { return .unknown }
+        if remaining < 0 { return .likelyShort(-remaining) }
+
+        // Less than 10% of the scheduled total leaves little room for variation.
+        return remaining < group.totalDue * 0.10 ? .tight : .likelyCovered
+    }
 }
 
 struct UpcomingCoverageProjection {
@@ -307,6 +334,8 @@ enum UpcomingCoverageEngine {
         let unknownReason: String?
         let paymentRoute: String?
         let charge: UpcomingCoverageCharge
+        var fundingRoute: NotificationRoute? = nil
+        var balanceSyncedAt: Date? = nil
     }
 
     static func project(
@@ -384,7 +413,8 @@ enum UpcomingCoverageEngine {
                 currency: first.charge.currency, charges: charges,
                 availableAmount: first.availableAmount, availableLabel: first.availableLabel,
                 status: status, reason: first.unknownReason,
-                paymentRoutes: Array(Set(values.compactMap(\.paymentRoute))).sorted()
+                paymentRoutes: Array(Set(values.compactMap(\.paymentRoute))).sorted(),
+                fundingRoute: first.fundingRoute, balanceSyncedAt: first.balanceSyncedAt
             )
         }.sorted {
             if $0.status != $1.status {
@@ -395,6 +425,107 @@ enum UpcomingCoverageEngine {
         }
 
         return UpcomingCoverageProjection(days: days, groups: groups, unscheduledCount: unscheduled)
+    }
+
+    static func inboxFunding(
+        subscription: Subscription,
+        payment: InboxScheduledPayment,
+        subscriptions: [Subscription],
+        institutions: [Institution],
+        cards: [FinancialCard],
+        plaidItems: [PlaidItemSummary],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> InboxSubscriptionFunding {
+        let days = payment.daysUntil(from: now, calendar: calendar)
+        let savedAmount = subscription.isFree ? 0 : subscription.cost
+        let amount = savedAmount.isFinite && savedAmount >= 0 ? savedAmount : nil
+        let active = ExecutiveBriefingSnapshot.isActive(subscription.status)
+        let sameDay = [subscription.renewalBeforeLocalNormalization, subscription.nextRenewalAt]
+            .compactMap { $0 }
+            .contains { payment.matchesServerDay($0, timeZone: calendar.timeZone) }
+        let matchesAlertSchedule = days >= 0 && active && sameDay
+        let scheduleReason: String?
+        if days < 0 {
+            scheduleReason = "This alert’s scheduled date has passed."
+        } else if !active {
+            scheduleReason = "This subscription is currently inactive."
+        } else {
+            scheduleReason = nil
+        }
+
+        var target = subscription
+        target.nextRenewalAt = payment.date
+        let chargeID = "service:\(target.id)"
+        let openCharge = UpcomingCoverageCharge(
+            id: chargeID, name: target.name, dueAt: payment.date, amount: amount ?? 0,
+            currency: ExecutiveBriefingSnapshot.currency(target.currency), isSupplemental: false
+        )
+        let paymentLabel = target.paymentMethod?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var plaidID = target.plaidAccountId.flatMap { $0.isEmpty ? nil : $0 }
+
+        if target.paymentMethodId == nil, plaidID == nil, let paymentLabel, !paymentLabel.isEmpty {
+            let cardMatches = cards.filter { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(paymentLabel) == .orderedSame }.count
+            let accountMatches = institutions.flatMap(\.accounts).filter {
+                ($0.name.isEmpty ? $0.type : $0.name)
+                    .trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(paymentLabel) == .orderedSame
+            }.count
+            if cardMatches + accountMatches > 1 {
+                return .init(amount: amount, matchesAlertSchedule: matchesAlertSchedule, reason: "More than one account matches the saved payment name. Choose the payment account in the subscription.")
+            }
+        }
+
+        if let savedID = target.paymentMethodId, let linkedID = plaidID {
+            let saved = resolve(openCharge, paymentMethod: paymentLabel, paymentMethodID: savedID, plaidAccountID: nil,
+                                institutions: institutions, cards: cards, plaidItems: plaidItems, now: now, calendar: calendar)
+            let linked = resolve(openCharge, paymentMethod: nil, paymentMethodID: nil, plaidAccountID: linkedID,
+                                  institutions: institutions, cards: cards, plaidItems: plaidItems, now: now, calendar: calendar)
+            if saved.key != linked.key {
+                // An explicit picker selection can retain an older Plaid
+                // account ID. Use it only when its displayed name confirms it.
+                let savedName = (saved.paymentRoute ?? saved.sourceName).components(separatedBy: " •").first
+                guard saved.fundingRoute != nil,
+                      let paymentLabel, savedName?.caseInsensitiveCompare(paymentLabel) == .orderedSame else {
+                    return .init(amount: amount, matchesAlertSchedule: matchesAlertSchedule,
+                                 reason: "The saved payment sources disagree. Review the payment account in the subscription.")
+                }
+                target.plaidAccountId = nil
+                plaidID = nil
+            }
+        }
+
+        let selected = resolve(openCharge, paymentMethod: paymentLabel, paymentMethodID: target.paymentMethodId,
+                               plaidAccountID: plaidID, institutions: institutions, cards: cards, plaidItems: plaidItems,
+                               now: now, calendar: calendar)
+        let balanceReason: String? = selected.unknownReason ?? (
+            selected.balanceSyncedAt == nil || selected.availableAmount?.isFinite != true
+                || ["Current balance", "Recorded balance"].contains(selected.availableLabel)
+            ? "A synced available balance is unavailable for this payment account." : nil
+        )
+
+        // Always provide the current payment source and independent balance facts.
+        // A mismatched alert date only prevents a coverage estimate for that alert.
+        let savedSource = UpcomingCoverageGroup(
+            id: selected.key, sourceName: selected.sourceName, sourceDetail: selected.sourceDetail,
+            currency: openCharge.currency, charges: [], availableAmount: selected.availableAmount,
+            availableLabel: selected.availableLabel, status: .unknown, reason: balanceReason,
+            paymentRoutes: [], fundingRoute: selected.fundingRoute, balanceSyncedAt: selected.balanceSyncedAt
+        )
+        let reason = scheduleReason ?? (amount == nil ? "The saved charge amount is unavailable." : balanceReason)
+        if let reason {
+            return .init(amount: amount, group: savedSource, paymentRoute: selected.paymentRoute,
+                         matchesAlertSchedule: matchesAlertSchedule, hasReliableBalance: balanceReason == nil, reason: reason)
+        }
+
+        let projection = project(
+            subscriptions: subscriptions.filter { $0.id != target.id } + [target],
+            institutions: institutions, cards: cards, plaidItems: plaidItems,
+            now: now, days: days, calendar: calendar
+        )
+        let group = projection.groups.first { $0.charges.contains { $0.id == chargeID } }
+        return .init(amount: amount, group: group ?? savedSource, paymentRoute: selected.paymentRoute,
+                     matchesAlertSchedule: matchesAlertSchedule, hasReliableBalance: true,
+                     reason: group == nil ? "Coverage is unavailable for this schedule." : nil)
     }
 
     private static func resolve(
@@ -460,7 +591,8 @@ enum UpcomingCoverageEngine {
                 key: "card:\(card.id):\(charge.currency)", sourceName: cardName,
                 sourceDetail: card.institutionName ?? card.type, availableAmount: available,
                 availableLabel: isCredit ? "Available credit" : "Available funds",
-                unknownReason: reason, paymentRoute: nil, charge: charge
+                unknownReason: reason, paymentRoute: nil, charge: charge,
+                fundingRoute: .resource(.card, card.id)
             )
         }
 
@@ -530,7 +662,9 @@ enum UpcomingCoverageEngine {
             key: "account:\(source.institution.id):\(account.id):\(charge.currency)",
             sourceName: accountName, sourceDetail: source.institution.name,
             availableAmount: available, availableLabel: availableLabel,
-            unknownReason: reason, paymentRoute: paymentRoute, charge: charge
+            unknownReason: reason, paymentRoute: paymentRoute, charge: charge,
+            fundingRoute: .institution(source.institution.id),
+            balanceSyncedAt: item?.lastSyncedAt ?? source.institution.lastSyncedAt
         )
     }
 
