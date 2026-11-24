@@ -54,7 +54,8 @@ struct OwnerHealthBriefingDashboard: View {
                 onShowReminders: { showingReminders = true },
                 onExploreConnections: onExploreConnections,
                 onOpenResource: onOpenHealthResource,
-                onOpenUrgent: openUrgent
+                onOpenUrgent: openUrgent,
+                isFetchingRecords: appState.isLoading && !snapshot.isLoaded
             )
         }
         .onAppear { keepScopeAvailable() }
@@ -195,6 +196,8 @@ private struct ExecutiveBriefingReceipt: View {
         financials.reduce(0) { $0 + $1.insight.records.count }
     }
 
+    var isFetchingRecords = false
+
     private var accountCount: Int {
         snapshot.institutions.reduce(0) { $0 + $1.accounts.count } + snapshot.cards.count + snapshot.loans.count
     }
@@ -208,6 +211,10 @@ private struct ExecutiveBriefingReceipt: View {
             receiptHeader
             dashedDivider
             selectors
+            if isFetchingRecords {
+                ReportLoadingArtwork()
+                    .frame(maxWidth: .infinity)
+            }
             Text(snapshot.coverage)
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(BriefingReceiptTheme.fadedInk)
