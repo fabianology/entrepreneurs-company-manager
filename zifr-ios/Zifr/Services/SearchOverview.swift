@@ -341,6 +341,23 @@ struct SearchTransactionYearGroup: Identifiable {
 }
 
 extension UniversalSearchIndex {
+    /// Use the same company-scoped attribution as search, without a text query that could match another service.
+    func latestPostedInboxCharge(subscriptionID: UUID, before cutoff: Date) -> SearchRecord? {
+        guard let root = records.first(where: { $0.kind == .subscription && $0.modelID == subscriptionID && $0.parentServiceID == nil }) else {
+            return nil
+        }
+        let childIDs = records.filter { $0.parentServiceID == root.id }.map(\.id)
+        let childLinks = childIDs.reduce(into: Set<String>()) { $0.formUnion(links[$1] ?? []) }
+        let direct = records.filter { (links[root.id] ?? []).contains($0.id) && !childLinks.contains($0.id) }
+        let matched = serviceMerchantHistory()
+        let history = childIDs.isEmpty ? matched.accounts[root.id] : matched.services[root.id]
+        return (direct + (history ?? [])).filter { record in
+            record.kind == .transaction && record.companyID == root.companyID
+                && !record.pending && record.flow == "expense" && (record.amount ?? 0) > 0
+                && record.date.map { $0 < cutoff } == true
+        }.max { ($0.date ?? .distantPast, $0.id) < ($1.date ?? .distantPast, $1.id) }
+    }
+
     /// Route service-history phrases through the same conservative attribution as overview history.
     func serviceHistorySelection(_ query: String, filters: SearchFilters, now: Date, calendar: Calendar) -> (ids: Set<String>, query: String, name: String)? {
         guard filters.kind == nil || filters.kind == .transaction else { return nil }

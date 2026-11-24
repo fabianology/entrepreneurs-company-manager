@@ -1736,6 +1736,25 @@ class DataRepository {
             .execute()
     }
 
+    func deleteNotification(_ notificationId: UUID) async throws {
+        try await client.from("app_notifications")
+            .delete()
+            .eq("id", value: notificationId)
+            .execute()
+    }
+
+    func deleteExpiredPaymentAlerts(_ ids: [UUID], for userID: UUID) async throws {
+        guard !ids.isEmpty, try await client.auth.session.user.id == userID else { throw CancellationError() }
+        try Task.checkCancellation()
+        try await client.from("app_notifications")
+            .delete()
+            .eq("user_id", value: userID)
+            .eq("notification_type", value: "portfolio_alert")
+            .in("resource_type", values: ["subscription", "loan"])
+            .in("id", values: ids)
+            .execute()
+    }
+
     func markAllNotificationsRead() async throws {
         guard let userId = try? await client.auth.session.user.id else { return }
         try await client.from("app_notifications")
