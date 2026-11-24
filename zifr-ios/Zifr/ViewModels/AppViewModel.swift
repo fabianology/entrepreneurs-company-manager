@@ -76,13 +76,19 @@ final class AppViewModel {
         guard company.userId == appState.portfolioUserID else { return }
         guard canEdit(companyId: company.id, resourceType: "company", resourceId: company.id, appState: appState) else { return }
         guard let idx = appState.companies.firstIndex(where: { $0.id == company.id }) else { return }
-        let original = appState.companies[idx]
-        var mutableCompany = company
-        mutableCompany.lastViewed = Date()
-        appState.companies[idx] = mutableCompany
+        let previous = appState.companies[idx].lastViewed
+        let viewed = Date()
+        appState.companies[idx].lastViewed = viewed
         Task {
-            do { try await DataRepository.shared.updateCompany(mutableCompany) }
-            catch { await MainActor.run { if let currentIdx = appState.companies.firstIndex(where: { $0.id == company.id }) { appState.companies[currentIdx] = original } } }
+            do {
+                try await DataRepository.shared.markCompanyViewed(company.id, at: viewed)
+            } catch {
+                await MainActor.run {
+                    guard let index = appState.companies.firstIndex(where: { $0.id == company.id }),
+                          appState.companies[index].lastViewed == viewed else { return }
+                    appState.companies[index].lastViewed = previous
+                }
+            }
         }
     }
 

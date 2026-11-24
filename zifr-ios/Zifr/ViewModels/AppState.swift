@@ -49,6 +49,42 @@ final class AppState {
     var entitlementSnapshot: AccessSnapshot = .free
     var resourceConnections: [ResourceConnection] = [] { didSet { searchRevision &+= 1 } }
     var obligations: [PortfolioObligation] = [] { didSet { searchRevision &+= 1 } }
+    var hasLoadedCompanies = false
+    @ObservationIgnored var companyLogoTask: Task<Void, Never>?
+
+    func publishCompanyCards(_ cards: [Company]) {
+        let previous = Dictionary(companies.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        companies = cards.map { card in
+            guard card.logoData == nil, let saved = previous[card.id],
+                  saved.userId == card.userId, saved.lastModified == card.lastModified else { return card }
+            var result = card
+            result.logoData = saved.logoData
+            return result
+        }
+    }
+
+    func applyCompanyLogos(_ rows: [Company]) {
+        let logos = Dictionary(rows.compactMap { row in
+            row.logoData.map { (row.id, (row.userId, row.lastModified, $0)) }
+        }, uniquingKeysWith: { first, _ in first })
+        for index in companies.indices {
+            let card = companies[index]
+            guard card.logoData == nil, let (owner, modified, data) = logos[card.id],
+                  card.userId == owner, card.lastModified == modified else { continue }
+            companies[index].logoData = data
+        }
+    }
+
+    var readyCardSections = Set<CompanyCardSection>()
+    var savedCardCounts: [UUID: CompanyCardCounts] = [:]
+
+    func cardCount(_ section: CompanyCardSection, for company: Company, live: Int) -> Int? {
+        if readyCardSections.contains(section) || live > 0 { return live }
+        guard company.userId == portfolioUserID else { return nil }
+        return savedCardCounts[company.id]?[section]
+    }
+
+    var hasReceivedCompanyList = false
     var hasLoadedPortfolio: Bool = false { didSet { searchRevision &+= 1 } }
     
     var isLoading: Bool = false
@@ -188,16 +224,45 @@ final class AppState {
     }
 
     func clearSearchSession() {
+        companyLogoTask?.cancel()
+        companyLogoTask = nil
+        readyCardSections.removeAll()
+        savedCardCounts.removeAll()
         portfolioLoadID = UUID()
         portfolioLoadingUserID = nil
         isLoading = false
         portfolioUserID = nil
+        hasLoadedCompanies = false
+        hasReceivedCompanyList = false
         hasLoadedPortfolio = false
         searchDocumentPages = []
         searchDocumentStatus = "Document contents have not been indexed"
         cachedSearch = nil
         pendingSearch?.task.cancel()
         pendingSearch = nil
+    }
+
+    func clearPortfolio() {
+        clearSearchSession()
+        companies = []
+        subscriptions = []
+        institutions = []
+        cards = []
+        loans = []
+        documents = []
+        transactions = []
+        transactionOverrides = []
+        transactionCategoryRules = []
+        resourceShares = []
+        activityLogs = []
+        notifications = []
+        userPreferences = nil
+        alertRules = []
+        plaidItems = []
+        resourceConnections = []
+        obligations = []
+        portfolioLoadIssue = nil
+        clearBusinessExpenses()
     }
 
     // Local Overrides: resourceId -> companyId

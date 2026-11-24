@@ -56,6 +56,7 @@
 		513378D112E827E79B6F1F5A /* ActivityLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5A707FAC0A5EAF6CD9EDA1 /* ActivityLogsView.swift */; };
 		53CC3CCB9973D82B1584B025 /* PlaidService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCF8AFCC4B90998C49582363 /* PlaidService.swift */; };
 		571D5A1D2727F27EEE2FAC4B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1AB753353782471740FACBA9 /* Foundation.framework */; };
+		A1026CAC0000000000000001 /* PortfolioCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1026CAC0000000000000002 /* PortfolioCache.swift */; };
 		5921C64C073EA205947D4777 /* DataRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E5CF10B11366A7F77DE656 /* DataRepository.swift */; };
 		5970666C186E2CA75860907F /* CompanyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */; };
 		5EBA22404FBAACD632D6D989 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0931BDA073A93591B071DF97 /* SupabaseService.swift */; };
@@ -275,6 +276,7 @@
 		C2E5474636781197EFD277E8 /* SubscriptionReceiptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionReceiptView.swift; sourceTree = "<group>"; };
 		C8AE50B1DF4829E44C696A33 /* EditLoanSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditLoanSheet.swift; sourceTree = "<group>"; };
 		C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyDocument.swift; sourceTree = "<group>"; };
+		A1026CAC0000000000000002 /* PortfolioCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioCache.swift; sourceTree = "<group>"; };
 		C9E5CF10B11366A7F77DE656 /* DataRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataRepository.swift; sourceTree = "<group>"; };
 		CB6907BC498BB2697B95920A /* ResetPasswordSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ResetPasswordSheet.swift; sourceTree = "<group>"; };
 		CC4FA694E089A3DBE0154364 /* ZifrSheetCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ZifrSheetCard.swift; sourceTree = "<group>"; };
@@ -491,6 +493,7 @@
 		9772A80219031D52B9EBF3E8 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A1026CAC0000000000000002 /* PortfolioCache.swift */,
 				C9E5CF10B11366A7F77DE656 /* DataRepository.swift */,
 				ED204010D74AB9325095BD9A /* DocumentScannerService.swift */,
 				D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */,
@@ -807,6 +810,7 @@
 				5970666C186E2CA75860907F /* CompanyDocument.swift in Sources */,
 				CD0308E14A8A6FD71D3348AC /* CompanyMetaSheet.swift in Sources */,
 				BD36B621F86387C0246A6622 /* DashboardView.swift in Sources */,
+				A1026CAC0000000000000001 /* PortfolioCache.swift in Sources */,
 				5921C64C073EA205947D4777 /* DataRepository.swift in Sources */,
 				67636BB971C2E199B6398175 /* Date+Formatting.swift in Sources */,
 				F583B5C82FBD983E6CA21FB5 /* DocumentListView.swift in Sources */,

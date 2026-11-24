@@ -74,12 +74,30 @@ struct Company: Identifiable, Codable, Hashable {
         lastModified = try container.decode(Date.self, forKey: .lastModified)
         lastViewed = try container.decode(Date.self, forKey: .lastViewed)
         
-        // SAFE DECODE: gracefully fail if logo_data is not valid Base64
-        if let base64String = try? container.decodeIfPresent(String.self, forKey: .logoData) {
-            logoData = Data(base64Encoded: base64String)
-        } else {
-            logoData = try? container.decodeIfPresent(Data.self, forKey: .logoData)
+        logoData = (try? container.decode(String.self, forKey: .logoData)).flatMap(Self.decodeLogo)
+    }
+
+    // Startup cache JSON contains base64. PostgREST bytea wraps the uploaded
+    // base64 text in hex, and older writers can store the image bytes directly.
+    private static func decodeLogo(_ value: String) -> Data? {
+        guard value.hasPrefix("\\x") else { return Data(base64Encoded: value) }
+        let hex = value.utf8.dropFirst(2)
+        guard !hex.isEmpty, hex.count.isMultiple(of: 2) else { return nil }
+        func nibble(_ byte: UInt8) -> UInt8? {
+            switch byte {
+            case 48...57: return byte - 48
+            case 65...70: return byte - 55
+            case 97...102: return byte - 87
+            default: return nil
+            }
         }
+        var bytes = Data(capacity: hex.count / 2)
+        var input = hex.makeIterator()
+        while let high = input.next(), let low = input.next() {
+            guard let upper = nibble(high), let lower = nibble(low) else { return nil }
+            bytes.append(upper << 4 | lower)
+        }
+        return Data(base64Encoded: bytes) ?? bytes
     }
 
     func encode(to encoder: Encoder) throws {
