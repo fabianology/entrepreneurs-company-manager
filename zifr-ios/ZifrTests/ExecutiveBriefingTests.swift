@@ -752,6 +752,49 @@ final class ExecutiveBriefingTests: XCTestCase {
             .contains { $0.title == "Scheduled payments may exceed funds" })
     }
 
+    @MainActor
+    func testCashFlowPullRefreshStartsOneSyncForShortContent() async throws {
+        var syncs = 0
+        let host = UIHostingController(rootView: ScrollView {
+            LazyVStack { Text("One transaction") }
+                .background { CashFlowPullToRefresh { syncs += 1 } }
+        })
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = host
+        window.isHidden = false
+        defer { window.isHidden = true }
+
+        func findScroll(in view: UIView) -> UIScrollView? {
+            if let scroll = view as? UIScrollView, scroll.refreshControl != nil { return scroll }
+            for child in view.subviews {
+                if let scroll = findScroll(in: child) { return scroll }
+            }
+            return nil
+        }
+
+        for _ in 0..<50 {
+            window.layoutIfNeeded()
+            if findScroll(in: window) != nil { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        func hierarchy(_ view: UIView) -> String {
+            String(describing: type(of: view)) + "(" + view.subviews.map(hierarchy).joined(separator: ", ") + ")"
+        }
+        let scroll = try XCTUnwrap(findScroll(in: window), hierarchy(window))
+        let control = try XCTUnwrap(scroll.refreshControl)
+        XCTAssertTrue(scroll.alwaysBounceVertical)
+        XCTAssertEqual(control.tintColor, .clear)
+        control.beginRefreshing()
+        control.sendActions(for: .valueChanged)
+        control.sendActions(for: .valueChanged)
+        for _ in 0..<50 where control.isRefreshing {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(syncs, 1)
+        XCTAssertFalse(control.isRefreshing)
+    }
+
     private func transaction(company: UUID, amount: Double) -> Zifr.Transaction {
         var value = Zifr.Transaction()
         value.userId = owner; value.companyId = company; value.amount = amount
