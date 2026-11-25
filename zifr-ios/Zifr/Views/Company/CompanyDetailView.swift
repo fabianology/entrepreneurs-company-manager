@@ -375,6 +375,9 @@ struct CompanyDetailView: View {
     @State private var tutFrameSubscriptions: CGRect = .zero
     @State private var tutFrameDocuments: CGRect = .zero
     @State private var tutFrameTabBar: CGRect = .zero
+    @State private var customVaultCenterY: CGFloat?
+    @State private var footerCenterY: CGFloat?
+    @State private var nativeFooterOffset: CGFloat?
     @State private var tutFrameFinancialActionBar: CGRect = .zero
 
     private var currentTabIndex: Int {
@@ -403,6 +406,7 @@ struct CompanyDetailView: View {
                 usesSystemItems: true,
                 showsStandalonePortraitEntitySwitcher: true,
                 stackedEntityTabSelection: duoLayout.usesStackedLayout ? $vm.activeTab : nil,
+                onStackedVaultCenterChange: { customVaultCenterY = $0 },
                 nativeReportMenu: AnyView(duoToolbarReportsMenu)
             ))
                 .overlay(alignment: .bottomTrailing) {
@@ -912,7 +916,8 @@ struct CompanyDetailView: View {
             selection: $vm.activeTab, tabs: EntityHomeTab.allCases,
             title: { Text($0.rawValue) }, icon: { $0.icon },
             horizontalInset: 3,
-            glass: .clear, selectionFill: .black.opacity(0.18), revealsTitlesOnHold: true
+            glass: .clear, selectionFill: .black.opacity(0.18), revealsTitlesOnHold: true,
+            onBottomTabCenterChange: { customVaultCenterY = $0 }
         )
         .buttonStyle(.plain)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
@@ -1131,15 +1136,85 @@ struct CompanyDetailView: View {
     }
 
     private var bottomBarSurface: some View {
-        bottomBarRow
+        alignedBottomBarRow
             .padding(.horizontal, 20)
             .padding(.bottom, usesInlineEntityPanel ? 0 : 12)
-            .offset(y: usesInlineEntityPanel ? 3 : 0)
     }
+
+    @ViewBuilder
+    private var alignedBottomBarRow: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *), isDuoDevice {
+            bottomBarRow
+                .offset(y: duoFooterOffset)
+                .background {
+                    // Measure outside the offset so reconciliation cannot feed back into itself.
+                    if hidesManagedEntityTabBar {
+                        DuoWindowVerticalMeasurement { footerCenterY = $0 }
+                    } else {
+                        DuoWindowVerticalMeasurement(measure: { marker, window in
+                            guard let vaultCenter = Self.nativeVaultCenter(in: window, window: window) else {
+                                return nil
+                            }
+                            return vaultCenter - marker.convert(marker.bounds, to: window).midY
+                        }) {
+                            nativeFooterOffset = $0
+                        }
+                    }
+                }
+        } else {
+            bottomBarRow
+        }
+        #else
+        bottomBarRow
+        #endif
+    }
+
+    private var duoFooterOffset: CGFloat {
+        let adjustment: CGFloat?
+        if hidesManagedEntityTabBar {
+            adjustment = customVaultCenterY.flatMap { vault in footerCenterY.map { vault - $0 } }
+        } else {
+            adjustment = nativeFooterOffset
+        }
+        // One rail can finish laying out before the other when rotating or resizing.
+        if let adjustment, abs(adjustment) <= 44 { return adjustment }
+        return usesInlineEntityPanel ? 3 : 0
+    }
+
+    #if compiler(>=6.4)
+    @available(iOS 27.1, *)
+    private static func nativeVaultCenter(in view: UIView, window: UIWindow) -> CGFloat? {
+        guard !view.isHidden, view.alpha > 0.01 else { return nil }
+
+        // Native tabs have no public frame API. Use the system's accessible tab
+        // controls and verify they form the three-item vertical rail.
+        let controls = view.subviews.compactMap { $0 as? UIControl }.filter {
+            $0.isAccessibilityElement && !$0.isHidden && $0.alpha > 0.01
+        }
+        if controls.count >= EntityHomeTab.allCases.count {
+            let frames = EntityHomeTab.allCases.compactMap { tab in
+                controls.first { $0.accessibilityLabel == tab.rawValue }
+                    .map { $0.convert($0.bounds, to: window) }
+            }
+            if frames.count == EntityHomeTab.allCases.count,
+               frames.allSatisfy({ !$0.isEmpty && window.bounds.intersects($0) }),
+               zip(frames, frames.dropFirst()).allSatisfy({ upper, lower in
+                   abs(upper.midX - lower.midX) <= 1 && upper.midY < lower.midY
+               }) {
+                return frames.last?.midY
+            }
+        }
+        for child in view.subviews {
+            if let center = nativeVaultCenter(in: child, window: window) { return center }
+        }
+        return nil
+    }
+    #endif
 
     private var bottomBarRow: some View {
         let geminiFirst = duoLayout.placesSplitControlsOnLeadingEdge(in: layoutDirection)
-        return HStack(alignment: .bottom, spacing: 10) {
+        return HStack(alignment: isDuoDevice ? .center : .bottom, spacing: 10) {
             if !isDuoDevice { profileControlButton }
             if isDuoDevice && geminiFirst { geminiControlButton }
 
@@ -1519,6 +1594,7 @@ struct CompanyDetailView: View {
         }
         .accessibilityLabel("Open Gemini Live")
         .accessibilityHint("Starts a voice conversation with Miloom")
+
     }
 
     @ViewBuilder

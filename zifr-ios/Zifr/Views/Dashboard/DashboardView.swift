@@ -178,7 +178,7 @@ struct DashboardView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .background {
-                                    DuoDashboardWindowCenterReader { adminCenterY = $0 }
+                                    DuoWindowVerticalMeasurement { adminCenterY = $0 }
                                         .allowsHitTesting(false)
                                 }
                             }
@@ -656,7 +656,7 @@ struct DashboardView: View {
             dashboardBottomControlsRow
                 .offset(y: nativeDashboardFooterOffset)
                 .background {
-                    DuoDashboardWindowCenterReader { footerCenterY = $0 }
+                    DuoWindowVerticalMeasurement { footerCenterY = $0 }
                 }
         } else {
             dashboardBottomControlsRow
@@ -1874,6 +1874,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     var usesSystemItems = false
     var showsStandalonePortraitEntitySwitcher = false
     var stackedEntityTabSelection: Binding<EntityHomeTab>? = nil
+    var onStackedVaultCenterChange: ((CGFloat?) -> Void)?
     var nativeReportMenu: AnyView? = nil
 
     @State private var compactStatusAreaBottom: CGFloat?
@@ -2041,9 +2042,10 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                     DuoTabBar(
                         selection: stackedEntityTabSelection, tabs: EntityHomeTab.allCases,
                         title: { Text($0.rawValue) }, icon: { $0.icon },
-                        horizontalInset: 3
+                        horizontalInset: 3,
+                        onBottomTabCenterChange: onStackedVaultCenterChange
                     )
-                        .layoutPriority(1)
+                    .layoutPriority(1)
                 } else {
                     primaryActionGroup
                     Spacer(minLength: 24)
@@ -2121,7 +2123,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                 geometry.frame(in: .global).midY
             } action: { bottomControlCenterY = $0 }
             .background {
-                DuoDashboardWindowCenterReader { bottomControlWindowCenterY = $0 }
+                DuoWindowVerticalMeasurement { bottomControlWindowCenterY = $0 }
             }
     }
 }
@@ -2139,6 +2141,7 @@ struct DuoTabBar<Tab: Hashable>: View {
     var glass: Glass = .regular
     var selectionFill = Color(hex: "#00613F")
     var revealsTitlesOnHold = false
+    var onBottomTabCenterChange: ((CGFloat?) -> Void)?
 
     @State private var heldTab: Tab?
 
@@ -2184,6 +2187,11 @@ struct DuoTabBar<Tab: Hashable>: View {
                 .accessibilityLabel(title(tab))
                 .accessibilityValue(count > 0 ? Text("\(count) unread") : Text(""))
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
+                .background {
+                    if tab == tabs.last, let onBottomTabCenterChange {
+                        DuoWindowVerticalMeasurement(onChange: onBottomTabCenterChange)
+                    }
+                }
 
                 if revealsTitlesOnHold {
                     button.buttonStyle(TabHoldStyle { isHeld in
@@ -2225,26 +2233,31 @@ struct DuoTabBar<Tab: Hashable>: View {
     }
 }
 
-/// Native toolbar items and collapsed content can have different SwiftUI global
-/// coordinate roots. Compare window coordinates before aligning them.
+/// Native controls and SwiftUI content can have different global coordinate roots.
+/// Measure within their common window after UIKit lays out its controls.
 @available(iOS 27.1, *)
-struct DuoDashboardWindowCenterReader: UIViewRepresentable {
-    let onChange: (CGFloat) -> Void
+struct DuoWindowVerticalMeasurement: UIViewRepresentable {
+    var measure: (UIView, UIWindow) -> CGFloat? = { view, window in
+        view.convert(view.bounds, to: window).midY
+    }
+    let onChange: (CGFloat?) -> Void
 
-    func makeUIView(context: Context) -> CenterView {
-        let view = CenterView()
+    func makeUIView(context: Context) -> MeasurementView {
+        let view = MeasurementView()
         view.isUserInteractionEnabled = false
         return view
     }
 
-    func updateUIView(_ view: CenterView, context: Context) {
+    func updateUIView(_ view: MeasurementView, context: Context) {
+        view.measure = measure
         view.onChange = onChange
         view.scheduleReport()
     }
 
-    final class CenterView: UIView {
-        var onChange: (CGFloat) -> Void = { _ in }
-        private var previousCenter: CGFloat?
+    final class MeasurementView: UIView {
+        var measure: ((UIView, UIWindow) -> CGFloat?)?
+        var onChange: (CGFloat?) -> Void = { _ in }
+        private var previousValue: CGFloat?
         private var reportQueued = false
 
         override func didMoveToWindow() {
@@ -2257,17 +2270,21 @@ struct DuoDashboardWindowCenterReader: UIViewRepresentable {
             scheduleReport()
         }
 
+        override func safeAreaInsetsDidChange() {
+            super.safeAreaInsetsDidChange()
+            scheduleReport()
+        }
+
         func scheduleReport() {
             guard !reportQueued else { return }
             reportQueued = true
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 reportQueued = false
-                guard window != nil else { return }
-                let center = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: nil).y
-                guard previousCenter != center else { return }
-                previousCenter = center
-                onChange(center)
+                let value = window.flatMap { self.measure?(self, $0) }
+                guard previousValue != value else { return }
+                previousValue = value
+                onChange(value)
             }
         }
     }
