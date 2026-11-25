@@ -4,11 +4,21 @@ import PhotosUI
 import PDFKit
 
 struct DocumentListView: View {
+    enum Presentation {
+        case combined
+        case scrolling
+        case categories
+        case attachments
+    }
+
     let company: Company
     let documents: [CompanyDocument]
     @Bindable var vm: AppViewModel
     var hideActionBar: Bool = false
     var canEdit: Bool = true
+    var presentation: Presentation = .combined
+    var categorySelection: Binding<String>?
+    var topContentInset: CGFloat?
     @Environment(AppState.self) private var appState
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Environment(AuthViewModel.self) private var authVM
@@ -34,7 +44,7 @@ struct DocumentListView: View {
     @State private var newDoc: CompanyDocument? = nil
     @State private var documentToDelete: CompanyDocument? = nil
     @State private var openURL: IdentifiableURL? = nil
-    @State private var selectedType: String = "All"
+    @State private var localSelectedType = "All"
     @State private var receiptQuery = ""
     @State private var receiptYear = "All years"
     @State private var receiptCategory = "All categories"
@@ -51,207 +61,77 @@ struct DocumentListView: View {
     @State private var showPremiumUpgrade = false
 
     private var contentTopInset: CGFloat {
-        hideActionBar ? 82 : 70
+        topContentInset ?? (hideActionBar ? 82 : 70)
     }
 
     private var documentRowsTopInset: CGFloat {
         contentTopInset + 214
     }
 
-    private var systemBottomSafeAreaInset: CGFloat {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow)?
-            .safeAreaInsets.bottom ?? 0
-    }
-
     private var scanButtonBottomInset: CGFloat {
-        // Clears the Home indicator, 44-point command bar, its 12-point padding,
-        // and leaves a stable 10-point gap above the search control.
-        hideActionBar ? systemBottomSafeAreaInset + 66 : 20
+        // The parent reserves its command bar with safeAreaInset. Only the
+        // designed gap belongs here, not another window's home-indicator inset.
+        hideActionBar ? 10 : 20
     }
 
     var grouped: [String: [CompanyDocument]] {
         Dictionary(grouping: documents, by: { CompanyDocument.normalizeType($0.type) })
     }
 
+    private var selectedType: String {
+        categorySelection?.wrappedValue ?? localSelectedType
+    }
+
+    private func selectType(_ type: String) {
+        if let categorySelection {
+            categorySelection.wrappedValue = type
+        } else {
+            localSelectedType = type
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
-            // Scrollable Document Rows List (Background layer scrolling behind header)
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Offset for top action bar + anchored category tabs header
-                    Spacer().frame(height: documentRowsTopInset)
-
-                    Group {
-                        if selectedType == "Receipts" {
-                            receiptList
-                        } else if documents.isEmpty {
-                            emptyState
-                        } else {
-                            if selectedType == "All" {
-                                VStack(spacing: 10) {
-                                    ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
-                                        if let docs = grouped[type], !docs.isEmpty {
-                                            ForEach(docs) { doc in
-                                                documentRow(for: doc)
-                                                    .padding(.horizontal, 20)
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Show only selected category
-                                let docs = grouped[selectedType] ?? []
-                                if docs.isEmpty {
-                                    VStack(spacing: 12) {
-                                        Image(systemName: "folder")
-                                            .font(.system(size: 32))
-                                            .foregroundStyle(Color.white.opacity(0.2))
-                                        Text("No Documents")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.white.opacity(0.4))
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 60)
-                                } else {
-                                    VStack(spacing: 10) {
-                                        ForEach(docs) { doc in
-                                            documentRow(for: doc)
-                                                .padding(.horizontal, 20)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+            switch presentation {
+            case .combined:
+                combinedContent
+            case .scrolling:
+                ScrollView {
+                    VStack(spacing: 16) {
+                        categoryControls
+                        if canEdit { scanButton }
+                        documentResults
                     }
-                    .padding(.bottom, 120)
+                    .padding(.vertical, 12)
+                    .duoSideScrollTarget(.documents)
                 }
-            }
-            .scrollIndicators(.hidden)
-            .mask(alignment: .top) {
-                VStack(spacing: 0) {
-                    if selectedType == "Receipts" { Color.clear.frame(height: documentRowsTopInset) }
-                    Rectangle()
+            case .categories:
+                ScrollView {
+                    categoryControls.duoSideScrollTarget(.documents)
                 }
-            }
-
-            // Fixed Header with Tabs (anchored, does not move when scrolling)
-            VStack(spacing: 0) {
-                Spacer().frame(height: contentTopInset)
-
-                VStack(spacing: 12) {
-                    // All Documents Box (Full Width)
-                    let isAllSelected = selectedType == "All"
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        selectedType = "All"
-                    } label: {
-                        HStack {
-                            Text("ALL DOCUMENTS")
-                                .font(.system(size: 12, weight: .bold))
-                                .tracking(1)
-                                .foregroundStyle(isAllSelected ? Color(hex: "#918457") : .white)
-                            Spacer()
-                            if documents.count > 0 {
-                                Text("\(documents.count)")
-                                    .font(.system(size: 10, weight: .black))
-                                    .foregroundStyle(isAllSelected ? Color(hex: "#918457") : .white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(isAllSelected ? Color(hex: "#918457").opacity(0.15) : Color.white.opacity(0.15))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(height: 40)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(isAllSelected ? Color.black.opacity(0.40) : Color.black.opacity(0.70))
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: "#918457"),
-                                            Color(hex: "#918457").opacity(0.3)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-                    }
-
-                    // Category Dashboard Grid
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
-                        ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
-                            let count = grouped[type]?.count ?? 0
-                            CategoryGridCard(
-                                title: type,
-                                icon: CompanyDocument.icon(for: type),
-                                count: count,
-                                isSelected: selectedType == type
-                            ) {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                if selectedType == type {
-                                    selectedType = "All"
-                                } else {
-                                    selectedType = type
-                                }
-                            }
-                        }
+                .padding(.top, contentTopInset)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if canEdit {
+                        scanButton.padding(.bottom, scanButtonBottomInset)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 10)
-            }
-            
-            if !hideActionBar && canEdit {
-                documentActionBar
-                    .zIndex(100)
-            }
-        }.overlay(alignment: .bottom) {
-            if canEdit {
-                Button {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                guard accessController.request(
-                    .documentUpload,
-                    source: "document_scanner",
-                    appState: appState,
-                    userId: authVM.currentUser?.id
-                ) else {
-                    showPremiumUpgrade = true
-                    return
+            case .attachments:
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Attached documents")
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                    ScrollView {
+                        documentResults.padding(.bottom, 20)
+                    }
                 }
-                if aiConsentStatus == "unset" {
-                    showAIConsentAlert = true
-                } else {
-                    isScanning = true
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "viewfinder")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color(hex: "#A2A2A2"))
-                    Text("SCAN")
-                        .font(.system(size: 12, weight: .heavy))
-                        .tracking(1)
-                        .foregroundStyle(Color.white)
-                }
-                .padding(.horizontal, 20)
-                .frame(height: 36)
-                .background(Color(hex: "#223E5A"))
-                .clipShape(Capsule())
-                .shadow(color: Color.zifrBlue.opacity(0.5), radius: 12, x: 0, y: 0)
+                .accessibilityIdentifier("duo.vaultAttachments")
             }
-                .padding(.bottom, scanButtonBottomInset)
+        }
+        .overlay(alignment: .bottom) {
+            if presentation == .combined && canEdit {
+                scanButton.padding(.bottom, scanButtonBottomInset)
             }
         }
         .overlay {
@@ -271,7 +151,13 @@ struct DocumentListView: View {
                 }
             }
         }
-        .task { await TaxOpportunitiesViewModel().refresh(appState) }
+        .task {
+            #if !(DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW)
+            if presentation != .attachments {
+                await TaxOpportunitiesViewModel().refresh(appState)
+            }
+            #endif
+        }
         .sheet(item: $receiptReview) { review in
             BusinessExpenseReviewSheet(initialReview: review)
         }
@@ -344,6 +230,179 @@ struct DocumentListView: View {
         }
     }
     
+    private var combinedContent: some View {
+        ZStack(alignment: .top) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    Spacer().frame(height: documentRowsTopInset)
+                    documentResults.padding(.bottom, 120)
+                }
+                .duoSideScrollTarget(.documents)
+            }
+            .scrollIndicators(.hidden)
+            .mask(alignment: .top) {
+                VStack(spacing: 0) {
+                    if selectedType == "Receipts" { Color.clear.frame(height: documentRowsTopInset) }
+                    Rectangle()
+                }
+            }
+
+            VStack(spacing: 0) {
+                Spacer().frame(height: contentTopInset)
+                categoryControls
+            }
+
+            if !hideActionBar && canEdit {
+                documentActionBar.zIndex(100)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var documentResults: some View {
+        if selectedType == "Receipts" {
+            receiptList
+        } else if documents.isEmpty {
+            emptyState
+        } else if selectedType == "All" {
+            VStack(spacing: 10) {
+                ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
+                    if let docs = grouped[type], !docs.isEmpty {
+                        ForEach(docs) { doc in
+                            documentRow(for: doc)
+                                .padding(.horizontal, 20)
+                        }
+                    }
+                }
+            }
+        } else if let docs = grouped[selectedType], !docs.isEmpty {
+            VStack(spacing: 10) {
+                ForEach(docs) { doc in
+                    documentRow(for: doc)
+                        .padding(.horizontal, 20)
+                }
+            }
+        } else {
+            VStack(spacing: 12) {
+                Image(systemName: "folder")
+                    .font(.system(size: 32))
+                    .foregroundStyle(Color.white.opacity(0.2))
+                Text("No Documents")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.4))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 60)
+        }
+    }
+
+    private var categoryControls: some View {
+        VStack(spacing: 12) {
+            // All Documents Box (Full Width)
+            let isAllSelected = selectedType == "All"
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                selectType("All")
+            } label: {
+                HStack {
+                    Text("ALL DOCUMENTS")
+                        .font(.system(size: 12, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(isAllSelected ? Color(hex: "#918457") : .white)
+                    Spacer()
+                    if documents.count > 0 {
+                        Text("\(documents.count)")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundStyle(isAllSelected ? Color(hex: "#918457") : .white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(isAllSelected ? Color(hex: "#918457").opacity(0.15) : Color.white.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .frame(height: presentation == .categories ? 44 : 40)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isAllSelected ? Color.black.opacity(0.40) : Color.black.opacity(0.70))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+            }
+            .accessibilityAddTraits(presentation == .categories && isAllSelected ? .isSelected : [])
+
+            // Category Dashboard Grid
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+                ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
+                    let count = grouped[type]?.count ?? 0
+                    let isSelected = selectedType == type
+                    CategoryGridCard(
+                        title: type,
+                        icon: CompanyDocument.icon(for: type),
+                        count: count,
+                        isSelected: isSelected
+                    ) {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        selectType(isSelected ? "All" : type)
+                    }
+                    .accessibilityAddTraits(presentation == .categories && isSelected ? .isSelected : [])
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 10)
+    }
+
+    private var scanButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            guard accessController.request(
+                .documentUpload,
+                source: "document_scanner",
+                appState: appState,
+                userId: authVM.currentUser?.id
+            ) else {
+                showPremiumUpgrade = true
+                return
+            }
+            if aiConsentStatus == "unset" {
+                showAIConsentAlert = true
+            } else {
+                isScanning = true
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "viewfinder")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                Text("SCAN")
+                    .font(.system(size: 12, weight: .heavy))
+                    .tracking(1)
+                    .foregroundStyle(Color.white)
+            }
+            .padding(.horizontal, 20)
+            .frame(height: presentation == .categories ? 44 : 36)
+            .background(Color(hex: "#223E5A"))
+            .clipShape(Capsule())
+            .shadow(color: Color.zifrBlue.opacity(0.5), radius: 12, x: 0, y: 0)
+        }
+    }
+
     private var receiptItems: [ReceiptVaultItem] {
         ReceiptVaultItem.items(documents: documents, reviews: appState.businessExpenseReviews)
     }
@@ -1614,16 +1673,41 @@ struct DocumentViewerView: View {
 
 struct PDFKitView: UIViewRepresentable {
     let url: URL
+    @Environment(\.verticalScrollIndicatorVisibility) private var verticalIndicatorVisibility
     
-    func makeUIView(context: Context) -> PDFView {
-        let pdfView = PDFView()
+    func makeUIView(context: Context) -> MiloomPDFView {
+        let pdfView = MiloomPDFView()
         pdfView.document = PDFDocument(url: url)
         pdfView.autoScales = true
         pdfView.backgroundColor = UIColor(red: 0.09, green: 0.09, blue: 0.09, alpha: 1.0)
         return pdfView
     }
     
-    func updateUIView(_ uiView: PDFView, context: Context) {}
+    func updateUIView(_ uiView: MiloomPDFView, context: Context) {
+        uiView.hidesVerticalScrollIndicator = verticalIndicatorVisibility == .never
+    }
+}
+
+// PDFKit manages its own UIKit scroll view outside SwiftUI's scroll settings.
+final class MiloomPDFView: PDFView {
+    var hidesVerticalScrollIndicator = false {
+        didSet {
+            if hidesVerticalScrollIndicator != oldValue { setNeedsLayout() }
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard hidesVerticalScrollIndicator else { return }
+
+        var ancestor = documentView?.superview
+        while let view = ancestor, view !== self {
+            if let scrollView = view as? UIScrollView {
+                scrollView.showsVerticalScrollIndicator = false
+            }
+            ancestor = view.superview
+        }
+    }
 }
 
 // MARK: - Safari View

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OwnerHealthBriefingDashboard: View {
     @Environment(AppState.self) private var appState
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     @Bindable var vm: AppViewModel
     @State private var selectedScope: OwnerBriefingScope = .personal
     @State private var financialMonth: CashFlowMonth = .current
@@ -54,7 +55,9 @@ struct OwnerHealthBriefingDashboard: View {
                 onShowReminders: { showingReminders = true },
                 onExploreConnections: onExploreConnections,
                 onOpenResource: onOpenHealthResource,
-                onOpenUrgent: openUrgent
+                onOpenUrgent: openUrgent,
+                showsLoadingArtwork: (UIDevice.current.userInterfaceIdiom != .phone || duoLayout.isDuoDevice)
+                    && appState.isLoading && !snapshot.isLoaded
             )
         }
         .onAppear { keepScopeAvailable() }
@@ -187,13 +190,17 @@ private struct ExecutiveBriefingReceipt: View {
     @State private var billsExpanded = false
     @State private var subscriptionsExpanded = false
 
+    var preparedFinancials: [ExecutiveCurrencySummary]? = nil
+
     private var financials: [ExecutiveCurrencySummary] {
-        ExecutiveBriefingSnapshot.financials(records: snapshot.records, now: now, month: financialMonth)
+        preparedFinancials ?? ExecutiveBriefingSnapshot.financials(records: snapshot.records, now: now, month: financialMonth)
     }
 
     private var transactionCount: Int {
         financials.reduce(0) { $0 + $1.insight.records.count }
     }
+
+    var showsLoadingArtwork = false
 
     private var accountCount: Int {
         snapshot.institutions.reduce(0) { $0 + $1.accounts.count } + snapshot.cards.count + snapshot.loans.count
@@ -208,6 +215,10 @@ private struct ExecutiveBriefingReceipt: View {
             receiptHeader
             dashedDivider
             selectors
+            if showsLoadingArtwork {
+                ReportLoadingArtwork()
+                    .frame(maxWidth: .infinity)
+            }
             Text(snapshot.coverage)
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(BriefingReceiptTheme.fadedInk)
@@ -1569,3 +1580,333 @@ enum BriefingFormat {
         values.isEmpty ? empty : values.keys.sorted().map { compactMoney(values[$0] ?? 0, $0) }.joined(separator: "\n")
     }
 }
+
+
+// MARK: - Automatically displayed Duo receipt
+
+/// Only mounted by the hinge-aware Duo dashboard. The legacy sheet above keeps
+/// its existing presentation, scope, loading and rendering behavior.
+struct DuoInlineBriefingView: View {
+    @Environment(AppState.self) private var appState
+    @Environment(\.scenePhase) private var scenePhase
+    @Bindable var vm: AppViewModel
+    @Bindable var store: DuoBriefingStore
+    let isActive: Bool
+    let onOpenResource: (PortfolioObligation) -> Void
+    let onOpenHealthResource: (ResourceKind, UUID) -> Void
+    let onExploreConnections: () -> Void
+    @State private var activeHUD: BriefingReceiptHUD?
+    @State private var showingReminders = false
+    @State private var selectedRecurringReview: RecurringSuggestionReview?
+    @State private var queuedRecurringReview: RecurringSuggestionReview?
+    @State private var ignoredDataIssueIDs = OwnerHealthDataIssueStore.load()
+    @State private var pendingNavigation: (() -> Void)?
+
+    private struct RefreshID: Hashable {
+        let key: DuoBriefingKey
+        let active: Bool
+        let retry: Int
+    }
+
+    private var scopes: [OwnerBriefingScope] {
+        let available = ExecutiveBriefingLayout.visibleScopes(companies: appState.companies)
+        return [.personal, .business].filter(available.contains)
+    }
+
+    private func key(at date: Date) -> DuoBriefingKey {
+        DuoBriefingKey(
+            userID: appState.portfolioUserID, revision: appState.searchRevision,
+            privacyRevision: appState.resourceShares.hashValue,
+            scope: store.scope, month: store.month,
+            minute: Int(date.timeIntervalSince1970 / 60),
+            ignoredDataIssueIDs: ignoredDataIssueIDs
+        )
+    }
+
+    private var visibleReport: DuoBriefingReport? {
+        guard let report = store.report, key(at: report.generatedAt).canKeepVisible(report.key) else { return nil }
+        return report
+    }
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let requested = key(at: context.date)
+            let active = isActive && scenePhase == .active && appState.hasLoadedPortfolio
+            ScrollView(.vertical) {
+                VStack(spacing: 8) {
+                    if let report = visibleReport {
+                        ExecutiveBriefingReceipt(
+                            snapshot: report.snapshot, health: report.health, notices: report.notices,
+                            selectedScope: $store.scope, financialMonth: $store.month,
+                            visibleScopes: scopes, now: report.generatedAt,
+                            onShowTransactions: { activeHUD = .transactions },
+                            onShowCategories: { activeHUD = .categories },
+                            onShowAccounts: { activeHUD = .accounts },
+                            onShowReview: { activeHUD = .review },
+                            onShowReminders: { showingReminders = true },
+                            onExploreConnections: onExploreConnections,
+                            onOpenResource: onOpenHealthResource,
+                            onOpenUrgent: openUrgent,
+                            preparedFinancials: report.financials
+                        )
+                        .modifier(DuoReceiptReveal(store: store))
+                        if store.isRefreshing {
+                            Text("Updating saved records…")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.65))
+                        }
+                    } else {
+                        DuoBriefingPlaceholder(
+                            message: store.preparationError ?? "Preparing your brief…",
+                            isLoading: store.preparationError == nil,
+                            animate: isActive,
+                            actionTitle: "Try Again",
+                            action: { store.retryRevision += 1 }
+                        )
+                    }
+                }
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
+                .padding(.bottom, 20)
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityIdentifier("duo.executiveBriefing")
+            .task(id: RefreshID(key: requested, active: active, retry: store.retryRevision)) {
+                guard active else { store.suspend(); return }
+                do {
+                    // Coalesce a batch of existing portfolio-loader publications.
+                    // Cached content is not hidden or held back for this delay.
+                    if store.report?.key != requested {
+                        try await Task.sleep(for: .milliseconds(100))
+                    }
+                    try Task.checkCancellation()
+                    guard key(at: context.date) == requested else { return }
+                    let input = SearchIndexSnapshot(appState)
+                    await store.prepare(input: input, key: requested, now: context.date)
+                } catch is CancellationError {
+                    // A fold, navigation, backgrounding or newer revision won.
+                } catch {}
+            }
+        }
+        .onDisappear { store.suspend() }
+        .onChange(of: appState.companies, initial: true) { _, _ in
+            if !scopes.contains(store.scope) { store.scope = scopes.first ?? .personal }
+        }
+        .sheet(item: $activeHUD, onDismiss: finishHUD) { hud in
+            if let report = visibleReport {
+                switch hud {
+                case .transactions:
+                    BriefingTransactionsReceipt(snapshot: report.snapshot, month: store.month, now: report.generatedAt)
+                case .categories:
+                    BriefingSpendingCategoriesReceipt(summaries: report.financials, month: store.month)
+                case .accounts:
+                    BriefingAccountsReceipt(snapshot: report.snapshot) { kind, id in
+                        pendingNavigation = { onOpenHealthResource(kind, id) }
+                        activeHUD = nil
+                    }
+                case .review:
+                    BriefingReviewReceipt(
+                        health: report.health,
+                        onOpen: { issue in
+                            pendingNavigation = { onOpenHealthResource(issue.resourceType, issue.resourceID) }
+                            activeHUD = nil
+                        },
+                        onIgnore: { issue in
+                            ignoredDataIssueIDs.insert(issue.id)
+                            OwnerHealthDataIssueStore.save(ignoredDataIssueIDs)
+                        },
+                        onReviewRecurring: { suggestions in
+                            queuedRecurringReview = RecurringSuggestionReview(suggestions: suggestions)
+                            activeHUD = nil
+                        }
+                    )
+                }
+            }
+        }
+        .sheet(isPresented: $showingReminders, onDismiss: finishPendingNavigation) {
+            OwnerBriefingView(scope: store.scope) { obligation in
+                pendingNavigation = { onOpenResource(obligation) }
+                showingReminders = false
+            }
+        }
+        .sheet(item: $selectedRecurringReview) { review in
+            DetectedSubscriptionsSheet(
+                detected: review.suggestions, cardId: nil,
+                cardName: "\(store.scope.rawValue.lowercased()) accounts", companyId: nil,
+                vm: vm, onDismissAll: { selectedRecurringReview = nil }
+            )
+            .environment(appState)
+        }
+    }
+
+    private func finishHUD() {
+        if let review = queuedRecurringReview {
+            queuedRecurringReview = nil
+            selectedRecurringReview = review
+        } else { finishPendingNavigation() }
+    }
+
+    private func finishPendingNavigation() {
+        let action = pendingNavigation
+        pendingNavigation = nil
+        action?()
+    }
+
+    private func openUrgent(_ notice: ExecutiveUrgentNotice) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if let obligation = notice.obligation { onOpenResource(obligation) }
+        else { onOpenHealthResource(notice.sourceType, notice.sourceID) }
+    }
+}
+
+private struct DuoReceiptReveal: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let store: DuoBriefingStore
+    @State private var reveal: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            // A reveal mask, not animated receipt height or per-row insertion.
+            .mask(alignment: .top) {
+                Rectangle().scaleEffect(x: 1, y: reveal, anchor: .top)
+            }
+            .task {
+                guard !store.hasRevealedReceipt else { reveal = 1; return }
+                store.hasRevealedReceipt = true
+                if reduceMotion || ProcessInfo.processInfo.isLowPowerModeEnabled {
+                    reveal = 1
+                } else {
+                    withAnimation(.easeOut(duration: 0.45)) { reveal = 1 }
+                }
+            }
+            .onChange(of: reduceMotion) { _, reduced in
+                if reduced { reveal = 1 }
+            }
+    }
+}
+
+struct DuoBriefingPlaceholder: View {
+    let message: String
+    var isLoading = false
+    var animate = true
+    var actionTitle = "Open Executive Briefing"
+    let action: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("EXECUTIVE BRIEFING")
+                .font(.system(.headline, design: .monospaced).weight(.bold))
+            Divider()
+            if isLoading { ReportLoadingArtwork(active: animate) }
+            Text(message)
+                .font(.system(.callout, design: .monospaced))
+                .multilineTextAlignment(.center)
+            if !isLoading {
+                Button(actionTitle, action: action)
+                    .font(.system(.callout, design: .monospaced).weight(.semibold))
+                    .tint(BriefingReceiptTheme.gold)
+            }
+        }
+        .foregroundStyle(BriefingReceiptTheme.ink)
+        .padding(22)
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .background(BriefingReceiptTheme.paper)
+        .clipShape(ReceiptPaperShape())
+        .padding(.horizontal, 20)
+        .padding(.top, 4)
+    }
+}
+
+/// Child ordering never changes. The same List and receipt move between their
+/// frames on rotation; neither navigation nor scroll state is rebuilt.
+private struct DuoDashboardPanelLayout: Layout {
+    let expanded: Bool
+    let division: CGRect?
+    let footerControlCenterY: CGFloat?
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 4 else { return }
+        let panels = DuoDashboardPanelFrames.resolve(size: bounds.size, expanded: expanded, division: division)
+        let chromeWidth = expanded && bounds.width >= bounds.height ? panels.cards.width : bounds.width
+        let measurement = ProposedViewSize(width: chromeWidth, height: nil)
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: bounds.size, expanded: expanded, division: division,
+            headerHeight: subviews[2].sizeThatFits(measurement).height,
+            footerHeight: subviews[3].sizeThatFits(measurement).height,
+            footerControlCenterY: footerControlCenterY
+        )
+        let ordered = [frames.cards, frames.receipt, frames.header, frames.footer]
+        for (index, subview) in subviews.enumerated() where index < ordered.count {
+            let frame = ordered[index].offsetBy(dx: bounds.minX, dy: bounds.minY)
+            subview.place(at: frame.origin, anchor: .topLeading, proposal: ProposedViewSize(frame.size))
+        }
+    }
+}
+
+#if compiler(>=6.4)
+@available(iOS 27.1, *)
+struct DuoDashboardPanels<Cards: View, Receipt: View, Header: View, Footer: View>: View {
+    let expanded: Bool
+    let bottomControlCenterY: CGFloat?
+    let cards: (Bool) -> Cards
+    let receipt: () -> Receipt
+    let header: () -> Header
+    let footer: () -> Footer
+
+    init(expanded: Bool, bottomControlCenterY: CGFloat?,
+         @ViewBuilder cards: @escaping (Bool) -> Cards, @ViewBuilder receipt: @escaping () -> Receipt,
+         @ViewBuilder header: @escaping () -> Header, @ViewBuilder footer: @escaping () -> Footer) {
+        self.expanded = expanded
+        self.bottomControlCenterY = bottomControlCenterY
+        self.cards = cards
+        self.receipt = receipt
+        self.header = header
+        self.footer = footer
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let portrait = geometry.size.height > geometry.size.width
+            let region = geometry.reservedRegions(kind: .division).first {
+                portrait ? $0.frame.width > $0.frame.height : $0.frame.height > $0.frame.width
+            }
+            let division = region.map {
+                CGRect(
+                    x: $0.frame.minX - $0.margins.leading,
+                    y: $0.frame.minY - $0.margins.top,
+                    width: $0.frame.width + $0.margins.leading + $0.margins.trailing,
+                    height: $0.frame.height + $0.margins.top + $0.margins.bottom
+                )
+            }
+            let landscape = expanded && !portrait
+            let localBottomControlCenterY = bottomControlCenterY.map { $0 - geometry.frame(in: .global).minY }
+            DuoDashboardPanelLayout(expanded: expanded, division: division,
+                                    footerControlCenterY: landscape ? localBottomControlCenterY : nil) {
+                cards(expanded)
+                    .clipped()
+                ZStack {
+                    if expanded { receipt() }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .accessibilityIdentifier("duo.receiptPanel")
+                ZStack {
+                    if landscape { header() }
+                }
+                .frame(height: landscape ? nil : 0)
+                ZStack {
+                    if landscape { footer() }
+                }
+                .frame(height: landscape ? nil : 0)
+            }
+        }
+    }
+}
+#endif

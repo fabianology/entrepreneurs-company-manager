@@ -34,7 +34,9 @@ extension UIColor {
     }
 }
 
+#if !(DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW)
 @main
+#endif
 struct ZifrApp: App {
     @UIApplicationDelegateAdaptor(MiloomAppDelegate.self) private var appDelegate
     @State private var authViewModel = AuthViewModel()
@@ -58,7 +60,7 @@ struct ZifrApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
+            ZStack {
                 if authViewModel.isAuthenticated {
                     RootView()
                 } else {
@@ -205,6 +207,7 @@ struct ZifrApp: App {
             } message: {
                 Text(appState.error ?? "An unknown error occurred.")
             }
+            .modifier(MiloomDuoWindow())
         }
     }
 }

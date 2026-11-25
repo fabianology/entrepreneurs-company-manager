@@ -14,6 +14,7 @@ struct InstitutionCardView: View {
     var canEdit: Bool = true
     var editableLoanIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
+    var fitsCompactWidth = false
     var isExpanded: Bool = true
     var onCollapse: (() -> Void)? = nil
     var onDragChanged: ((DragGesture.Value) -> Void)? = nil
@@ -65,32 +66,12 @@ struct InstitutionCardView: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.85)
 
-                            HStack(spacing: 6) {
-                                HStack(spacing: 3) {
-                                    Text("\(institution.accounts.count)").foregroundStyle(.white)
-                                    Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
-                                }
-                                .font(.system(size: 12, weight: .medium))
-                                .fixedSize(horizontal: true, vertical: false)
-                                
-                                statusPipe()
-                                
-                                HStack(spacing: 3) {
-                                    Text("\(cardCount)").foregroundStyle(.white)
-                                    Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
-                                }
-                                .font(.system(size: 12, weight: .medium))
-                                .fixedSize(horizontal: true, vertical: false)
-                                
-                                statusPipe()
-                                
-                                HStack(spacing: 3) {
-                                    Text("\(loanCount)").foregroundStyle(.white)
-                                    Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
-                                }
-                                .font(.system(size: 12, weight: .medium))
-                                .fixedSize(horizontal: true, vertical: false)
-                            }
+                            InstitutionCardCounts(
+                                accounts: institution.accounts.count,
+                                cards: cardCount,
+                                loans: loanCount,
+                                fitsCompactWidth: fitsCompactWidth
+                            )
                         }
                         Spacer(minLength: 0)
                     }
@@ -295,6 +276,10 @@ struct InstitutionCardView: View {
                 }
             }
         }
+        .frame(
+            minWidth: fitsCompactWidth ? 0 : nil,
+            maxWidth: fitsCompactWidth ? .infinity : nil
+        )
         .background(
             RoundedRectangle(cornerRadius: 24)
                 .fill(Color(hex: "#1C1C1E").opacity(0.40))
@@ -449,5 +434,49 @@ struct InstitutionCardView: View {
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+struct InstitutionCardCounts: View {
+    let accounts: Int
+    let cards: Int
+    let loans: Int
+    let fitsCompactWidth: Bool
+
+    var body: some View {
+        if fitsCompactWidth {
+            let divider = Text("  |  ").foregroundStyle(Color.white.opacity(0.2))
+            Text("\(compactCount(accounts, label: "Accounts"))\(divider)\(compactCount(cards, label: "Cards"))\(divider)\(compactCount(loans, label: "Loans"))")
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        } else {
+            HStack(spacing: 6) {
+                countGroup(accounts, label: "Accounts")
+                countDivider
+                countGroup(cards, label: "Cards")
+                countDivider
+                countGroup(loans, label: "Loans")
+            }
+        }
+    }
+
+    private func compactCount(_ number: Int, label: LocalizedStringKey) -> Text {
+        Text("\(Text("\(number)").foregroundStyle(.white)) \(Text(label).foregroundStyle(Color(hex: "#C1AA78")))")
+    }
+
+    private func countGroup(_ number: Int, label: LocalizedStringKey) -> some View {
+        HStack(spacing: 3) {
+            Text("\(number)").foregroundStyle(.white)
+            Text(label).foregroundStyle(Color(hex: "#C1AA78"))
+        }
+        .font(.system(size: 12, weight: .medium))
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var countDivider: some View {
+        Text("|")
+            .font(.system(size: 10))
+            .foregroundStyle(Color.white.opacity(0.2))
     }
 }

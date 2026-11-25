@@ -7,12 +7,14 @@ struct FinancialView: View {
     let loans: [Loan]
     @Bindable var vm: AppViewModel
     var hideActionBar: Bool = false
+    var topContentInset: CGFloat?
     var canEdit: Bool = true
     var canAccessCredentials: Bool = true
     
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authVM
     @Environment(OnboardingStateManager.self) private var onboardingState
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
 
     private func canEditResource(_ type: String, _ id: UUID) -> Bool {
         AppViewModel.resourceAllowsEdit(
@@ -89,7 +91,7 @@ struct FinancialView: View {
                     VStack(spacing: 0) {
                         // ── Main Wallet Stack ──
                         VStack(spacing: 0) {
-                            Spacer().frame(height: hideActionBar ? 82 : 70) // Offset for tabs (82) or action bar (70) to maintain consistent 20pt card gap
+                            Spacer().frame(height: topContentInset ?? (hideActionBar ? 82 : 70))
                             if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy wallet
                         let dummyAmexId = UUID()
@@ -284,6 +286,7 @@ struct FinancialView: View {
                                 editableCardIDs: editableCardIDs,
                                 editableLoanIDs: editableLoanIDs,
                                 canAccessCredentials: canAccessCredentials,
+                                fitsCompactWidth: duoLayout.usesCompactLayout,
                                 onEditInst: { if canEditResource("institution", $0.id) { editingInst = $0 } },
                                 onEditCard: { if canEditResource("card", $0.id) { editingCard = $0 } },
                                 onEditLoan: { if canEditResource("loan", $0.id) { editingLoan = $0 } }
@@ -327,8 +330,13 @@ struct FinancialView: View {
                         
                         // Match Services: keep the final item fully above the floating search/action controls.
                         Spacer().frame(height: 120)
+                            .duoSideScrollTarget(.financial)
                     }
                 }
+                .frame(
+                    minWidth: duoLayout.usesCompactLayout ? 0 : nil,
+                    maxWidth: duoLayout.usesCompactLayout ? .infinity : nil
+                )
                 .padding(.horizontal, 20)
             }
         }
@@ -415,7 +423,7 @@ struct FinancialView: View {
                     .zIndex(100)
             }
         }
-        .frame(width: UIScreen.main.bounds.width)
+        .frame(maxWidth: .infinity)
     }
     
     private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {
@@ -553,7 +561,7 @@ struct FinancialView: View {
                     
                     FinancialCardVisual(card: card, isPopped: isPopped, canAccessCredentials: canAccessCredentials)
                         .id(card.id)
-                        .frame(maxWidth: UIScreen.main.bounds.width - 40)
+                        .frame(maxWidth: .infinity)
                         .frame(height: isPopped ? fullCardH : cardH)
                         .scaleEffect(scale, anchor: .bottom)
                         .rotation3DEffect(
@@ -622,7 +630,7 @@ struct FinancialView: View {
                     
                     FinancialCardVisual(card: card, isPopped: isPopped, canAccessCredentials: canAccessCredentials)
                         .id(card.id)
-                        .frame(maxWidth: UIScreen.main.bounds.width - 40)
+                        .frame(maxWidth: .infinity)
                         .frame(height: fullCardH)
                         .scaleEffect(scale, anchor: .bottom)
                         .rotation3DEffect(

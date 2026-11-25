@@ -6,6 +6,10 @@ struct FinancialReceiptView: View {
     let cards: [FinancialCard]
     let loans: [Loan]
     let subscriptions: [Subscription]
+    var isEmbedded = false
+    var usesHolographicStyle = false
+    var usesGlassSummaryStyle = false
+    @State private var showsAccountDetails = false
     
     @Environment(\.dismiss) private var dismiss
     
@@ -36,9 +40,9 @@ struct FinancialReceiptView: View {
     }
     
     // Aesthetic tokens for the White Paper receipt
-    private let paperColor = Color(hex: "#F8F9FA")
-    private let inkColor = Color(hex: "#1A1A1A")
-    private let fadedInk = Color(hex: "#1A1A1A").opacity(0.6)
+    private var paperColor: Color { usesHolographicStyle ? .clear : Color(hex: "#F8F9FA") }
+    private var inkColor: Color { usesHolographicStyle || usesGlassSummaryStyle ? .white : Color(hex: "#1A1A1A") }
+    private var fadedInk: Color { inkColor.opacity(usesHolographicStyle || usesGlassSummaryStyle ? 0.75 : 0.6) }
     
     @Environment(AppState.self) private var appState
 
@@ -47,51 +51,116 @@ struct FinancialReceiptView: View {
             connections: appState.resourceConnections, companyOverrides: appState.localCompanyOverrides)
     }
 
+    @ViewBuilder
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Receipt Content
-                    VStack(alignment: .leading, spacing: 16) {
-                        receiptHeader
-                        
-                        dashedDivider
-                        
-                        ForEach(institutions) { inst in
-                            institutionItem(inst: inst)
-                            dashedDivider
+        if isEmbedded {
+            if usesGlassSummaryStyle { glassScroll }
+            else if usesHolographicStyle { holographicScroll }
+            else { receiptScroll }
+        } else {
+            NavigationStack {
+                receiptScroll
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Close") { dismiss() }
+                                .font(.system(.body, design: .monospaced).bold())
+                                .foregroundStyle(.white)
                         }
-                        
-                        let relationships = institutionRelationships
-                        let orphanedCards = cards.filter { relationships.banks(for: .card, id: $0.id).isEmpty }
-                        let orphanedLoans = loans.filter { $0.isLender && relationships.banks(for: .loan, id: $0.id).isEmpty }
-                        
-                        if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
-                            otherAccountsItem(cards: orphanedCards, loans: orphanedLoans)
-                            dashedDivider
-                        }
-                        
-                        receiptFooter
                     }
-                    .padding(24)
-                    .background(paperColor)
-                }
-                .padding(.vertical, 32)
-                .padding(.horizontal, 16)
-                .shadow(color: .white.opacity(0.1), radius: 20, x: 0, y: 10)
             }
-            .background(Color(hex: "#121212").ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") { dismiss() }
-                        .font(.system(.body, design: .monospaced).bold())
-                        .foregroundStyle(.white)
+        }
+    }
+
+    private var glassScroll: some View {
+        DuoGlassReportBody {
+            DuoGlassFinancialSummary(institutions: institutions,
+                creditCards: creditCards, availableCredit: availableCredit)
+
+            DuoGlassReportDisclosure(title: "Account details") {
+                VStack(alignment: .leading, spacing: 16) {
+                    accountDetails
+                    LabeledContent("Total debt", value: DuoGlassReportStyle.amount(totalDebt))
+                        .font(.subheadline)
+                    if totalCreditLimit > 0 {
+                        let ratio = min(1, totalDebt / totalCreditLimit)
+                        LabeledContent("Debt-to-credit ratio", value: ratio.formatted(.percent.precision(.fractionLength(0))))
+                            .font(.subheadline)
+                    }
                 }
             }
         }
     }
-    
+
+    @ViewBuilder private var accountDetails: some View {
+        ForEach(institutions) { inst in institutionItem(inst: inst) }
+        let relationships = institutionRelationships
+        let orphanedCards = cards.filter { relationships.banks(for: .card, id: $0.id).isEmpty }
+        let orphanedLoans = loans.filter { $0.isLender && relationships.banks(for: .loan, id: $0.id).isEmpty }
+        if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
+            otherAccountsItem(cards: orphanedCards, loans: orphanedLoans)
+        }
+    }
+
+    private var holographicScroll: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                DuoHolographicFinancialSummary(debt: totalDebt,
+                    cardDebt: creditCards.reduce(0) { $0 + $1.balance },
+                    availableCredit: availableCredit, monthlyServices: totalSubscriptionCost)
+                DisclosureGroup("Account details", isExpanded: $showsAccountDetails) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        accountDetails
+                        receiptFooter
+                    }.padding(.top, 16)
+                }
+                .font(.subheadline.weight(.semibold)).tint(DuoHologram.cyan)
+                .foregroundStyle(.white).padding(.vertical, 8)
+            }
+            .padding(.horizontal, 24).padding(.top, 20).padding(.bottom, 32)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+    }
+
+    private var receiptScroll: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Receipt Content
+                VStack(alignment: .leading, spacing: 16) {
+                    receiptHeader
+
+                    dashedDivider
+
+                    ForEach(institutions) { inst in
+                        institutionItem(inst: inst)
+                        dashedDivider
+                    }
+
+                    let relationships = institutionRelationships
+                    let orphanedCards = cards.filter { relationships.banks(for: .card, id: $0.id).isEmpty }
+                    let orphanedLoans = loans.filter { $0.isLender && relationships.banks(for: .loan, id: $0.id).isEmpty }
+
+                    if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
+                        otherAccountsItem(cards: orphanedCards, loans: orphanedLoans)
+                        dashedDivider
+                    }
+
+                    receiptFooter
+                }
+                .padding(24)
+                .background(paperColor)
+            }
+            .padding(.vertical, 32)
+            .padding(.horizontal, 16)
+            .shadow(color: .white.opacity(0.1), radius: 20, x: 0, y: 10)
+        }
+        .background {
+            if !isEmbedded {
+                Color(hex: "#121212").ignoresSafeArea()
+            }
+        }
+    }
+
     // MARK: - Components
     
     private var dashedDivider: some View {
@@ -170,7 +239,8 @@ struct FinancialReceiptView: View {
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("- \(nameToMatch) (\(acc.last4.isEmpty ? "0000" : acc.last4))")
-                                    HighlightedTypeView(text: acc.type, fadedInk: fadedInk)
+                                    HighlightedTypeView(text: acc.type, fadedInk: fadedInk,
+                                        showsHighlight: !usesGlassSummaryStyle)
                                 }
                                 Spacer()
                                 Text("Bal: $\(String(format: "%.0f", acc.balance))")
@@ -208,7 +278,8 @@ struct FinancialReceiptView: View {
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("- \(card.name) (\(card.last4 ?? "0000"))")
-                                    HighlightedTypeView(text: "\(networkStr)\(typeStr)", fadedInk: fadedInk)
+                                    HighlightedTypeView(text: "\(networkStr)\(typeStr)", fadedInk: fadedInk,
+                                        showsHighlight: !usesGlassSummaryStyle)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
@@ -231,7 +302,8 @@ struct FinancialReceiptView: View {
                                                         .font(.system(size: 9, design: .monospaced))
                                                         .foregroundStyle(fadedInk)
                                                 }
-                                                HighlightedTypeView(text: "Promo: \(String(format: "%.1f", card.promoApr))%" + (card.promoEnds != nil ? " until \(card.promoEnds!.formatted(date: .abbreviated, time: .omitted))" : ""), fadedInk: fadedInk, indent: false)
+                                                HighlightedTypeView(text: "Promo: \(String(format: "%.1f", card.promoApr))%" + (card.promoEnds != nil ? " until \(card.promoEnds!.formatted(date: .abbreviated, time: .omitted))" : ""),
+                                                    fadedInk: fadedInk, indent: false, showsHighlight: !usesGlassSummaryStyle)
                                             }
                                         }
                                     }
@@ -345,7 +417,8 @@ struct FinancialReceiptView: View {
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("- \(card.name) (\(card.last4 ?? "0000"))")
-                                    HighlightedTypeView(text: "\(networkStr)\(typeStr)", fadedInk: fadedInk)
+                                    HighlightedTypeView(text: "\(networkStr)\(typeStr)", fadedInk: fadedInk,
+                                        showsHighlight: !usesGlassSummaryStyle)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
@@ -368,7 +441,8 @@ struct FinancialReceiptView: View {
                                                         .font(.system(size: 9, design: .monospaced))
                                                         .foregroundStyle(fadedInk)
                                                 }
-                                                HighlightedTypeView(text: "Promo: \(String(format: "%.1f", card.promoApr))%" + (card.promoEnds != nil ? " until \(card.promoEnds!.formatted(date: .abbreviated, time: .omitted))" : ""), fadedInk: fadedInk, indent: false)
+                                                HighlightedTypeView(text: "Promo: \(String(format: "%.1f", card.promoApr))%" + (card.promoEnds != nil ? " until \(card.promoEnds!.formatted(date: .abbreviated, time: .omitted))" : ""),
+                                                    fadedInk: fadedInk, indent: false, showsHighlight: !usesGlassSummaryStyle)
                                             }
                                         }
                                     }
@@ -527,6 +601,7 @@ struct HighlightedTypeView: View {
     let text: String
     let fadedInk: Color
     var indent: Bool = true
+    var showsHighlight = true
     
     @State private var drawHighlight = false
     
@@ -541,16 +616,18 @@ struct HighlightedTypeView: View {
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(fadedInk)
                 .background(alignment: .leading) {
-                    GeometryReader { geo in
-                        Rectangle()
-                            .fill(Color.yellow.opacity(0.4))
-                            .frame(width: drawHighlight ? geo.size.width + 4 : 0)
-                            .offset(x: -2)
-                            .animation(.easeInOut(duration: 0.6).delay(Double.random(in: 0.2...0.5)), value: drawHighlight)
+                    if showsHighlight {
+                        GeometryReader { geo in
+                            Rectangle()
+                                .fill(Color.yellow.opacity(0.4))
+                                .frame(width: drawHighlight ? geo.size.width + 4 : 0)
+                                .offset(x: -2)
+                                .animation(.easeInOut(duration: 0.6).delay(Double.random(in: 0.2...0.5)), value: drawHighlight)
+                        }
+                        .onAppear {
+                            drawHighlight = true
+                        }
                     }
-                }
-                .onAppear {
-                    drawHighlight = true
                 }
         }
     }

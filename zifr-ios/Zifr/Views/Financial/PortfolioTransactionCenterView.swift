@@ -82,6 +82,16 @@ struct CashFlowMonth: Identifiable, Hashable {
     func isCurrent(at date: Date, calendar: Calendar = .current) -> Bool {
         self == CashFlowMonth(containing: date, calendar: calendar)
     }
+
+    func containsTransactionDate(_ value: String) -> Bool {
+        let parts = value.prefix(10).split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, let day = Int(parts[2]), (1...31).contains(day) else { return false }
+        return Int(parts[0]) == year && Int(parts[1]) == month
+    }
+}
+
+enum DuoTransactionSection: Equatable {
+    case all, cashFlow, transactions
 }
 
 struct ResolvedTransaction: Identifiable, Equatable {
@@ -313,6 +323,7 @@ enum CashFlowInsightEngine {
 struct MiloomMonthPicker: View {
     @Binding var selection: CashFlowMonth
     let anchorDate: Date
+    var usesSearchGlass = false
 
     private var months: [CashFlowMonth] {
         CashFlowMonth.recent(from: anchorDate)
@@ -354,6 +365,8 @@ struct MiloomMonthPicker: View {
         .buttonStyle(.plain)
         .tint(Color.miloomGold)
         .background { pickerGlass(Capsule()) }
+        .shadow(color: usesSearchGlass ? Color.black.opacity(0.4) : .clear,
+                radius: 6, x: 0, y: 3)
         .accessibilityLabel("Choose transaction month")
         .accessibilityValue(selection.title())
         .accessibilityHint("Shows the latest twelve calendar months")
@@ -364,7 +377,9 @@ struct MiloomMonthPicker: View {
         if #available(iOS 26.0, *) {
             Color.clear
                 .glassEffect(
-                    .clear.interactive(),
+                    usesSearchGlass
+                        ? .clear.tint(Color.zifrTabBarFill.opacity(0.28)).interactive()
+                        : .clear.interactive(),
                     in: shape
                 )
         } else {
@@ -374,10 +389,33 @@ struct MiloomMonthPicker: View {
     }
 }
 
-private struct TransactionCenterAnalysis {
+struct TransactionCenterAnalysis {
     let records: [ResolvedTransaction]
     let detectedSubscriptions: [DetectedSubscription]
     let duplicateAlerts: [DuplicateChargeAlert]
+
+    static func prepare(
+        transactions: [Transaction], companies: [Company], institutions: [Institution],
+        cards: [FinancialCard], subscriptions: [Subscription],
+        overrides: [TransactionOverride] = [], categoryRules: [TransactionCategoryRule] = [],
+        companyID: UUID? = nil
+    ) -> Self {
+        // Resolve inferred Plaid ownership before scoping. Every insight and
+        // review banner must use the same entity as the visible transaction rows.
+        let resolved = TransactionIntelligence.resolveAll(
+            transactions, companies: companies, institutions: institutions,
+            cards: cards, overrides: overrides, categoryRules: categoryRules
+        )
+        let records = companyID.map { id in resolved.filter { $0.companyId == id } } ?? resolved
+        return Self(
+            records: records,
+            detectedSubscriptions: SubscriptionDetector.detect(
+                transactions: TransactionIntelligence.enrichedTransactions(from: records),
+                existingSubscriptions: subscriptions
+            ),
+            duplicateAlerts: DuplicateChargeDetector.detect(records: records)
+        )
+    }
 }
 
 struct DuplicateChargeAlert: Identifiable, Equatable {
@@ -784,6 +822,10 @@ struct PortfolioTransactionCenterView: View {
     @Bindable var vm: AppViewModel
     var initialTransactionID: UUID? = nil
     var initiallyShowsReviewQueue: Bool = false
+    /// Used only by the Duo inline pane. Nil preserves the existing iPhone sheet.
+    var embeddedCompanyID: UUID? = nil
+    var embeddedSection: DuoTransactionSection = .all
+    var usesGlassSummaryStyle = false
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
@@ -813,6 +855,8 @@ struct PortfolioTransactionCenterView: View {
     private var filteredRecords: [ResolvedTransaction] {
         allRecords.filter { record in
             let transaction = record.transaction
+            if embeddedCompanyID != nil && embeddedSection == .transactions,
+               !cashFlowMonth.containsTransactionDate(transaction.date) { return false }
             guard TransactionIntelligence.matchesSearch(record, query: searchText) else { return false }
             if showNeedsReviewOnly && TransactionIntelligence.effectiveFlow(for: record) == .ignored { return false }
             if showNeedsReviewOnly && record.companyId != nil && !record.accountId.isEmpty { return false }
@@ -881,6 +925,7 @@ struct PortfolioTransactionCenterView: View {
 
     private var analysisInputSignature: Int {
         var hasher = Hasher()
+        hasher.combine(embeddedCompanyID)
         for transaction in appState.transactions {
             hasher.combine(transaction.id)
             hasher.combine(transaction.companyId)
@@ -919,15 +964,65 @@ struct PortfolioTransactionCenterView: View {
         )
     }
 
+    @ViewBuilder
     var body: some View {
-        transactionNavigation
-            .presentationDetents([.fraction(0.92), .large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(24)
-            .presentationBackground(Color(hex: "#1C1C1E"))
-            .task(id: analysisInputSignature) {
-                await rebuildAnalysis(showLoading: allRecords.isEmpty)
-            }
+        if let embeddedCompanyID {
+            embeddedTransactions(companyID: embeddedCompanyID)
+                .task(id: analysisInputSignature) {
+                    await rebuildAnalysis(showLoading: allRecords.isEmpty)
+                }
+        } else {
+            transactionNavigation
+                .presentationDetents([.fraction(0.92), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+                .presentationBackground(Color(hex: "#1C1C1E"))
+                .task(id: analysisInputSignature) {
+                    await rebuildAnalysis(showLoading: allRecords.isEmpty)
+                }
+        }
+    }
+
+    private var taxReviewCount: Int {
+        appState.businessExpenseReviews.filter {
+            BusinessExpenseFilter.needsReview.includes($0) && $0.belongs(to: embeddedCompanyID)
+        }.count
+    }
+
+    private var cashFlowActionBackground: Color {
+        embeddedCompanyID == nil ? .zifrBG : Color(hex: "#0D4635")
+    }
+
+    private func embeddedTransactions(companyID: UUID) -> some View {
+        VStack(spacing: 0) {
+            transactionContent
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .sheet(isPresented: $showTaxOpportunities) { TaxOpportunitiesView(initialCompanyId: companyID) }
+        .sheet(isPresented: $showSpendingCategories) {
+            SpendingCategorySheet(
+                insights: cashFlowInsights, month: cashFlowMonth,
+                onSave: { draft, record in try await saveOverride(draft, for: record) },
+                onReset: { record in try await resetOverride(for: record) }
+            )
+        }
+        .sheet(isPresented: $showDuplicateReview) {
+            DuplicateChargeReviewSheet(
+                alerts: duplicateAlerts,
+                onDismissAlert: { alert in
+                    DuplicateChargeDismissalStore.dismiss(alert)
+                    dismissedDuplicateIds.insert(alert.id)
+                }
+            )
+        }
+        .sheet(item: $selectedTransaction) { record in
+            TransactionDetailSheet(
+                record: record,
+                onSave: { draft in try await saveOverride(draft, for: record) },
+                onReset: { try await resetOverride(for: record) }
+            )
+        }
     }
 
     private var transactionNavigation: some View {
@@ -972,15 +1067,29 @@ struct PortfolioTransactionCenterView: View {
     @ViewBuilder
     private var transactionContent: some View {
         ZStack {
-            Color(hex: "#1C1C1E").ignoresSafeArea()
+            if embeddedCompanyID == nil {
+                Color(hex: "#1C1C1E").ignoresSafeArea()
+            }
 
-            if isPreparing {
+            if usesGlassSummaryStyle && (isPreparing || allRecords.isEmpty) {
+                DuoGlassReportBody {
+                    portraitTransactionsTitle
+                    if isPreparing || isSyncing {
+                        loadingState(isPreparing ? "Preparing transactions…" : "Syncing all accounts…")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24)
+                    } else {
+                        taxOpportunitiesAction
+                        emptyState
+                    }
+                }
+            } else if isPreparing {
                 loadingState("Preparing transactions…")
             } else if allRecords.isEmpty && isSyncing {
                 loadingState("Syncing all accounts…")
             } else if allRecords.isEmpty {
                 VStack {
-                    TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }.padding(20)
+                    taxOpportunitiesAction.padding(20)
                     emptyState
                 }
             } else {
@@ -989,10 +1098,36 @@ struct PortfolioTransactionCenterView: View {
         }
     }
 
+    @ViewBuilder
     private var transactionList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                cashFlowInsightsCard
+        if usesGlassSummaryStyle {
+            DuoGlassReportBody {
+                portraitTransactionsTitle
+                transactionSections
+            }
+        } else {
+            ScrollView {
+                transactionSections
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 36)
+            }
+        }
+    }
+
+    private var portraitTransactionsTitle: some View {
+        Text("Transactions")
+            .font(.title2.bold())
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var transactionSections: some View {
+        LazyVStack(alignment: .leading, spacing: 16) {
+            if embeddedSection != .transactions { cashFlowInsightsCard }
+            if embeddedSection == .transactions {
+                MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: true)
+            }
+            if embeddedSection != .cashFlow {
                 searchAndFilters
                 reviewQueueCard
 
@@ -1014,11 +1149,8 @@ struct PortfolioTransactionCenterView: View {
                     }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 36)
         }
-        .refreshable { await syncAndRefresh() }
+        .background { CashFlowPullToRefresh { await syncAndRefresh() } }
     }
 
     @ToolbarContentBuilder
@@ -1028,14 +1160,14 @@ struct PortfolioTransactionCenterView: View {
                 Task { await syncAndRefresh() }
             } label: {
                 if isSyncing {
-                    ProgressView().tint(Color.zifrGold)
+                    ReportLoadingArtwork(width: 32)
                 } else {
                     Image(systemName: "arrow.clockwise")
                         .foregroundStyle(Color.zifrGold)
                 }
             }
             .disabled(isSyncing)
-            .accessibilityLabel("Sync available transactions")
+            .accessibilityLabel(isSyncing ? "Syncing transactions" : "Sync available transactions")
         }
         ToolbarItem(placement: .principal) {
             Text("Transactions")
@@ -1048,13 +1180,83 @@ struct PortfolioTransactionCenterView: View {
         }
     }
 
+    @ViewBuilder
     private var cashFlowInsightsCard: some View {
+        if usesGlassSummaryStyle { portraitCashFlow } else { legacyCashFlowInsightsCard }
+    }
+
+    private var portraitCashFlow: some View {
+        let insights = cashFlowInsights
+        return VStack(alignment: .leading, spacing: 14) {
+            MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date())
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Net cash flow")
+                    .font(.subheadline)
+                    .foregroundStyle(DuoGlassReportStyle.muted)
+                Text(signedCurrency(insights.current.net))
+                    .font(.largeTitle.bold())
+                    .monospacedDigit()
+                    .foregroundStyle(Color.zifrGold)
+            }
+            .accessibilityElement(children: .combine)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 18) {
+                    cashFlowFigure("Money in", amount: insights.current.moneyIn, icon: "arrow.down.left")
+                    Spacer(minLength: 4)
+                    cashFlowFigure("Money out", amount: insights.current.moneyOut, icon: "arrow.up.right")
+                    Spacer(minLength: 0)
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    cashFlowFigure("Money in", amount: insights.current.moneyIn, icon: "arrow.down.left")
+                    cashFlowFigure("Money out", amount: insights.current.moneyOut, icon: "arrow.up.right")
+                }
+            }
+            Divider().overlay(DuoGlassReportStyle.border)
+            Text(cashFlowComparisonText(insights))
+                .font(.caption)
+                .foregroundStyle(DuoGlassReportStyle.muted)
+
+            VStack(spacing: 8) {
+                spendingByCategory(insights)
+                taxOpportunitiesAction
+            }
+            if let syncError {
+                Label(syncError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(DuoHologram.coral)
+            }
+        }
+    }
+
+    private func cashFlowFigure(_ title: String, amount: Double, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.zifrGold)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.caption).foregroundStyle(DuoGlassReportStyle.muted)
+                Text(formatCurrency(amount)).font(.headline).monospacedDigit()
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var taxOpportunitiesAction: some View {
+        TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground,
+            usesGlassSummaryStyle: usesGlassSummaryStyle) { showTaxOpportunities = true }
+    }
+
+    private var legacyCashFlowInsightsCard: some View {
         let insights = cashFlowInsights
         return ZifrSheetCard(
             title: "CASH-FLOW INSIGHTS",
             icon: "waveform.path.ecg",
             subtitle: cashFlowMonth.title().uppercased(),
-            showsBorder: false,
+            showsBorder: embeddedCompanyID != nil,
+            usesClearGlass: embeddedCompanyID != nil,
             contentHorizontalPadding: 20,
             contentTopPadding: 18,
             contentBottomPadding: 18,
@@ -1068,12 +1270,12 @@ struct PortfolioTransactionCenterView: View {
             },
             content: {
                 VStack(alignment: .leading, spacing: 16) {
-                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date())
+                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: embeddedCompanyID != nil)
 
                     if insights.hasCurrentActivity {
                         cashFlowNetSummary(insights)
                         spendingByCategory(insights)
-                        TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }
+                        TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }
 
                         VStack(spacing: 0) {
                             if let largestExpense = insights.largestExpense {
@@ -1098,7 +1300,7 @@ struct PortfolioTransactionCenterView: View {
                                 .stroke(Color.white.opacity(0.06), lineWidth: 1)
                         )
                     } else {
-                        TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }
+                        TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }
                         HStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 19, weight: .semibold))
@@ -1136,7 +1338,7 @@ struct PortfolioTransactionCenterView: View {
                 cashFlowMetric(
                     title: "MONEY IN",
                     value: formatCurrency(insights.current.moneyIn),
-                    color: Color.zifrBG
+                    color: embeddedCompanyID == nil ? Color.zifrBG : .white
                 )
                 cashFlowMetric(
                     title: "MONEY OUT",
@@ -1155,7 +1357,7 @@ struct PortfolioTransactionCenterView: View {
             .padding(.vertical, 2)
         }
         .padding(18)
-        .background(Color(hex: "#2C2C2E"))
+        .background(embeddedCompanyID == nil ? Color(hex: "#2C2C2E") : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 15))
         .overlay(
             RoundedRectangle(cornerRadius: 15)
@@ -1168,7 +1370,7 @@ struct PortfolioTransactionCenterView: View {
                         startPoint: .top,
                         endPoint: .bottom
                     ),
-                    lineWidth: 1.5
+                    lineWidth: embeddedCompanyID == nil ? 1.5 : 0
                 )
         )
         .accessibilityElement(children: .ignore)
@@ -1229,7 +1431,9 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private func spendingByCategory(_ insights: CashFlowInsightSnapshot) -> some View {
-        Button {
+        let categoryCount = insights.expenseCategories.count
+        let categoryNoun = usesGlassSummaryStyle && categoryCount == 1 ? "category" : "categories"
+        return Button {
             showSpendingCategories = true
         } label: {
             HStack(spacing: 14) {
@@ -1243,15 +1447,15 @@ struct PortfolioTransactionCenterView: View {
                         .foregroundStyle(.white)
                     Text(insights.expenseCategories.isEmpty
                         ? "No spending in this period"
-                        : "Explore \(insights.expenseCategories.count) categories")
+                        : "Explore \(categoryCount) \(categoryNoun)")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.75))
+                        .foregroundStyle(usesGlassSummaryStyle ? DuoGlassReportStyle.muted : Color.white.opacity(0.75))
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(usesGlassSummaryStyle ? Color.zifrGold : .white)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -1260,8 +1464,18 @@ struct PortfolioTransactionCenterView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens a pie chart with transactions by category")
-        .background(Color.zifrBG)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background {
+            if usesGlassSummaryStyle {
+                let shape = RoundedRectangle(cornerRadius: 14)
+                shape.fill(DuoGlassReportStyle.tile)
+                    .overlay {
+                        shape.strokeBorder(DuoGlassReportStyle.border)
+                            .allowsHitTesting(false)
+                    }
+            } else {
+                RoundedRectangle(cornerRadius: 14).fill(cashFlowActionBackground)
+            }
+        }
     }
 
     private func cashFlowComparisonText(_ insights: CashFlowInsightSnapshot) -> String {
@@ -1286,6 +1500,7 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private func netCashFlowColor(_ value: Double) -> Color {
+        if embeddedCompanyID != nil { return .zifrGold }
         if value > 0.005 { return Color.zifrBG }
         if value < -0.005 { return .orange }
         return .white
@@ -1312,7 +1527,10 @@ struct PortfolioTransactionCenterView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Color.white.opacity(0.45))
-                TextField("Search merchant, account, or company", text: $searchText)
+                TextField("Search merchant, account, or company", text: $searchText,
+                    prompt: usesGlassSummaryStyle
+                        ? Text("Search merchant, account, or company").foregroundStyle(DuoGlassReportStyle.muted)
+                        : nil)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .foregroundStyle(.white)
@@ -1325,16 +1543,90 @@ struct PortfolioTransactionCenterView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .frame(height: 44)
-            .background(Color(hex: "#2C2C2E"))
+            .frame(height: usesGlassSummaryStyle ? nil : 44)
+            .frame(minHeight: usesGlassSummaryStyle ? 44 : nil)
+            .background(usesGlassSummaryStyle ? DuoGlassReportStyle.panel : Color(hex: "#2C2C2E"))
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
-            )
+            .overlay {
+                let shape = RoundedRectangle(cornerRadius: 10)
+                if usesGlassSummaryStyle {
+                    shape.strokeBorder(DuoGlassReportStyle.border)
+                        .allowsHitTesting(false)
+                } else {
+                    shape.stroke(Color.white.opacity(0.06), lineWidth: 1)
+                }
+            }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+            if usesGlassSummaryStyle {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { portraitFilterMenus }
+                        .fixedSize(horizontal: true, vertical: false)
+                    VStack(alignment: .leading, spacing: 8) { portraitFilterMenus }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                legacyFilterControls
+            }
+
+            if showNeedsReviewOnly {
+                clearReviewFilter
+            }
+        }
+    }
+
+    @ViewBuilder private var portraitFilterMenus: some View {
+        portraitFilterMenu(
+            title: selectedAccountId.flatMap { id in accountOptions.first { $0.id == id }?.label } ?? "All Accounts",
+            icon: "creditcard"
+        ) {
+            Picker("Account", selection: $selectedAccountId) {
+                Text("All Accounts").tag(nil as String?)
+                ForEach(accountOptions, id: \.id) { account in
+                    Text(account.label).tag(Optional(account.id))
+                }
+            }
+        }
+        portraitFilterMenu(title: "Flow · \(flowFilter.rawValue)", icon: "arrow.up.arrow.down") {
+            Picker("Flow", selection: flowFilterSelection) {
+                ForEach(TransactionFlowFilter.allCases) { option in
+                    Text(option.rawValue).tag(option.rawValue)
+                }
+            }
+        }
+        portraitFilterMenu(title: "Status · \(postingFilter.rawValue)", icon: "checkmark.circle") {
+            Picker("Posting status", selection: postingFilterSelection) {
+                ForEach(TransactionPostingFilter.allCases) { option in
+                    Text(option.rawValue).tag(option.rawValue)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func portraitFilterMenu<Content: View>(
+        title: String, icon: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        let menu = Menu(content: content) {
+            HStack(spacing: 5) {
+                Label(title, systemImage: icon)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .accessibilityHidden(true)
+            }
+            .font(.caption.weight(.semibold))
+        }
+        if #available(iOS 26.0, *) {
+            menu.menuStyle(.button).buttonStyle(.glass(.clear)).controlSize(.large)
+        } else {
+            menu.buttonStyle(.bordered)
+        }
+    }
+
+    @ViewBuilder private var legacyFilterControls: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if embeddedCompanyID == nil {
                     filterMenu(
                         title: selectedCompanyId.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All Companies",
                         icon: "building.2"
@@ -1344,49 +1636,49 @@ struct PortfolioTransactionCenterView: View {
                             Button(company.name) { selectedCompanyId = company.id }
                         }
                     }
+                }
 
-                    filterMenu(
-                        title: selectedAccountId.flatMap { id in accountOptions.first { $0.id == id }?.label } ?? "All Accounts",
-                        icon: "creditcard"
-                    ) {
-                        Button("All Accounts") { selectedAccountId = nil }
-                        ForEach(accountOptions, id: \.id) { account in
-                            Button(account.label) { selectedAccountId = account.id }
-                        }
+                filterMenu(
+                    title: selectedAccountId.flatMap { id in accountOptions.first { $0.id == id }?.label } ?? "All Accounts",
+                    icon: "creditcard"
+                ) {
+                    Button("All Accounts") { selectedAccountId = nil }
+                    ForEach(accountOptions, id: \.id) { account in
+                        Button(account.label) { selectedAccountId = account.id }
                     }
                 }
-            }
-
-            CustomSegmentedControl(
-                options: TransactionFlowFilter.allCases.map(\.rawValue),
-                selection: flowFilterSelection
-            )
-
-            CustomSegmentedControl(
-                options: TransactionPostingFilter.allCases.map(\.rawValue),
-                selection: postingFilterSelection
-            )
-
-            if showNeedsReviewOnly {
-                Button {
-                    showNeedsReviewOnly = false
-                } label: {
-                    HStack(spacing: 7) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                        Text("Needs Review")
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 12)
-                    .frame(height: 34)
-                    .background(Color.orange.opacity(0.12))
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+
+        CustomSegmentedControl(
+            options: TransactionFlowFilter.allCases.map(\.rawValue),
+            selection: flowFilterSelection
+        )
+
+        CustomSegmentedControl(
+            options: TransactionPostingFilter.allCases.map(\.rawValue),
+            selection: postingFilterSelection
+        )
+    }
+
+    private var clearReviewFilter: some View {
+        Button {
+            showNeedsReviewOnly = false
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("Needs Review")
+                Image(systemName: "xmark.circle.fill")
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(Color.orange.opacity(0.12))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -1395,7 +1687,8 @@ struct PortfolioTransactionCenterView: View {
             ZifrSheetCard(
                 title: "REVIEW QUEUE",
                 icon: "checklist",
-                subtitle: "No data is changed automatically"
+                subtitle: "No data is changed automatically",
+                usesClearGlass: usesGlassSummaryStyle
             ) {
                 VStack(alignment: .leading, spacing: 12) {
                     if !duplicateAlerts.isEmpty {
@@ -1464,7 +1757,7 @@ struct PortfolioTransactionCenterView: View {
                 .foregroundStyle(Color.white.opacity(0.3))
         }
         .padding(12)
-        .background(Color(hex: "#2C2C2E"))
+        .background(usesGlassSummaryStyle ? DuoGlassReportStyle.panel : Color(hex: "#2C2C2E"))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -1505,34 +1798,47 @@ struct PortfolioTransactionCenterView: View {
             Text(sectionDate(group.date))
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.8)
-                .foregroundStyle(Color.white.opacity(0.45))
+                .foregroundStyle(usesGlassSummaryStyle ? DuoGlassReportStyle.muted : Color.white.opacity(0.45))
                 .padding(.leading, 4)
 
-            VStack(spacing: 0) {
-                ForEach(Array(group.records.enumerated()), id: \.element.id) { index, record in
-                    transactionRow(record)
-                    if index < group.records.count - 1 {
-                        Divider().overlay(Color.white.opacity(0.07)).padding(.leading, 58)
+            if usesGlassSummaryStyle {
+                transactionRows(group.records)
+                    .background(DuoGlassReportStyle.tile, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14).strokeBorder(DuoGlassReportStyle.border)
+                            .allowsHitTesting(false)
                     }
+            } else {
+                transactionRows(group.records)
+                    .background(Color.black.opacity(0.70))
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#918457").opacity(0.7),
+                                        Color(hex: "#918457").opacity(0.2)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+            }
+        }
+    }
+
+    private func transactionRows(_ records: [ResolvedTransaction]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(records.enumerated()), id: \.element.id) { index, record in
+                transactionRow(record)
+                if index < records.count - 1 {
+                    Divider().overlay(Color.white.opacity(0.07)).padding(.leading, 58)
                 }
             }
-            .background(Color.black.opacity(0.70))
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#918457").opacity(0.7),
-                                Color(hex: "#918457").opacity(0.2)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1
-                    )
-            )
         }
     }
 
@@ -1541,64 +1847,75 @@ struct PortfolioTransactionCenterView: View {
         let assignableCompanies = appState.companies
             .filter { $0.userId == transaction.userId }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let row = HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(usesGlassSummaryStyle ? Color.zifrGold.opacity(0.12) : transactionColor(record).opacity(0.16))
+                    .frame(width: 42, height: 42)
+                Image(systemName: transactionIcon(record))
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(usesGlassSummaryStyle ? Color.zifrGold : transactionColor(record))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                if let review = appState.businessExpenseReviews.first(where: { $0.transactionId == record.id }) {
+                    Text(review.statusLabel).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.zifrGold)
+                }
+                Text(TransactionIntelligence.displayName(for: record))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(record.companyName)
+                    Text("·")
+                    Text(record.accountName)
+                    if transaction.pending == true {
+                        Text("· Pending")
+                            .foregroundStyle(.orange)
+                    }
+                    if duplicateTransactionIds.contains(record.id) {
+                        Text("· Possible duplicate")
+                            .foregroundStyle(.orange)
+                    }
+                    if record.override?.flowOverride == .ignored {
+                        Text("· Ignored")
+                            .foregroundStyle(Color.white.opacity(0.55))
+                    } else if record.override != nil {
+                        Text("· Reviewed")
+                            .foregroundStyle(Color.zifrGold)
+                    }
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(usesGlassSummaryStyle ? DuoGlassReportStyle.muted : Color.white.opacity(0.45))
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Text(signedAmount(for: record))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(usesGlassSummaryStyle ? .white : transactionAmountColor(record))
+                .lineLimit(1)
+
+            if usesGlassSummaryStyle {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.zifrGold)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .contentShape(Rectangle())
+
         return VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(transactionColor(record).opacity(0.16))
-                        .frame(width: 42, height: 42)
-                    Image(systemName: transactionIcon(record))
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(transactionColor(record))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    if let review = appState.businessExpenseReviews.first(where: { $0.transactionId == record.id }) {
-                        Text(review.statusLabel).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.zifrGold)
-                    }
-                    Text(TransactionIntelligence.displayName(for: record))
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    HStack(spacing: 4) {
-                        Text(record.companyName)
-                        Text("·")
-                        Text(record.accountName)
-                        if transaction.pending == true {
-                            Text("· Pending")
-                                .foregroundStyle(.orange)
-                        }
-                        if duplicateTransactionIds.contains(record.id) {
-                            Text("· Possible duplicate")
-                                .foregroundStyle(.orange)
-                        }
-                        if record.override?.flowOverride == .ignored {
-                            Text("· Ignored")
-                                .foregroundStyle(Color.white.opacity(0.55))
-                        } else if record.override != nil {
-                            Text("· Reviewed")
-                                .foregroundStyle(Color.zifrGold)
-                        }
-                    }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.45))
-                    .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-
-                Text(signedAmount(for: record))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(transactionAmountColor(record))
-                    .lineLimit(1)
+            if usesGlassSummaryStyle {
+                Button { selectedTransaction = record } label: { row }
+                    .buttonStyle(.plain)
+            } else {
+                row.onTapGesture { selectedTransaction = record }
+                    .accessibilityAddTraits(.isButton)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                selectedTransaction = record
-            }
-            .accessibilityAddTraits(.isButton)
 
             if record.companyId == nil {
                 Divider().overlay(Color.white.opacity(0.06)).padding(.leading, 58)
@@ -1653,7 +1970,7 @@ struct PortfolioTransactionCenterView: View {
 
     private func loadingState(_ message: String) -> some View {
         VStack(spacing: 16) {
-            ProgressView().tint(Color.zifrGold).scaleEffect(1.3)
+            ReportLoadingArtwork()
             Text(message)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
@@ -1743,23 +2060,13 @@ struct PortfolioTransactionCenterView: View {
         let subscriptions = appState.subscriptions
         let overrides = appState.transactionOverrides
         let categoryRules = appState.transactionCategoryRules
+        let companyID = embeddedCompanyID
 
         let analysis = await Task.detached(priority: .userInitiated) {
-            let records = TransactionIntelligence.resolveAll(
-                transactions,
-                companies: companies,
-                institutions: institutions,
-                cards: cards,
-                overrides: overrides,
-                categoryRules: categoryRules
-            )
-            return TransactionCenterAnalysis(
-                records: records,
-                detectedSubscriptions: SubscriptionDetector.detect(
-                    transactions: TransactionIntelligence.enrichedTransactions(from: records),
-                    existingSubscriptions: subscriptions
-                ),
-                duplicateAlerts: DuplicateChargeDetector.detect(records: records)
+            TransactionCenterAnalysis.prepare(
+                transactions: transactions, companies: companies, institutions: institutions,
+                cards: cards, subscriptions: subscriptions, overrides: overrides,
+                categoryRules: categoryRules, companyID: companyID
             )
         }.value
 

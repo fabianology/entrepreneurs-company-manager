@@ -11,6 +11,7 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
     var badgeCount: Int? = nil
     var cornerRadius: CGFloat = 24
     var showsBorder: Bool = true
+    var usesClearGlass: Bool = false
     var headerLeadingPadding: CGFloat = 20
     var headerTrailingPadding: CGFloat = 20
     var contentHorizontalPadding: CGFloat = 20
@@ -27,6 +28,7 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
         badgeCount: Int? = nil,
         cornerRadius: CGFloat = 24,
         showsBorder: Bool = true,
+        usesClearGlass: Bool = false,
         contentHorizontalPadding: CGFloat = 20,
         contentTopPadding: CGFloat = 16,
         contentBottomPadding: CGFloat = 20,
@@ -40,6 +42,7 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
         self.badgeCount = badgeCount
         self.cornerRadius = cornerRadius
         self.showsBorder = showsBorder
+        self.usesClearGlass = usesClearGlass
         self.contentHorizontalPadding = contentHorizontalPadding
         self.contentTopPadding = contentTopPadding
         self.contentBottomPadding = contentBottomPadding
@@ -86,28 +89,39 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
             .padding(.top, (title != nil && !title!.isEmpty) ? contentTopPadding : 20)
             .padding(.bottom, contentBottomPadding)
         }
-        .background(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color.black.opacity(0.70))
-        )
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+        .background {
+            if usesClearGlass, #available(iOS 26.0, *) {
+                // Match the entity Search bar's native glass recipe.
+                Color.clear.glassEffect(
+                    .clear.tint(Color.zifrTabBarFill.opacity(0.28)).interactive(),
+                    in: RoundedRectangle(cornerRadius: cornerRadius)
+                )
+            } else {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.black.opacity(0.70))
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .overlay {
             if showsBorder {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#918457"),
-                                Color(hex: "#918457").opacity(0.3)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1.5
-                    )
+                ZifrSheetCardOutline(shape: RoundedRectangle(cornerRadius: cornerRadius))
             }
         }
+        .shadow(color: usesClearGlass ? Color.black.opacity(0.4) : .clear,
+                radius: 6, x: 0, y: 3)
+    }
+}
+
+struct ZifrSheetCardOutline: View {
+    let shape: RoundedRectangle
+
+    var body: some View {
+        let gold = Color(hex: "#918457")
+        shape.stroke(
+            LinearGradient(colors: [gold, gold.opacity(0.3)], startPoint: .top, endPoint: .bottom),
+            lineWidth: 1.5
+        )
     }
 }
 
@@ -120,6 +134,7 @@ extension ZifrSheetCard where Trailing == EmptyView {
         badgeCount: Int? = nil,
         cornerRadius: CGFloat = 24,
         showsBorder: Bool = true,
+        usesClearGlass: Bool = false,
         contentHorizontalPadding: CGFloat = 20,
         contentTopPadding: CGFloat = 16,
         contentBottomPadding: CGFloat = 20,
@@ -132,6 +147,7 @@ extension ZifrSheetCard where Trailing == EmptyView {
         self.badgeCount = badgeCount
         self.cornerRadius = cornerRadius
         self.showsBorder = showsBorder
+        self.usesClearGlass = usesClearGlass
         self.contentHorizontalPadding = contentHorizontalPadding
         self.contentTopPadding = contentTopPadding
         self.contentBottomPadding = contentBottomPadding

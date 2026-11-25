@@ -4,6 +4,7 @@ import LocalAuthentication
 
 struct LoginView: View {
     @Bindable var authViewModel: AuthViewModel
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     
     @State private var email = ""
     @State private var password = ""
@@ -11,6 +12,10 @@ struct LoginView: View {
     @State private var isPasswordRevealed = false
     @State private var showForgotPassword = false
     
+    private var usesCompactLoginLayout: Bool {
+        duoLayout.isDuoDevice && (!duoLayout.isExpanded || duoLayout.usesExpandedLandscape)
+    }
+
     var body: some View {
         ZStack {
             // MARK: - Premium Animated Background
@@ -21,10 +26,10 @@ struct LoginView: View {
                 }
             
             VStack(spacing: 0) {
-                Spacer()
+                Spacer(minLength: usesCompactLoginLayout ? 0 : nil)
                 
                 // MARK: - Logo & Brand
-                VStack(spacing: 20) {
+                VStack(spacing: usesCompactLoginLayout ? 14 : 20) {
                     Image("login_logo")
                         .resizable()
                         .scaledToFit()
@@ -36,16 +41,18 @@ struct LoginView: View {
                             .tracking(8)
                             .foregroundStyle(Color.white)
                         
-                        Text("Your entrepreneurial command center.")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
+                        if !duoLayout.isDuoDevice || duoLayout.isExpanded {
+                            Text("Your entrepreneurial command center.")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                        }
                     }
                 }
                 
-                Spacer()
+                Spacer(minLength: usesCompactLoginLayout ? 10 : nil)
                 
                 // MARK: - Auth Actions
-                VStack(spacing: 16) {
+                VStack(spacing: usesCompactLoginLayout ? 10 : 16) {
                     if let error = authViewModel.authError {
                         Text(error)
                             .font(.system(size: 12, weight: .medium))
@@ -173,7 +180,7 @@ struct LoginView: View {
                             }
                         }
                         .padding(.horizontal, 32)
-                        .padding(.top, 8)
+                        .padding(.top, usesCompactLoginLayout ? 4 : 8)
                         
                         // Toggle Sign In / Sign Up
                         Button {
@@ -194,7 +201,7 @@ struct LoginView: View {
                             Rectangle().fill(Color(hex: "#333333")).frame(height: 1)
                         }
                         .padding(.horizontal, 40)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, usesCompactLoginLayout ? 6 : 12)
                         
                         // Social Auth
                         VStack(spacing: 12) {
@@ -245,10 +252,12 @@ struct LoginView: View {
                     
                     // Legal links
                     VStack(spacing: 4) {
-                        Text("By continuing, your data is securely synced to your personal account.")
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                            .multilineTextAlignment(.center)
+                        if !usesCompactLoginLayout {
+                            Text("By continuing, your data is securely synced to your personal account.")
+                                .font(.system(size: 11, weight: .regular))
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                                .multilineTextAlignment(.center)
+                        }
                         
                         HStack(spacing: 8) {
                             Link(destination: URL(string: "https://miloom.co/terms")!) {
@@ -269,10 +278,11 @@ struct LoginView: View {
                         }
                     }
                     .padding(.horizontal, 40)
-                    .padding(.top, 16)
+                    .padding(.top, usesCompactLoginLayout ? 8 : 16)
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, usesCompactLoginLayout ? 20 : 40)
             }
+            .padding(.top, usesCompactLoginLayout ? 20 : 0)
         }
         .sheet(isPresented: $showForgotPassword) {
             ForgotPasswordSheet(authViewModel: authViewModel, initialEmail: email)

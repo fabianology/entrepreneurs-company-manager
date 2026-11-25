@@ -32,6 +32,14 @@ struct EntityHomeView: View {
     @State private var expandedCategories: Set<String> = []
     
     @Binding var activeInternalTab: EntityHomeTab
+    var usesNativeTabs = false
+    var reservesTabRow = false
+    var compactTopSpacing = false
+    var tabSelectorHeaderHeight: CGFloat?
+    var tabSelectorBottomInset: CGFloat?
+    var vaultPresentation: DocumentListView.Presentation = .combined
+    var vaultCategorySelection: Binding<String>?
+    var vaultTopContentInset: CGFloat?
     
     // Quick Add States
     @State private var newSub: Subscription? = nil
@@ -61,73 +69,27 @@ struct EntityHomeView: View {
         EntityHomeViewModel(company: company, subscriptions: subscriptions, cards: cards, institutions: institutions, loans: loans, documents: documents)
     }
 
-    // MARK: - Body
-    var body: some View {
-        ZStack(alignment: .top) {
-            // ACTIVE TAB CONTENT (scrolls behind tabs)
-            Group {
-                switch activeInternalTab {
-                case .financial:
-                    FinancialView(
-                        company: company,
-                        cards: cards,
-                        institutions: institutions,
-                        loans: loans,
-                        vm: vm,
-                        hideActionBar: true,
-                        canEdit: canEdit,
-                        canAccessCredentials: canAccessCredentials
-                    )
-                    .id("financialSection")
-                    
-                case .subscriptions:
-                    SubscriptionListView(
-                        company: company,
-                        subscriptions: subscriptions,
-                        institutions: institutions,
-                        cards: cards,
-                        vm: vm,
-                        hideActionBar: true,
-                        canEdit: canEdit,
-                        canAccessCredentials: canAccessCredentials
-                    )
-                    .id("subscriptionSection")
-                    
-                case .documents:
-                    DocumentListView(
-                        company: company,
-                        documents: documents,
-                        vm: vm,
-                        hideActionBar: true,
-                        canEdit: canEdit
-                    )
-                    .id("documentSection")
-                }
-            }
-            .mask(
-                VStack(spacing: 0) {
-                    // Fully disappeared (clear) at and above the top 1/3 of the tab bar
-                    Color.clear
-                        .frame(height: 25)
-                    
-                    // Smooth gradient fade across the lower 2/3 of the tab bar
-                    LinearGradient(
-                        colors: [.clear, .black],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 37)
-                    
-                    // Fully visible below the tab bar to the bottom of the display
-                    Color.black
-                        .frame(maxHeight: .infinity)
-                }
-                .ignoresSafeArea(edges: .bottom)
-            )
-            
-            // TAB SELECTOR (floating on top)
+    @ViewBuilder
+    private var tabContent: some View {
+        if usesNativeTabs {
+            section(for: activeInternalTab)
+        } else {
+            legacyTabContent
+        }
+    }
+
+    private var legacyTabContent: some View {
+        let tabSelectorTopPadding: CGFloat = 6
+        let layout = reservesTabRow
+            ? AnyLayout(VStackLayout(spacing: 0))
+            : AnyLayout(ZStackLayout(alignment: .top))
+        return layout {
             ControlCenterTabSelector(
                 activeTab: $activeInternalTab,
+                isStandalone: tabSelectorHeaderHeight != nil,
+                backgroundTopExtension: reservesTabRow ? 0 : (tabSelectorHeaderHeight.map { $0 + tabSelectorTopPadding } ?? 0),
+                contentBottomInset: tabSelectorBottomInset,
+                usesDuoMotion: tabSelectorHeaderHeight != nil,
                 institutions: institutions,
                 loans: loans,
                 subscriptions: subscriptions,
@@ -135,12 +97,77 @@ struct EntityHomeView: View {
                 documents: documents,
                 totalDebt: model.totalDebt
             )
-            .padding(.top, 6)
-            .padding(.bottom, 10)
+            .padding(.top, tabSelectorTopPadding)
+            .padding(.bottom, reservesTabRow ? 0 : 10)
+            .zIndex(1)
+
+            section(for: activeInternalTab)
+                .padding(.top, compactTopSpacing ? -16 : 0)
+                .mask {
+                    if reservesTabRow {
+                        Rectangle()
+                    } else {
+                        VStack(spacing: 0) {
+                            Color.clear.frame(height: 25)
+                            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 37)
+                            Color.black.frame(maxHeight: .infinity)
+                        }
+                        .ignoresSafeArea(edges: .bottom)
+                    }
+                }
         }
+    }
+
+    @ViewBuilder
+    private func section(for tab: EntityHomeTab) -> some View {
+        switch tab {
+        case .financial:
+            FinancialView(
+                company: company,
+                cards: cards,
+                institutions: institutions,
+                loans: loans,
+                vm: vm,
+                hideActionBar: true,
+                topContentInset: usesNativeTabs || reservesTabRow ? 12 : nil,
+                canEdit: canEdit,
+                canAccessCredentials: canAccessCredentials
+            )
+            .id("financialSection")
+        case .subscriptions:
+            SubscriptionListView(
+                company: company,
+                subscriptions: subscriptions,
+                institutions: institutions,
+                cards: cards,
+                vm: vm,
+                hideActionBar: true,
+                topContentInset: usesNativeTabs || reservesTabRow ? 12 : nil,
+                canEdit: canEdit,
+                canAccessCredentials: canAccessCredentials
+            )
+            .id("subscriptionSection")
+        case .documents:
+            DocumentListView(
+                company: company,
+                documents: documents,
+                vm: vm,
+                hideActionBar: true,
+                canEdit: canEdit,
+                presentation: vaultPresentation,
+                categorySelection: vaultCategorySelection,
+                topContentInset: vaultTopContentInset
+            )
+            .id("documentSection")
+        }
+    }
+
+    // MARK: - Body
+    var body: some View {
+        tabContent
         .frame(maxWidth: .infinity)
         .background(Color.clear)
-        .ignoresSafeArea(edges: .bottom)
         .sheet(item: $newSub) { sub in
             AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
                 .presentationDetents([.fraction(0.9), .large])

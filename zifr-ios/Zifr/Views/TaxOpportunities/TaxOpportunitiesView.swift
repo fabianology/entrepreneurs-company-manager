@@ -2,6 +2,8 @@ import SwiftUI
 
 struct TaxOpportunitiesButton: View {
     var count: Int
+    var backgroundColor: Color = .zifrBG
+    var usesGlassSummaryStyle = false
     var action: () -> Void
     var body: some View {
         Button(action: action) {
@@ -11,13 +13,26 @@ struct TaxOpportunitiesButton: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Tax Opportunities").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
                     Text(count > 0 ? "\(count) potential business expenses to review" : "Find and organize potential business expenses")
-                        .font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.75))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(usesGlassSummaryStyle ? DuoGlassReportStyle.muted : .white.opacity(0.75))
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(usesGlassSummaryStyle ? Color.zifrGold : .white)
             }
             .padding(.horizontal, 16).padding(.vertical, 14).frame(minHeight: 64)
-            .background(Color.zifrBG, in: RoundedRectangle(cornerRadius: 14))
+            .background {
+                if usesGlassSummaryStyle {
+                    let shape = RoundedRectangle(cornerRadius: 14)
+                    shape.fill(DuoGlassReportStyle.tile)
+                        .overlay {
+                            shape.strokeBorder(DuoGlassReportStyle.border)
+                                .allowsHitTesting(false)
+                        }
+                } else {
+                    RoundedRectangle(cornerRadius: 14).fill(backgroundColor)
+                }
+            }
         }
         .buttonStyle(.plain).accessibilityIdentifier("taxOpportunitiesButton")
         .accessibilityHint("Opens business expense review across your accounts")

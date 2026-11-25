@@ -205,7 +205,6 @@ struct SpotlightOverlayView: View {
                 }
             }
         }
-        .ignoresSafeArea()
     }
 }
 
@@ -214,7 +213,7 @@ struct SpotlightOverlayView: View {
 // No PreferenceKey / Anchor required — bypasses the List preference-swallowing issue.
 
 struct TutorialSpotlightOverlayView: View {
-    let anchor: CGRect          // Frame in coordinate space
+    let anchor: CGRect          // Target frame in global coordinates
     let stepIndex: Int          // 1-based
     let totalSteps: Int
     let title: String
@@ -235,7 +234,8 @@ struct TutorialSpotlightOverlayView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let frame = anchor
+            let origin = proxy.frame(in: .global).origin
+            let frame = anchor.offsetBy(dx: -origin.x, dy: -origin.y)
             // Determine if the spotlight is in the lower half
             let tooltipAbove = frame.midY > proxy.size.height * 0.5
 
@@ -391,7 +391,6 @@ struct TutorialSpotlightOverlayView: View {
                 )
             }
         }
-        .ignoresSafeArea()
     }
 }
 

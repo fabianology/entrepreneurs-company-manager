@@ -395,7 +395,12 @@ private enum InboxSection: String, CaseIterable, Identifiable {
 }
 
 struct NotificationInboxView: View {
+    enum Presentation {
+        case sheet, duoDrawer
+    }
+
     @Bindable var vm: AppViewModel
+    var presentation: Presentation = .sheet
     let onOpenRoute: (NotificationRoute) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -415,28 +420,14 @@ struct NotificationInboxView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.zifrCard.ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                header
-
-                Picker("Inbox section", selection: $section) {
-                    ForEach(InboxSection.allCases) { item in
-                        Text(item.rawValue).tag(item)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-
-                Group {
-                    switch section {
-                    case .alerts: alertList
-                    case .invitations: invitationList
-                    case .activity: activityList
-                    }
-                }
+        Group {
+            switch presentation {
+            case .sheet:
+                inboxContent
+                    .background { Color.zifrCard.ignoresSafeArea() }
+            case .duoDrawer:
+                inboxContent
+                    .background(DuoGlassReportStyle.tile, in: RoundedRectangle(cornerRadius: 20))
             }
         }
         .task {
@@ -466,6 +457,44 @@ struct NotificationInboxView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "The inbox could not be updated.")
+        }
+    }
+
+    private var inboxContent: some View {
+        VStack(spacing: 0) {
+            switch presentation {
+            case .sheet:
+                header
+            case .duoDrawer:
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Inbox")
+                            .font(.title2.bold())
+                            .accessibilityAddTraits(.isHeader)
+                        Text(inboxCountLabel.lowercased())
+                            .font(.subheadline)
+                            .foregroundStyle(DuoGlassReportStyle.muted)
+                    }
+                    Spacer()
+                    inboxMenu
+                }
+                .padding(16)
+            }
+
+            Picker("Inbox section", selection: $section) {
+                ForEach(InboxSection.allCases) { item in
+                    Text(item.rawValue).tag(item)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+
+            switch section {
+            case .alerts: alertList
+            case .invitations: invitationList
+            case .activity: activityList
+            }
         }
     }
 
@@ -499,34 +528,48 @@ struct NotificationInboxView: View {
 
             Spacer()
 
-            Menu {
-                if section != .invitations {
-                    Button {
-                        Task { await markAllRead() }
-                    } label: {
-                        Label("Mark All as Read", systemImage: "envelope.open")
-                    }
-                    .disabled(unreadCount == 0)
-                }
+            inboxMenu
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
 
-                if section != .activity {
-                    Button {
-                        Task {
-                            if section == .alerts {
-                                do {
-                                    try await DataRepository.shared.refreshNotifications(appState: appState)
-                                } catch {
-                                    errorMessage = error.localizedDescription
-                                }
-                            } else {
-                                await refreshInvitations()
-                            }
-                        }
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
+    private var inboxMenu: some View {
+        Menu {
+            if section != .invitations {
+                Button {
+                    Task { await markAllRead() }
+                } label: {
+                    Label("Mark All as Read", systemImage: "envelope.open")
                 }
-            } label: {
+                .disabled(unreadCount == 0)
+            }
+
+            if section != .activity {
+                Button {
+                    Task {
+                        if section == .alerts {
+                            do {
+                                try await DataRepository.shared.refreshNotifications(appState: appState)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        } else {
+                            await refreshInvitations()
+                        }
+                    }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+            }
+        } label: {
+            if presentation == .duoDrawer {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.zifrGold)
+                    .frame(width: 44, height: 44)
+            } else {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.9))
@@ -536,9 +579,6 @@ struct NotificationInboxView: View {
                     .overlay(Circle().stroke(.vaultOutline, lineWidth: 1.5))
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
     }
 
     private var inboxCountLabel: String {
@@ -765,7 +805,7 @@ struct NotificationInboxView: View {
         }
         guard let route = notification.route else { return }
         onOpenRoute(route)
-        dismiss()
+        if presentation == .sheet { dismiss() }
     }
 
     @MainActor

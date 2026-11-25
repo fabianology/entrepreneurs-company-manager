@@ -1,5 +1,25 @@
 import SwiftUI
 
+struct MiloomDuoFooterButton<Label: View, LegacyLabel: View>: View {
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
+    let borderShape: ButtonBorderShape
+    let action: () -> Void
+    @ViewBuilder let label: () -> Label
+    @ViewBuilder let legacyLabel: () -> LegacyLabel
+
+    var body: some View {
+        if #available(iOS 26.0, *), duoLayout.isDuoDevice {
+            Button(action: action, label: label)
+                .buttonStyle(.glass(.clear.tint(Color.zifrBG.opacity(0.45))))
+                .buttonBorderShape(borderShape)
+                .controlSize(.large)
+        } else {
+            Button(action: action, label: legacyLabel)
+                .buttonStyle(.plain)
+        }
+    }
+}
+
 // MARK: - Glass Card Modifier
 struct GlassCardModifier: ViewModifier {
     var cornerRadius: CGFloat = 24
@@ -178,7 +198,7 @@ struct ShimmerModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .overlay(
+            .overlay {
                 LinearGradient(
                     gradient: Gradient(colors: [
                         .clear, Color.white.opacity(0.15), .clear
@@ -187,7 +207,7 @@ struct ShimmerModifier: ViewModifier {
                     endPoint: .init(x: phase + 0.3, y: 0)
                 )
                 .blendMode(.plusLighter)
-            )
+            }
             .onAppear {
                 withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
                     phase = 1.3

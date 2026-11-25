@@ -549,7 +549,7 @@ struct OwnerHealthSnapshot: Hashable {
 
 enum OwnerHealthEngine {
     static func snapshot(
-        appState: AppState,
+        appState: some ExecutiveBriefingData,
         scope: OwnerBriefingScope,
         now: Date = Date(),
         ignoredDataIssueIDs: Set<String> = [],
@@ -678,8 +678,9 @@ enum OwnerHealthEngine {
             }
             return nil
         }
+        let analysisTransactions = appState.transactionsForAnalysis
         let recurringSuggestions = scopedCompanies.flatMap { company in
-            let companyTransactions = appState.transactionsForAnalysis.filter { transactionCompanyID($0) == company.id }
+            let companyTransactions = analysisTransactions.filter { transactionCompanyID($0) == company.id }
             let companySubscriptions = subscriptions.filter { $0.companyId == company.id }
             return SubscriptionDetector.detect(
                 transactions: companyTransactions,
