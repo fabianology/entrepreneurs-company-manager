@@ -1187,6 +1187,7 @@ struct NotificationInboxView: View {
                 }
             }
         }
+        .scrollIndicators(.never)
         .refreshable { await refreshInbox() }
     }
 

@@ -458,6 +458,7 @@ struct MiloomDuoPortraitSheet<Content: View>: View {
 struct MiloomDuoBriefingFile<Content: View>: View {
     @Binding var isPresented: Bool
     var tabTopInset: CGFloat = 0
+    var separatesControls = false
     var additionalControls: AnyView? = nil
     @ViewBuilder let content: () -> Content
     @State private var progress: CGFloat = 0
@@ -479,32 +480,29 @@ struct MiloomDuoBriefingFile<Content: View>: View {
                     .offset(x: frames.sheet.minX)
                     .transition(.identity).zIndex(2)
                 }
-                VStack(spacing: 0) {
-                    Button { isPresented = true } label: {
-                        Image(systemName: "receipt")
-                            .font(.system(size: 21.5, weight: .medium))
-                            .foregroundStyle(.white)
-                            .offset(y: 1)
-                            .frame(width: 48, height: 48)
-                            .contentShape(Rectangle())
+                Group {
+                    if separatesControls {
+                        VStack(spacing: 8) {
+                            briefingButton
+                                .glassEffect(.regular.interactive(), in: Circle())
+                                .simultaneousGesture(briefingDrag(travel: frames.travel))
+                            if let additionalControls {
+                                additionalControls.glassEffect(.regular.interactive(), in: Circle())
+                            }
+                        }
+                    } else {
+                        VStack(spacing: 0) {
+                            briefingButton
+                            additionalControls
+                        }
+                        .padding(1)
+                        .glassEffect(.regular.interactive(), in: Capsule())
+                        .simultaneousGesture(briefingDrag(travel: frames.travel))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Executive Briefing")
-                    if let additionalControls { additionalControls }
                 }
-                .padding(1)
-                .glassEffect(.regular.interactive(), in: Capsule())
-                .simultaneousGesture(DragGesture(minimumDistance: 10, coordinateSpace: .global)
-                    .onChanged { value in
-                        dragging = true
-                        if !isPresented { isPresented = true }
-                        progress = min(1, max(0, value.translation.width / max(1, frames.travel)))
-                    }
-                    .onEnded { value in
-                        settle(open: value.predictedEndTranslation.width / max(1, frames.travel) > 0.5)
-                    })
-                    .offset(x: 22, y: tabTopInset)
-                    .allowsHitTesting(!isPresented || dragging).accessibilityHidden(isPresented && !dragging)
+                .offset(x: 22, y: tabTopInset)
+                .allowsHitTesting(!isPresented || dragging)
+                .accessibilityHidden(isPresented && !dragging)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .clipped()
@@ -515,6 +513,31 @@ struct MiloomDuoBriefingFile<Content: View>: View {
                 else if !dragging { settle(open: true) }
             }
         }
+    }
+
+    private var briefingButton: some View {
+        Button { isPresented = true } label: {
+            Image(systemName: "receipt")
+                .font(.system(size: 21.5, weight: .medium))
+                .foregroundStyle(.white)
+                .offset(y: 1)
+                .frame(width: 48, height: 48)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Executive Briefing")
+    }
+
+    private func briefingDrag(travel: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 10, coordinateSpace: .global)
+            .onChanged { value in
+                dragging = true
+                if !isPresented { isPresented = true }
+                progress = min(1, max(0, value.translation.width / max(1, travel)))
+            }
+            .onEnded { value in
+                settle(open: value.predictedEndTranslation.width / max(1, travel) > 0.5)
+            }
     }
 
     private func settle(open: Bool) {

@@ -19,6 +19,7 @@
 - Target the `Zifr` iOS scheme and preserve iOS 17 compatibility unless a task explicitly changes deployment requirements.
 - Follow the existing SwiftUI/Observation architecture: `AppState` for shared data, `AppViewModel` for current coordination, and `DataRepository` for persistence.
 - Reuse existing colors, glass modifiers, sheet cards, and shared components before adding new design patterns.
+- Hide scroll indicators in new designs while preserving scrolling.
 - Keep changes focused. Do not combine feature work with broad renames, architecture rewrites, dependency upgrades, or repository cleanup.
 - Ask before adding production dependencies or changing Supabase contracts, entitlements, signing, bundle identifiers, or deployment targets.
 - When adding a Swift file, ensure it belongs to the `Zifr` target/project configuration.

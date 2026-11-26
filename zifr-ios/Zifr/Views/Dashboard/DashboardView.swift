@@ -358,6 +358,8 @@ struct DashboardView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         dashboardShareControl
                     }
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                        .axisBehavior(.verticalPreferred)
                     ToolbarItem(placement: .topBarTrailing) {
                         dashboardAddControl
                     }
@@ -365,13 +367,20 @@ struct DashboardView: View {
                     if duoLayout.usesNativeSideToolbarGroups {
                         ToolbarSpacer(.fixed, placement: .topBarTrailing)
                             .axisBehavior(.verticalPreferred)
-                        ToolbarItemGroup(placement: .topBarTrailing) {
+                        ToolbarItem(placement: .topBarTrailing) {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 presentBriefing()
                             } label: {
                                 Label("Executive Briefing", systemImage: "receipt")
                             }
+                        }
+                        .axisBehavior(.verticalPreferred)
+                        if !duoLayout.isExpanded || duoLayout.displayIsPortrait {
+                            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                                .axisBehavior(.verticalPreferred)
+                        }
+                        ToolbarItem(placement: .topBarTrailing) {
                             Button(action: openDashboardInbox) {
                                 Label("Notification inbox", systemImage: "bell")
                             }
@@ -407,6 +416,7 @@ struct DashboardView: View {
             .overlay {
                 if showsPortraitToolbar {
                     MiloomDuoBriefingFile(isPresented: $showPortraitBriefing, tabTopInset: portraitControlsTopInset,
+                        separatesControls: true,
                         additionalControls: AnyView(notificationInboxButton)) {
                         inlineBriefingPanel(isActive: vm.path.isEmpty)
                     }
@@ -559,7 +569,8 @@ struct DashboardView: View {
                     tabs: [.briefing, .inbox],
                     title: { Text($0.title) }, icon: { $0.icon },
                     badge: { $0 == .inbox ? unreadCount : 0 },
-                    verticalInset: usesStackedPortrait || nativeBarEdge == nil ? 1 : 2
+                    verticalInset: usesStackedPortrait || nativeBarEdge == nil ? 1 : 2,
+                    separatesButtons: usesStackedPortrait
                 )
                 .buttonStyle(.plain)
             }
@@ -567,28 +578,13 @@ struct DashboardView: View {
         }
 
         private var actionGroup: some View {
-            ViewThatFits(in: .vertical) {
-                VStack(spacing: 0) {
-                    share
-                    add
-                    if !usesStackedPortrait { admin }
-                }
-                VStack(spacing: 0) {
-                    add
-                    Menu {
-                        share
-                        if !usesStackedPortrait { admin }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 21.5, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                    }
-                    .accessibilityLabel("More dashboard actions")
+            VStack(spacing: 8) {
+                share.glassEffect(.regular.interactive(), in: Circle())
+                add.glassEffect(.regular.interactive(), in: Circle())
+                if !usesStackedPortrait {
+                    admin.glassEffect(.regular.interactive(), in: Circle())
                 }
             }
-            .padding(1)
-            .glassEffect(.regular.interactive(), in: Capsule())
         }
     }
 
@@ -610,9 +606,13 @@ struct DashboardView: View {
                     if isActive && !usesCustomBars && showsActions {
                         ToolbarItem(placement: .topBarTrailing) { share }
                             .axisBehavior(.verticalPreferred)
+                        ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                            .axisBehavior(.verticalPreferred)
                         ToolbarItem(placement: .topBarTrailing) { add }
                             .axisBehavior(.verticalPreferred)
                             .visibilityPriority(.high)
+                        ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                            .axisBehavior(.verticalPreferred)
                         ToolbarItem(placement: .topBarTrailing) { admin }
                             .axisBehavior(.verticalPreferred)
                             .visibilityPriority(.low)
@@ -630,12 +630,19 @@ struct DashboardView: View {
     @available(iOS 26.0, *)
     private var portraitDashboardToolbar: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                dashboardShareControl
-                dashboardAddControl
+            if isDuoDevice {
+                VStack(spacing: 8) {
+                    dashboardShareControl.glassEffect(.regular.interactive(), in: Circle())
+                    dashboardAddControl.glassEffect(.regular.interactive(), in: Circle())
+                }
+            } else {
+                VStack(spacing: 0) {
+                    dashboardShareControl
+                    dashboardAddControl
+                }
+                .padding(1)
+                .glassEffect(.regular.interactive(), in: Capsule())
             }
-            .padding(1)
-            .glassEffect(.regular.interactive(), in: Capsule())
             if duoLayout.usesPadSplit {
                 VStack(spacing: 0) {
                     dashboardBriefingButton
@@ -2011,7 +2018,8 @@ struct DashboardView: View {
                             icon: { $0.icon },
                             badge: { $0 == .inbox ? appState.unreadNotificationCount : 0 },
                             verticalInset: 1,
-                            axis: .horizontal
+                            axis: .horizontal,
+                            separatesButtons: true
                         )
                         .buttonStyle(.plain)
                     }
@@ -2277,6 +2285,8 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                         }
                         ToolbarItem(placement: .topBarTrailing) { primaryAction }
                             .axisBehavior(.verticalPreferred)
+                        ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                            .axisBehavior(.verticalPreferred)
                         ToolbarItem(placement: .topBarTrailing) { add }
                             .axisBehavior(.verticalPreferred)
                             .visibilityPriority(.high)
@@ -2363,9 +2373,12 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                             .glassEffect(.regular.interactive(), in: Circle())
                     } else {
                         ViewThatFits(in: .vertical) {
-                            entityActionGroup
-                            stackedEntityActionGroup(includesShare: true)
-                            stackedEntityActionGroup(includesShare: false)
+                            stackedActions(compact: false)
+                            stackedActions(compact: true)
+                            ScrollView {
+                                stackedActions(compact: true)
+                            }
+                            .scrollIndicators(.never)
                         }
                     }
                     Spacer(minLength: 12)
@@ -2407,44 +2420,36 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     }
 
     private var primaryActionGroup: some View {
-        VStack(spacing: 0) {
-            primaryAction
-            add
+        VStack(spacing: 8) {
+            primaryAction.glassEffect(.regular.interactive(), in: Circle())
+            add.glassEffect(.regular.interactive(), in: Circle())
         }
-        .padding(1)
-        .glassEffect(.regular.interactive(), in: Capsule())
     }
 
-    private var entityActionGroup: some View {
-        VStack(spacing: 0) {
-            primaryAction
-            add
-            entities
-            measuredAdmin
-        }
-        .padding(1)
-        .glassEffect(.regular.interactive(), in: Capsule())
-    }
-
-    private func stackedEntityActionGroup(includesShare: Bool) -> some View {
-        VStack(spacing: 0) {
-            if includesShare { primaryAction }
-            add
-            Menu {
-                if !includesShare { primaryAction }
-                entities
-                admin
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 21.5, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 48, height: 48)
-                    .contentShape(Rectangle())
+    private func stackedActions(compact: Bool) -> some View {
+        VStack(spacing: 4) {
+            primaryActionGroup
+            if compact {
+                Menu {
+                    entities
+                    admin
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 21.5, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 48)
+                }
+                .accessibilityLabel("More entity actions")
+                .glassEffect(.regular.interactive(), in: Circle())
+            } else {
+                VStack(spacing: 0) {
+                    entities
+                    measuredAdmin
+                }
+                .padding(1)
+                .glassEffect(.regular.interactive(), in: Capsule())
             }
-            .accessibilityLabel("More entity actions")
         }
-        .padding(1)
-        .glassEffect(.regular.interactive(), in: Capsule())
     }
 
     private var measuredAdmin: some View {
@@ -2470,6 +2475,7 @@ struct DuoTabBar<Tab: Hashable>: View {
     var horizontalInset: CGFloat = 2
     var verticalInset: CGFloat = 2
     var axis: Axis = .vertical
+    var separatesButtons = false
     var glass: Glass = .regular
     var selectionFill = Color(hex: "#00613F")
     var revealsTitlesOnHold = false
@@ -2478,7 +2484,8 @@ struct DuoTabBar<Tab: Hashable>: View {
     @State private var heldTab: Tab?
 
     var body: some View {
-        let layout = axis == .horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        let spacing: CGFloat = separatesButtons ? 8 : 0
+        let layout = axis == .horizontal ? AnyLayout(HStackLayout(spacing: spacing)) : AnyLayout(VStackLayout(spacing: spacing))
         layout {
             ForEach(tabs, id: \.self) { tab in
                 let count = badge(tab)
@@ -2498,7 +2505,7 @@ struct DuoTabBar<Tab: Hashable>: View {
                         }
                     }
                         .foregroundStyle(.white)
-                        .frame(width: 44, height: 48)
+                        .frame(width: separatesButtons ? 48 : 44, height: 48)
                         .background {
                             if selection == tab {
                                 Capsule().fill(selectionFill)
@@ -2525,7 +2532,9 @@ struct DuoTabBar<Tab: Hashable>: View {
                     }
                 }
 
-                if revealsTitlesOnHold {
+                if separatesButtons {
+                    button.glassEffect(glass.interactive(), in: Circle())
+                } else if revealsTitlesOnHold {
                     button.buttonStyle(TabHoldStyle { isHeld in
                         if isHeld {
                             heldTab = tab
@@ -2540,7 +2549,7 @@ struct DuoTabBar<Tab: Hashable>: View {
         }
         .padding(.horizontal, horizontalInset)
         .padding(.vertical, verticalInset)
-        .glassEffect(glass.interactive(), in: Capsule())
+        .glassEffect(separatesButtons ? .identity : glass.interactive(), in: Capsule())
     }
 
     private struct TabHoldStyle: ButtonStyle {
