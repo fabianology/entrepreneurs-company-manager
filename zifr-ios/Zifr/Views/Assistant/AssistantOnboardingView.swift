@@ -264,7 +264,7 @@ struct AssistantOnboardingView: View {
                                     if (record.destinationKind ?? record.kind) == .company,
                                        let company = appState.companies.first(where: { $0.id == (record.destinationID ?? record.modelID) }) {
                                         vm.selectedCompany = company
-                                        vm.path.append(company)
+                                        vm.openCompany(company)
                                         disconnectAndDismiss()
                                     } else { searchPresentation = SearchPresentation(record: record) }
                                 } label: {
@@ -1006,7 +1006,7 @@ struct AssistantOnboardingView: View {
                 if let company = targetCompany {
                     self.vm.selectedCompany = company
                     if self.vm.path.isEmpty {
-                        self.vm.path.append(company)
+                        self.vm.openCompany(company)
                     }
                 }
                 
@@ -1023,6 +1023,9 @@ struct AssistantOnboardingView: View {
                 
                 if let tab = tabMap[tabStr.lowercased()] {
                     self.vm.activeTab = tab
+                    if self.vm.phoneTab != nil {
+                        self.vm.phoneTab = .section(tab)
+                    }
                 }
                 
                 self.sendToolResponse(for: firstCall, success: true, advanceQueue: false)

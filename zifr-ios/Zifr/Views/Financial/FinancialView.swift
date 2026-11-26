@@ -286,11 +286,12 @@ struct FinancialView: View {
                                 editableCardIDs: editableCardIDs,
                                 editableLoanIDs: editableLoanIDs,
                                 canAccessCredentials: canAccessCredentials,
-                                fitsCompactWidth: duoLayout.usesCompactLayout,
+                                fitsCompactWidth: duoLayout.isStandardIPhone || duoLayout.usesCompactLayout,
                                 onEditInst: { if canEditResource("institution", $0.id) { editingInst = $0 } },
                                 onEditCard: { if canEditResource("card", $0.id) { editingCard = $0 } },
                                 onEditLoan: { if canEditResource("loan", $0.id) { editingLoan = $0 } }
                             )
+                            .modifier(PhoneCommandCenterContentWidth())
                         }
                         
                         // Remaining standalone accounts block
@@ -326,6 +327,7 @@ struct FinancialView: View {
                                     )
                                 }
                             }
+                            .modifier(PhoneCommandCenterContentWidth())
                         }
                         
                         // Match Services: keep the final item fully above the floating search/action controls.
@@ -334,10 +336,10 @@ struct FinancialView: View {
                     }
                 }
                 .frame(
-                    minWidth: duoLayout.usesCompactLayout ? 0 : nil,
-                    maxWidth: duoLayout.usesCompactLayout ? .infinity : nil
+                    minWidth: duoLayout.isStandardIPhone || duoLayout.usesCompactLayout ? 0 : nil,
+                    maxWidth: duoLayout.isStandardIPhone || duoLayout.usesCompactLayout ? .infinity : nil
                 )
-                .padding(.horizontal, 20)
+                .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
             }
         }
         .scrollIndicators(.hidden)

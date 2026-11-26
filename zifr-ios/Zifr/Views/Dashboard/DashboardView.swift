@@ -15,6 +15,7 @@ struct DashboardView: View {
     private var documents: [CompanyDocument] { appState.documents }
 
     @Bindable var vm: AppViewModel
+    @State private var phoneActionTab: AppViewModel.PhoneTab?
     @State private var showAddCompany = false
     @State private var showSharedWithMe = false
     @State private var editingCompany: Company?
@@ -28,6 +29,7 @@ struct DashboardView: View {
     @State private var selectedInstitution: Institution?
     @State private var selectedLoan: Loan?
     @State private var selectedDocument: CompanyDocument? = nil
+    @State private var showGeminiAfterSearch = false
     @State private var showAssistant = false    
     @State private var showPremiumUpgrade = false
     @State private var showDowngradeSelection = false
@@ -82,13 +84,127 @@ struct DashboardView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $vm.path) {
-            portfolioPresentedPanels(dashboardWithToolbar)
+        Group {
+            if #available(iOS 26.0, *), duoLayout.usesPhoneTabs {
+                portfolioPresentedPanels(phoneNavigation)
+            } else {
+                NavigationStack(path: $vm.path) {
+                    portfolioPresentedPanels(portfolioDestinations(dashboardWithToolbar))
+                }
+            }
+        }
+        .onChange(of: duoLayout.usesPhoneTabs, initial: true) { _, enabled in
+            vm.setPhoneNavigationEnabled(enabled)
         }
         .task {
             if !appState.hasLoadedCompanies {
                 await DataRepository.shared.fetchAllData(appState: appState)
             }
+        }
+    }
+
+    private var phoneCompany: Company? {
+        if let selected = vm.selectedCompany,
+           let current = appState.companies.first(where: { $0.id == selected.id }) { return current }
+        if onboardingState.isTutorialActive && companies.isEmpty { return dummyCompany }
+        return companies.first
+    }
+
+    @available(iOS 26.0, *)
+    @ViewBuilder
+    private var phoneNavigation: some View {
+        if case .section = vm.phoneTab {
+            phoneTabs
+        } else {
+            phoneStack(for: .dashboard) { dashboardWithToolbar }
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private var phoneTabs: some View {
+        let selection = Binding<AppViewModel.PhoneTab>(
+            get: { phoneActionTab ?? .section(vm.activeTab) },
+            set: { tab in
+                switch tab {
+                case .add, .search:
+                    if phoneAddRole != nil {
+                        phoneActionTab = tab
+                    } else {
+                        openPhoneTabAction(tab)
+                    }
+                case .section(let section):
+                    vm.activeTab = section
+                    vm.selectedCompany = phoneCompany
+                case .dashboard:
+                    break
+                }
+            }
+        )
+        return TabView(selection: selection) {
+            Tab("Search", systemImage: "magnifyingglass", value: AppViewModel.PhoneTab.search) {
+                phoneTabActionContent(.search)
+            }
+            ForEach(EntityHomeTab.allCases, id: \.self) { section in
+                Tab(section.rawValue, systemImage: section.icon, value: AppViewModel.PhoneTab.section(section)) {
+                    phoneStack(for: .section(section)) {
+                        if let company = phoneCompany {
+                            CompanyDetailView(company: company, vm: vm, onShowAllEntities: vm.returnToDashboard,
+                                              phoneSection: section)
+                                .id(company.id)
+                        } else if appState.hasLoadedCompanies {
+                            ContentUnavailableView {
+                                Label("Choose an entity", systemImage: "building.2")
+                            } description: {
+                                Text("Add an entity to start using its Command Center.")
+                            } actions: {
+                                Button("Add entity", action: requestAddCompany)
+                                Button("All Entities", action: vm.returnToDashboard)
+                            }
+                        } else {
+                            ProgressView("Loading entities…")
+                        }
+                    }
+                }
+            }
+            Tab("Add", systemImage: "plus", value: AppViewModel.PhoneTab.add, role: phoneAddRole) {
+                phoneTabActionContent(.add)
+            }
+        }
+        .tabViewStyle(.tabBarOnly)
+        .tabBarMinimizeBehavior(.onScrollDown)
+    }
+
+    @available(iOS 26.0, *)
+    private var phoneAddRole: TabRole? {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) { return .prominent }
+        #endif
+        return nil
+    }
+
+    private func phoneTabActionContent(_ tab: AppViewModel.PhoneTab) -> some View {
+        Color.zifrBG.ignoresSafeArea()
+            .task(id: phoneActionTab) {
+                guard phoneActionTab == tab else { return }
+                // iOS 27 updates a tab's selection before presenting its content.
+                // Restore the section before opening the action from that screen.
+                phoneActionTab = nil
+                openPhoneTabAction(tab)
+            }
+    }
+
+    private func openPhoneTabAction(_ tab: AppViewModel.PhoneTab) {
+        switch tab {
+        case .add:
+            if phoneCompany != nil {
+                vm.phoneAddRequest &+= 1
+            } else if appState.hasLoadedCompanies {
+                requestAddCompany()
+            }
+        case .search:
+            vm.showSearch = true
+        default:
+            break
         }
     }
 
@@ -114,6 +230,104 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var dashboardWithToolbar: some View {
+        if #available(iOS 26.0, *), duoLayout.usesPadSideNavigation {
+            dashboardSurface
+                .safeAreaInset(edge: .trailing, spacing: 8) {
+                    portraitDashboardToolbar.padding(.top, duoLayout.padActionsTopInset)
+                }
+                .toolbar(.hidden, for: .navigationBar)
+                .allowsHitTesting(!isPortraitDrawerOpen)
+                .accessibilityHidden(isPortraitDrawerOpen)
+                .overlay {
+                    if usesDuoPortraitDashboard && vm.path.isEmpty {
+                        MiloomDuoBriefingFile(isPresented: $showPortraitBriefing,
+                            tabTopInset: duoLayout.padActionsTopInset,
+                            additionalControls: AnyView(notificationInboxButton)) {
+                            inlineBriefingPanel(isActive: vm.path.isEmpty)
+                        }
+                        .allowsHitTesting(!showPortraitInbox)
+                        .accessibilityHidden(showPortraitInbox)
+                    }
+                }
+                .overlay { portraitInboxOverlay }
+                .onDisappear {
+                    showPortraitBriefing = false
+                    showPortraitInbox = false
+                }
+                .onChange(of: duoLayout.usesPadSplit) { _, _ in
+                    showPortraitBriefing = false
+                    dismissPortraitInbox()
+                }
+        } else if #available(iOS 26.0, *), duoLayout.usesPhoneTabs {
+            dashboardSurface
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            presentBriefing(source: "dashboard_header_receipt")
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "receipt")
+                                    .accessibilityHidden(true)
+                                Text("Briefing")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: openDashboardInbox) {
+                            Label("Notification inbox", systemImage: "bell")
+                        }
+                        .badge(appState.unreadNotificationCount)
+                    }
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            dashboardSharingChoices
+                        } label: {
+                            Label("Add entity", systemImage: "plus")
+                        } primaryAction: {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            requestAddCompany()
+                        }
+                    }
+                }
+        } else if #available(iOS 26.0, *), duoLayout.usesPhoneAndPadGlassNavigation {
+            dashboardSurface
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItemGroup(placement: .topBarLeading) {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            presentBriefing(source: "dashboard_header_receipt")
+                        } label: {
+                            Label("Executive Briefing", systemImage: "receipt")
+                        }
+                        Button(action: openDashboardInbox) {
+                            Label("Notification inbox", systemImage: "bell")
+                        }
+                        .badge(appState.unreadNotificationCount)
+                    }
+                    ToolbarItem(placement: .principal) {
+                        Image("miloom_text_embossed")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 96)
+                            .accessibilityLabel("Miloom")
+                    }
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        dashboardShareControl
+                        dashboardAddControl
+                    }
+                }
+        } else {
+            adaptiveDashboardWithToolbar
+        }
+    }
+
+    @ViewBuilder
+    private var adaptiveDashboardWithToolbar: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
             let showsPortraitToolbar = usesDuoPortraitDashboard && vm.path.isEmpty
@@ -410,7 +624,7 @@ struct DashboardView: View {
     #endif
 
     private var usesDuoPortraitDashboard: Bool {
-        duoLayout.usesExpandedPortrait
+        duoLayout.usesExpandedPortrait || (duoLayout.usesPadSideNavigation && !duoLayout.usesPadSplit)
     }
 
     @available(iOS 26.0, *)
@@ -422,6 +636,15 @@ struct DashboardView: View {
             }
             .padding(1)
             .glassEffect(.regular.interactive(), in: Capsule())
+            if duoLayout.usesPadSplit {
+                VStack(spacing: 0) {
+                    dashboardBriefingButton
+                    notificationInboxButton
+                }
+                .padding(1)
+                .glassEffect(.regular.interactive(), in: Capsule())
+                .padding(.top, 12)
+            }
             Spacer(minLength: 24)
             dashboardAdminControl
                 .frame(height: portraitBottomRowHeight)
@@ -434,7 +657,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func dashboardToolbarLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
-        if usesDuoPortraitDashboard || duoLayout.usesStackedLayout {
+        if usesDuoPortraitDashboard || duoLayout.usesPadSplit || duoLayout.usesStackedLayout {
             Label(title, systemImage: systemImage)
                 .labelStyle(.iconOnly)
                 .font(.system(size: 21.5, weight: .medium))
@@ -458,7 +681,7 @@ struct DashboardView: View {
     private var dashboardAdminControl: some View {
         Button(action: openDashboardAdmin) {
             let label = dashboardToolbarLabel("Admin settings", systemImage: "person.crop.circle")
-            if #available(iOS 26.0, *), usesDuoPortraitDashboard || duoLayout.usesStackedPortraitLayout {
+            if #available(iOS 26.0, *), usesDuoPortraitDashboard || duoLayout.usesPadSplit || duoLayout.usesStackedPortraitLayout {
                 label.glassEffect(.regular.interactive(), in: Circle())
             } else {
                 label
@@ -529,13 +752,15 @@ struct DashboardView: View {
                 }
 
                 VStack(spacing: 0) {
-                    if !usesDuoLandscapeDashboard && !duoLayout.usesStackedPortraitLayout {
+                    if !duoLayout.usesPhoneAndPadGlassNavigation && !usesDuoLandscapeDashboard && !duoLayout.usesStackedPortraitLayout {
                         dashboardHeader
                     }
                     portfolioPanels
                 }
                 .safeAreaInset(edge: .bottom, spacing: duoLayout.usesStackedPortraitLayout ? 0 : nil) {
-                    if !usesDuoLandscapeDashboard && !duoLayout.usesStackedPortraitLayout {
+                    if #available(iOS 26.0, *), duoLayout.usesPhoneTabs {
+                        phoneDashboardControls
+                    } else if !duoLayout.usesPadSideNavigation && !usesDuoLandscapeDashboard && !duoLayout.usesStackedPortraitLayout {
                         dashboardBottomControls
                     }
                 }
@@ -632,7 +857,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var dashboardBottomControls: some View {
-        if usesDuoPortraitDashboard {
+        if duoLayout.usesExpandedPortrait {
             GeometryReader { geometry in
                 let frames = DuoPortraitFilingFrames.resolve(size: geometry.size)
                 dashboardBottomControlsRow
@@ -673,10 +898,33 @@ struct DashboardView: View {
         return abs(adjustment) <= 44 ? adjustment : 0
     }
 
+    @available(iOS 26.0, *)
+    private var phoneDashboardControls: some View {
+        HStack(spacing: 10) {
+            dashboardAdminControl
+                .labelStyle(.iconOnly)
+                .buttonStyle(.glass(.clear.tint(Color.zifrBG.opacity(0.45))))
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
+            dashboardSearchButton
+            dashboardAssistantButton
+        }
+        .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
+        .padding(.bottom, bottomControlInset)
+    }
+
     private var dashboardBottomControlsRow: some View {
         let assistantFirst = duoLayout.placesSplitControlsOnLeadingEdge(in: layoutDirection)
         return HStack(spacing: 10) {
-            if !isDuoDevice { dashboardAdminButton }
+            if #available(iOS 26.0, *), duoLayout.usesPhoneAndPadGlassNavigation && !duoLayout.usesPadSideNavigation {
+                dashboardAdminControl
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.large)
+            } else if !isDuoDevice && !duoLayout.usesPadSideNavigation {
+                dashboardAdminButton
+            }
             if assistantFirst {
                 dashboardAssistantButton
             }
@@ -684,7 +932,7 @@ struct DashboardView: View {
             if !assistantFirst {
                 dashboardAssistantButton
             }
-            if !isDuoDevice {
+            if !isDuoDevice && !duoLayout.usesPhoneAndPadGlassNavigation {
                 legacyPlusCommandMenu
             }
         }
@@ -742,7 +990,7 @@ struct DashboardView: View {
     }
 
     private var dashboardSearchButton: some View {
-        MiloomDuoFooterButton(borderShape: .capsule) {
+        MiloomFooterButton(borderShape: .capsule) {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             vm.showSearch = true
         } label: {
@@ -800,7 +1048,7 @@ struct DashboardView: View {
     }
 
     private var dashboardAssistantButton: some View {
-        MiloomDuoFooterButton(borderShape: .circle) {
+        MiloomFooterButton(borderShape: .circle) {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showAssistant = true
         } label: {
@@ -829,6 +1077,45 @@ struct DashboardView: View {
         )
     }
 
+    private func portfolioDestinations<Content: View>(_ content: Content, includesShared: Bool = true) -> some View {
+        content
+            .navigationBarBackButtonHidden(true)
+            .navigationDestination(for: Company.self) { company in
+                if duoLayout.usesPhoneTabs {
+                    // Resolve restored navigation paths created before the tab host mounted.
+                    Color.clear.task {
+                        vm.path = NavigationPath()
+                        vm.openCompany(company)
+                    }
+                } else {
+                    CompanyDetailView(company: company, vm: vm, onShowAllEntities: { showBriefing = false })
+                        .id(company.id)
+                }
+            }
+            .navigationDestination(for: AppViewModel.AppRoute.self) { route in
+                if route == .adminSettings {
+                    AdminSettingsView(vm: vm)
+                        .toolbar(duoLayout.usesPhoneTabs ? .hidden : .automatic, for: .tabBar)
+                }
+            }
+            .navigationDestination(isPresented: includesShared ? $showSharedWithMe : .constant(false)) {
+                if let uid = currentUserId {
+                    SharedWithMeView(vm: vm, currentUserId: uid)
+                        .toolbar(duoLayout.usesPhoneTabs ? .hidden : .automatic, for: .tabBar)
+                }
+            }
+    }
+
+    private func phoneStack<Content: View>(for tab: AppViewModel.PhoneTab, @ViewBuilder content: () -> Content) -> some View {
+        let path = Binding<NavigationPath>(
+            get: { vm.phonePaths[tab] ?? NavigationPath() },
+            set: { vm.phonePaths[tab] = $0 }
+        )
+        return NavigationStack(path: path) {
+            portfolioDestinations(content(), includesShared: tab == .dashboard)
+        }
+    }
+
     private func portfolioLifecyclePanels<Content: View>(_ content: Content) -> some View {
         content
             .onAppear {
@@ -847,7 +1134,7 @@ struct DashboardView: View {
                             vm.selectedCompany = newCompany
                             vm.activeTab = .financial
                             vm.touchCompany(newCompany, appState: appState)
-                            vm.path.append(newCompany)
+                            vm.openCompany(newCompany)
                         }
                     }
                 }
@@ -884,25 +1171,6 @@ struct DashboardView: View {
                     Text("Are you sure you want to delete this company? All associated data will be removed for everyone.")
                 }
             }
-            .navigationBarBackButtonHidden(true)
-            .navigationDestination(for: Company.self) { company in
-                CompanyDetailView(
-                    company: company,
-                    vm: vm,
-                    onShowAllEntities: { showBriefing = false }
-                )
-                .id(company.id)
-            }
-            .navigationDestination(for: AppViewModel.AppRoute.self) { route in
-                if route == .adminSettings {
-                    AdminSettingsView(vm: vm)
-                }
-            }
-            .navigationDestination(isPresented: $showSharedWithMe) {
-                if let uid = currentUserId {
-                    SharedWithMeView(vm: vm, currentUserId: uid)
-                }
-            }
             .sheet(item: $companyToShare) { company in
                 ShareEntitySheet(resourceId: company.id, resourceType: "company", resourceTitle: company.name)
             }
@@ -918,7 +1186,7 @@ struct DashboardView: View {
                         vm.selectedCompany = company
                         vm.activeTab = .financial
                         vm.touchCompany(company, appState: appState)
-                        vm.path.append(company)
+                        vm.openCompany(company)
                     }
                 }
             }
@@ -931,8 +1199,21 @@ struct DashboardView: View {
             .sheet(item: $editingCompany) { company in
                 NewEntitySheet(vm: vm, company: company) { _ in }
             }
-            .sheet(isPresented: $vm.showSearch) {
-                GlobalSearchView(vm: vm)
+            .sheet(isPresented: $vm.showSearch, onDismiss: {
+                if showGeminiAfterSearch {
+                    showGeminiAfterSearch = false
+                    showAssistant = true
+                }
+            }) {
+                if duoLayout.usesPhoneTabs {
+                    GlobalSearchView(vm: vm, onAskGemini: {
+                        if onboardingState.isSpotlightingAssistant { onboardingState.completeOnboarding() }
+                        showGeminiAfterSearch = true
+                        vm.showSearch = false
+                    })
+                } else {
+                    GlobalSearchView(vm: vm)
+                }
             }
             .sheet(isPresented: $showBriefing) {
                 GeometryReader { geometry in
@@ -1029,7 +1310,7 @@ struct DashboardView: View {
                         let entity = appState.companies.first ?? dummyCompany
                         vm.selectedCompany = entity
                         if vm.path.isEmpty {
-                            vm.path.append(entity)
+                            vm.openCompany(entity)
                         }
                         // CompanyDetailView will render the Control Center
                     }
@@ -1042,7 +1323,7 @@ struct DashboardView: View {
                         let entity = appState.companies.first ?? dummyCompany
                         vm.selectedCompany = entity
                         if vm.path.isEmpty {
-                            vm.path.append(entity)
+                            vm.openCompany(entity)
                         }
                         // CompanyDetailView's own onChange will set vm.activeTab = .financial
                     }
@@ -1052,14 +1333,14 @@ struct DashboardView: View {
                      .tutorialSearch, .tutorialAssistant, .tutorialSwipeHint:
                     stackedDashboardTab = .entities
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        vm.path = NavigationPath()
+                        vm.returnToDashboard()
                         vm.activeTab = .financial
                     }
 
                 // ── Done ──
                 case .tutorialDone:
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        vm.path = NavigationPath()
+                        vm.returnToDashboard()
                         vm.activeTab = .financial
                     }
 
@@ -1094,6 +1375,28 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var portfolioPanels: some View {
+        if duoLayout.usesPadSideNavigation {
+            HStack(spacing: 12) {
+                if duoLayout.usesPadSplit {
+                    inlineBriefingPanel(isActive: vm.path.isEmpty)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                }
+                VStack(spacing: 0) {
+                    dashboardHeader
+                    entityList(isDuoExpanded: true)
+                }
+                .safeAreaInset(edge: .bottom) { dashboardBottomControls }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.leading, duoLayout.usesPadSplit ? 0 : 80)
+        } else {
+            adaptivePortfolioPanels
+        }
+    }
+
+    @ViewBuilder
+    private var adaptivePortfolioPanels: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *), duoLayout.usesStackedPortraitLayout {
             let headerHeight = dashboardHeaderHeight + dashboardHeaderInsets.top + dashboardHeaderInsets.bottom
@@ -1165,7 +1468,8 @@ struct DashboardView: View {
     }
 
     private func entityList(isDuoExpanded: Bool = false, compactCards: Bool = false) -> some View {
-                    List {
+        let sideInset = PhoneCommandCenterContentWidth.sideInset
+        return List {
                         if companies.isEmpty && !appState.hasLoadedCompanies && appState.portfolioLoadIssue == nil && !onboardingState.isTutorialActive {
                             ProgressView("Loading your companies…")
                                 .tint(Color.zifrGold)
@@ -1193,12 +1497,13 @@ struct DashboardView: View {
                                         .foregroundStyle(Color.zifrGold)
                                 }
                                 .padding(12)
+                                .modifier(PhoneCommandCenterContentWidth())
                                 .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                             }
                             .buttonStyle(.plain)
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 10, trailing: 20))
+                            .listRowInsets(EdgeInsets(top: 0, leading: sideInset, bottom: 10, trailing: sideInset))
                         }
 
                         ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
@@ -1210,7 +1515,7 @@ struct DashboardView: View {
                                 .background(tutorialFrameCapture(index: index))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: (isLast && !hasPlaceholder && !isDuoExpanded && !compactCards) ? 120 : rowSpacing, trailing: 20))
+                                .listRowInsets(EdgeInsets(top: 0, leading: sideInset, bottom: (isLast && !hasPlaceholder && !isDuoExpanded && !compactCards) ? 120 : rowSpacing, trailing: sideInset))
                         }
 
                         // Add company button / empty state placeholder under the dummy company
@@ -1276,7 +1581,7 @@ struct DashboardView: View {
                         }
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: compactCards ? 10 : (isDuoExpanded ? 16 : 120), trailing: 20))
+                        .listRowInsets(EdgeInsets(top: 0, leading: sideInset, bottom: compactCards ? 10 : (isDuoExpanded ? 16 : 120), trailing: sideInset))
                     }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -1413,22 +1718,26 @@ struct DashboardView: View {
         }
     }
 
-    private var dashboardShareControl: some View {
-        Menu {
-            Section("Share Entity") {
-                ForEach(shareableDuoCompanies) { company in
-                    Menu(company.name.isEmpty ? "New Business" : company.name) {
-                        ForEach(EntitySharingScope.allCases) { scope in
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                duoSharingRequest = DuoDashboardSharingRequest(company: company, scope: scope)
-                            } label: {
-                                Label(scope.title, systemImage: scope.icon)
-                            }
+    private var dashboardSharingChoices: some View {
+        Section("Share Entity") {
+            ForEach(shareableDuoCompanies) { company in
+                Menu(company.name.isEmpty ? "New Business" : company.name) {
+                    ForEach(EntitySharingScope.allCases) { scope in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            duoSharingRequest = DuoDashboardSharingRequest(company: company, scope: scope)
+                        } label: {
+                            Label(scope.title, systemImage: scope.icon)
                         }
                     }
                 }
             }
+        }
+    }
+
+    private var dashboardShareControl: some View {
+        Menu {
+            dashboardSharingChoices
         } label: {
             dashboardToolbarLabel("Share access", systemImage: "square.and.arrow.up")
         }
@@ -1486,7 +1795,7 @@ struct DashboardView: View {
         switch resourceType {
         case .company:
             if let company = appState.companies.first(where: { $0.id == resourceID }) {
-                vm.path.append(company)
+                vm.openCompany(company)
             }
         case .subscription:
             selectedSubscription = appState.subscriptions.first { $0.id == resourceID }
@@ -1551,7 +1860,7 @@ struct DashboardView: View {
         vm.searchQuery = ""
         vm.activeTab = .subscriptions
         vm.deepLinkModelId = id
-        vm.path = NavigationPath([company])
+        vm.openCompany(company, replacingPath: true)
     }
 
     private func openSharedItem(_ share: SharedItem) {
@@ -1653,13 +1962,14 @@ struct DashboardView: View {
     }
 
     private func dashboardHeaderShortcut(_ symbol: String) -> some View {
-        let size: CGFloat = usesDuoPortraitDashboard ? duoControlSize : 40
+        let sideControl = usesDuoPortraitDashboard || duoLayout.usesPadSplit
+        let size: CGFloat = sideControl ? duoControlSize : 40
         return Image(systemName: symbol)
-            .font(.system(size: usesDuoPortraitDashboard ? 21.5 : 17,
-                          weight: usesDuoPortraitDashboard ? .medium : .semibold))
-            .foregroundStyle(Color.white.opacity(usesDuoPortraitDashboard ? 1 : 0.82))
+            .font(.system(size: sideControl ? 21.5 : 17,
+                          weight: sideControl ? .medium : .semibold))
+            .foregroundStyle(Color.white.opacity(sideControl ? 1 : 0.82))
             .frame(width: size, height: size)
-            .background(Color.black.opacity(usesDuoPortraitDashboard ? 0 : 0.32), in: Circle())
+            .background(Color.black.opacity(sideControl ? 0 : 0.32), in: Circle())
             .contentShape(Rectangle())
     }
 
@@ -1683,7 +1993,7 @@ struct DashboardView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: geometry.size.width * 0.35)
-                    .position(x: usesDuoPortraitDashboard ? cardFrames.page.midX : geometry.size.width / 2,
+                    .position(x: duoLayout.usesExpandedPortrait ? cardFrames.page.midX : geometry.size.width / 2,
                               y: geometry.size.height / 2)
                     .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
             }
@@ -1706,7 +2016,7 @@ struct DashboardView: View {
                         .buttonStyle(.plain)
                     }
                     #endif
-                } else if !usesDuoPortraitDashboard && !duoLayout.usesNativeSideToolbarGroups {
+                } else if !duoLayout.usesPadSideNavigation && !usesDuoPortraitDashboard && !duoLayout.usesNativeSideToolbarGroups {
                     dashboardBriefingButton
                     notificationInboxButton
                 }
@@ -1741,7 +2051,7 @@ struct DashboardView: View {
             vm.selectedCompany = company
             vm.activeTab = tab
             vm.touchCompany(company, appState: appState)
-            vm.path.append(company)
+            vm.openCompany(company)
         }
 
         CompanyCardView(
@@ -1751,7 +2061,7 @@ struct DashboardView: View {
             docsCount: appState.hasLoadedCompanyContent ? dCount : nil,
             onEdit: { editingCompany = company },
             canEdit: canEdit,
-            onShare: isDuoDevice || isSharedWithMe ? nil : { companyToShare = company },
+            onShare: isDuoDevice || duoLayout.usesPadSideNavigation || isSharedWithMe ? nil : { companyToShare = company },
             shareRole: role,
             isSharedWithMe: isSharedWithMe,
             isSharedByMe: isSharedByMe,
@@ -1770,7 +2080,7 @@ struct DashboardView: View {
         case .needsReview:
             vm.activeTab = .subscriptions
         case .needsAssistant, .completed:
-            vm.path = NavigationPath()
+            vm.returnToDashboard()
             vm.activeTab = .financial
         default:
             break
@@ -2148,7 +2458,9 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     }
 }
 
-@available(iOS 27.1, *)
+#endif
+
+@available(iOS 26.0, *)
 struct DuoTabBar<Tab: Hashable>: View {
     @Binding var selection: Tab
     let tabs: [Tab]
@@ -2255,7 +2567,6 @@ struct DuoTabBar<Tab: Hashable>: View {
 
 /// Native controls and SwiftUI content can have different global coordinate roots.
 /// Measure within their common window after UIKit lays out its controls.
-@available(iOS 27.1, *)
 struct DuoWindowVerticalMeasurement: UIViewRepresentable {
     var measure: (UIView, UIWindow) -> CGFloat? = { view, window in
         view.convert(view.bounds, to: window).midY
@@ -2309,7 +2620,6 @@ struct DuoWindowVerticalMeasurement: UIViewRepresentable {
         }
     }
 }
-#endif
 
 struct SharedWithMeView: View {
     @Bindable var vm: AppViewModel

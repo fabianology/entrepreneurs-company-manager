@@ -220,7 +220,8 @@ struct SubscriptionListView: View {
                     }
                 )
                 .allowsHitTesting(false)
-                .padding(.horizontal, 20)
+                .modifier(PhoneCommandCenterContentWidth())
+                .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
                 .padding(.top, 24)
             } else if canEdit {
                 Button(action: {
@@ -247,7 +248,8 @@ struct SubscriptionListView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
                     }
-                    .padding(.horizontal, 20)
+                    .modifier(PhoneCommandCenterContentWidth())
+                    .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 24)
@@ -269,7 +271,8 @@ struct SubscriptionListView: View {
                     }
                     .padding(.horizontal, 28)
                 }
-                .padding(.horizontal, 20)
+                .modifier(PhoneCommandCenterContentWidth())
+                .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
                 .padding(.top, 24)
                 .accessibilityElement(children: .combine)
             }
@@ -340,7 +343,8 @@ private struct StackedSubscriptionDeckView: View {
                     options: ["All", "Bills", "Subscriptions"],
                     selection: $selectedServiceFilter
                 )
-                .padding(.horizontal, 20)
+                .modifier(PhoneCommandCenterContentWidth())
+                .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
                 .padding(.bottom, filterSpacing)
 
                 if subscriptions.isEmpty {
@@ -589,6 +593,7 @@ private struct StackedServiceSection: View {
                         }
                     )
                     .frame(maxWidth: .infinity)
+                    .modifier(PhoneCommandCenterContentWidth())
                     .fixedSize(horizontal: false, vertical: true)
                     .clipShape(cardShape)
                     .overlay(
@@ -634,7 +639,8 @@ private struct StackedServiceSection: View {
             .frame(maxWidth: .infinity)
             .frame(height: totalStackHeight, alignment: .top)
         }
-        .padding(.horizontal, 20)
+        .modifier(PhoneCommandCenterContentWidth())
+        .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
         .padding(.top, centeringInsets.top)
         .padding(.bottom, bottomPadding + centeringInsets.bottom)
         .onChange(of: focus, initial: true) { _, request in

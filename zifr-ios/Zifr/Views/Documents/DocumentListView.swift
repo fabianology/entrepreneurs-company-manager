@@ -270,7 +270,7 @@ struct DocumentListView: View {
                     if let docs = grouped[type], !docs.isEmpty {
                         ForEach(docs) { doc in
                             documentRow(for: doc)
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
                         }
                     }
                 }
@@ -279,7 +279,7 @@ struct DocumentListView: View {
             VStack(spacing: 10) {
                 ForEach(docs) { doc in
                     documentRow(for: doc)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
                 }
             }
         } else {
@@ -364,7 +364,8 @@ struct DocumentListView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .modifier(PhoneCommandCenterContentWidth())
+        .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
         .padding(.bottom, 10)
     }
 
@@ -461,7 +462,8 @@ struct DocumentListView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .modifier(PhoneCommandCenterContentWidth())
+        .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
     }
 
     private var documentActionBar: some View {
@@ -572,7 +574,8 @@ struct DocumentListView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
                     }
-                    .padding(.horizontal, 20)
+                    .modifier(PhoneCommandCenterContentWidth())
+                    .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 24)
@@ -594,7 +597,8 @@ struct DocumentListView: View {
                     }
                     .padding(.horizontal, 24)
                 }
-                .padding(.horizontal, 20)
+                .modifier(PhoneCommandCenterContentWidth())
+                .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
                 .padding(.top, 24)
                 .accessibilityElement(children: .combine)
             }
@@ -619,6 +623,7 @@ struct DocumentListView: View {
             onShare: canManageSharing && doc.visibility != "owner_private" ? { shareDocument(doc) } : nil,
             onDelete: canEditDocument(doc) ? { documentToDelete = doc } : nil
         )
+        .modifier(PhoneCommandCenterContentWidth())
     }
 
     private func shareDocument(_ doc: CompanyDocument) {

@@ -17,6 +17,37 @@ final class MiloomDuoLayoutState {
         let commandCenter: CGFloat
     }
 
+    var usesPhoneAndPadGlassNavigation: Bool {
+        guard #available(iOS 26.0, *), !isDuoDevice, !ProcessInfo.processInfo.isiOSAppOnMac else { return false }
+        if #available(iOS 26.1, *), ProcessInfo.processInfo.isiOSAppOnVision { return false }
+        let idiom = UIDevice.current.userInterfaceIdiom
+        return idiom == .phone || idiom == .pad
+    }
+
+    var isStandardIPhone: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone && !isDuoDevice
+    }
+
+    var usesPhoneTabs: Bool {
+        usesPhoneAndPadGlassNavigation && UIDevice.current.userInterfaceIdiom == .phone
+    }
+
+    var padWindowSize = CGSize.zero
+
+    var usesPadSideNavigation: Bool {
+        usesPhoneAndPadGlassNavigation && UIDevice.current.userInterfaceIdiom == .pad
+            && padWindowSize.width >= 600 && padWindowSize.height >= 500
+    }
+
+    var usesPadSplit: Bool {
+        usesPadSideNavigation && padWindowSize.width > padWindowSize.height && padWindowSize.width >= 800
+    }
+
+    var padActionsTopInset: CGFloat {
+        min(padWindowSize.height * (usesPadSplit ? 0.12 : 0.25),
+            max(12, padWindowSize.height - 480))
+    }
+
     var usesStackedLayout: Bool {
         isDuoDevice && isExpanded && splitPane == .stacked
     }
@@ -113,6 +144,13 @@ struct MiloomDuoWindow: ViewModifier {
                 if isDuoDevice { visibility = .never }
             }
             .background { layoutObservation }
+            .background {
+                if layout.usesPhoneAndPadGlassNavigation && UIDevice.current.userInterfaceIdiom == .pad {
+                    Color.clear
+                        .onGeometryChange(for: CGSize.self) { $0.size } action: { layout.padWindowSize = $0 }
+                        .ignoresSafeArea()
+                }
+            }
     }
 
     @ViewBuilder
@@ -418,6 +456,7 @@ private struct DuoSplitPaneReader: UIViewRepresentable {
                             .foregroundStyle(Color.zifrGold)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 4)
+                            .offset(y: vm.phoneTab == nil ? 0 : -16)
                             .allowsHitTesting(false)
                     }
                     .background(Color.zifrBG)

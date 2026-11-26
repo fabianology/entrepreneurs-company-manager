@@ -1324,7 +1324,7 @@ struct EditCompanySheet: View {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     dismiss()
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        vm.path = NavigationPath()
+                                        vm.returnToDashboard()
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                                             onboardingState.startTutorial()
                                         }

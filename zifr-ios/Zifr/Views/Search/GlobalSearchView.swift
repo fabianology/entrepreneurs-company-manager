@@ -2,6 +2,8 @@ import SwiftUI
 
 struct GlobalSearchView: View {
     @Bindable var vm: AppViewModel
+    var onAskGemini: (() -> Void)? = nil
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
@@ -79,9 +81,12 @@ struct GlobalSearchView: View {
                     case .coverage: coverageSheet
                     }
                 }
+                .toolbar(duoLayout.usesPhoneTabs ? .hidden : .automatic, for: .navigationBar)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        companyPicker
+                    if #available(iOS 26.0, *), duoLayout.usesPhoneTabs {
+                        DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                    } else {
+                        ToolbarItem(placement: .topBarTrailing) { companyPicker }
                     }
                 }
         }
@@ -130,6 +135,22 @@ struct GlobalSearchView: View {
     private var resultsList: some View {
         let page = SearchResultPage(response: response, overviews: overviews, limit: visibleLimit)
         return List {
+            if duoLayout.usesPhoneTabs {
+                let actionsLayout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                    : AnyLayout(HStackLayout(spacing: 8))
+                actionsLayout {
+                    companyPicker
+                    if let onAskGemini {
+                        if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
+                        talkToGeminiButton(action: onAskGemini)
+                            .layoutPriority(1)
+                    }
+                }
+                .buttonStyle(.borderless)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
             if !appState.hasLoadedPortfolio {
                 ContentUnavailableView("Loading your portfolio", systemImage: "arrow.triangle.2.circlepath",
                     description: Text("Your results will appear when your records are ready."))
@@ -255,6 +276,37 @@ struct GlobalSearchView: View {
         .scrollContentBackground(.hidden)
         .background(Color.zifrCard.opacity(0.65))
         .scrollDismissesKeyboard(.immediately)
+    }
+
+    private func talkToGeminiButton(action: @escaping () -> Void) -> some View {
+        let accent = LinearGradient(
+            colors: [Color(hex: "#7FAEFF"), Color(hex: "#AB8CFF"), Color(hex: "#ED99C5")],
+            startPoint: .leading, endPoint: .trailing
+        )
+        return Button {
+            endEditing()
+            action()
+        } label: {
+            HStack(spacing: 8) {
+                MiloomGeminiSparkle()
+                Text("Talk to Gemini")
+                    .font(.subheadline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(minHeight: 44)
+            .background(
+                LinearGradient(
+                    colors: [Color(hex: "#243458"), Color(hex: "#3A2D4F")],
+                    startPoint: .leading, endPoint: .trailing
+                ),
+                in: Capsule()
+            )
+            .overlay { Capsule().strokeBorder(accent.opacity(0.85), lineWidth: 1) }
+            .contentShape(Capsule())
+        }
     }
 
     private func refreshClock() {
@@ -519,7 +571,10 @@ struct GlobalSearchView: View {
     private func open(_ record: SearchRecord) {
         endEditing()
         if response.isCredentialRequest && (!record.login.isEmpty || record.credential != .none) { presentation = .result(.init(recordIDs: [record.id])) }
-        else if (record.destinationKind ?? record.kind) == .company, let company = appState.companies.first(where: { $0.id == (record.destinationID ?? record.modelID) }) { vm.selectedCompany = company; vm.path.append(company); dismiss() }
+        else if (record.destinationKind ?? record.kind) == .company, let company = appState.companies.first(where: { $0.id == (record.destinationID ?? record.modelID) }) {
+            vm.openCompany(company)
+            dismiss()
+        }
         else { presentation = .result(.init(record: record)) }
     }
     @MainActor private func search() async {

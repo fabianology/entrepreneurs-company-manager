@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct MiloomDuoFooterButton<Label: View, LegacyLabel: View>: View {
+struct MiloomFooterButton<Label: View, LegacyLabel: View>: View {
     @Environment(MiloomDuoLayoutState.self) private var duoLayout
     let borderShape: ButtonBorderShape
     let action: () -> Void
@@ -8,7 +8,7 @@ struct MiloomDuoFooterButton<Label: View, LegacyLabel: View>: View {
     @ViewBuilder let legacyLabel: () -> LegacyLabel
 
     var body: some View {
-        if #available(iOS 26.0, *), duoLayout.isDuoDevice {
+        if #available(iOS 26.0, *), duoLayout.isDuoDevice || duoLayout.usesPhoneAndPadGlassNavigation {
             Button(action: action, label: label)
                 .buttonStyle(.glass(.clear.tint(Color.zifrBG.opacity(0.45))))
                 .buttonBorderShape(borderShape)

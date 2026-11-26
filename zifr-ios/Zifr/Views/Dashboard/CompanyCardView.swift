@@ -172,6 +172,7 @@ struct CompanyCardView: View {
             }
             .padding(.bottom, 16)
         }
+        .modifier(PhoneCommandCenterContentWidth())
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .background(cardBackdrop(cornerRadius: 24))
         .shadow(color: resolvedBrandColor.opacity(0.08), radius: 20, x: 0, y: 10)

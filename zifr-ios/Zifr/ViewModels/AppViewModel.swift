@@ -6,17 +6,66 @@ import Observation
 final class AppViewModel {
     // MARK: - Navigation State
     var selectedCompany: Company?
-    var activeTab: EntityHomeTab = .financial
+    enum PhoneTab: Hashable {
+        case dashboard, section(EntityHomeTab), add, search
+    }
+
+    // Non-nil while the standard iPhone tab host owns primary navigation.
+    var phoneTab: PhoneTab?
+    var phoneAddRequest = 0
+    var activeTab: EntityHomeTab = .financial {
+        didSet {
+            if oldValue != activeTab, case .section = phoneTab {
+                phoneTab = .section(activeTab)
+            }
+        }
+    }
     var searchQuery: String = ""
     var showSearch: Bool = false
     var deepLinkModelId: UUID? = nil
-    var path = NavigationPath()
+    private var portfolioPath = NavigationPath()
+    var phonePaths: [PhoneTab: NavigationPath] = [:]
+    var path: NavigationPath {
+        get { phoneTab.map { phonePaths[$0] ?? NavigationPath() } ?? portfolioPath }
+        set {
+            if let phoneTab { phonePaths[phoneTab] = newValue }
+            else { portfolioPath = newValue }
+        }
+    }
+
+    func setPhoneNavigationEnabled(_ enabled: Bool) {
+        if enabled && phoneTab == nil {
+            phonePaths[.dashboard] = portfolioPath
+            phoneTab = .dashboard
+        } else if !enabled, let previousTab = phoneTab {
+            portfolioPath = phonePaths[previousTab] ?? NavigationPath()
+            phoneTab = nil
+            phonePaths.removeAll()
+        }
+    }
 
     enum AppRoute: Hashable {
         case adminSettings
     }
 
     typealias CompanyTab = EntityHomeTab
+
+    func openCompany(_ company: Company, replacingPath: Bool = false) {
+        selectedCompany = company
+        if phoneTab != nil {
+            for section in EntityHomeTab.allCases { phonePaths.removeValue(forKey: .section(section)) }
+            phoneTab = .section(activeTab)
+        } else if replacingPath {
+            path = NavigationPath([company])
+        } else {
+            path.append(company)
+        }
+    }
+
+    func returnToDashboard() {
+        if phoneTab != nil { phoneTab = .dashboard }
+        path = NavigationPath()
+    }
 
     // CRUD: Companies
     func addCompany(appState: AppState, userId: UUID, name: String, structure: String, colorHex: String, logoData: Data?, website: String) {

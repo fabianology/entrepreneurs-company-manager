@@ -83,6 +83,9 @@ struct MiloomEntitySwitcher: View {
     @Environment(AppState.self) private var appState
     let selectedCompanyID: UUID?
     var usesSystemToolbar = false
+    var companyTitle: String? = nil
+    var isPhoneCommandCenter = false
+    var onOpenAdmin: (() -> Void)? = nil
     let onShowAllEntities: () -> Void
 
     @ViewBuilder
@@ -103,9 +106,17 @@ struct MiloomEntitySwitcher: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             vm.selectedCompany = company
                             vm.touchCompany(company, appState: appState)
-                            vm.path = NavigationPath([company])
+                            vm.openCompany(company, replacingPath: true)
                         } label: {
-                            if company.id == selectedCompanyID {
+                            if company.id == selectedCompanyID, isPhoneCommandCenter,
+                               let emblem = Self.activeEntityEmblem {
+                                Label {
+                                    Text(company.name)
+                                } icon: {
+                                    Image(uiImage: emblem)
+                                }
+                                .labelStyle(.titleAndIcon)
+                            } else if company.id == selectedCompanyID {
                                 Label(company.name, systemImage: "checkmark")
                             } else {
                                 Text(company.name)
@@ -114,14 +125,26 @@ struct MiloomEntitySwitcher: View {
                     }
                 }
             }
-            Button {
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                onShowAllEntities()
-            } label: {
-                Label("All Entities", systemImage: "square.grid.2x2")
+            if isPhoneCommandCenter { allEntitiesItem }
+            if let onOpenAdmin {
+                Button(action: onOpenAdmin) {
+                    Label(isPhoneCommandCenter ? "Admin" : "Admin settings", systemImage: "person.crop.circle")
+                }
             }
+            if !isPhoneCommandCenter { allEntitiesItem }
         } label: {
-            if usesSystemToolbar {
+            if let companyTitle {
+                HStack(spacing: 5) {
+                    Text(companyTitle)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: 158)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .accessibilityHidden(true)
+                }
+            } else if usesSystemToolbar {
                 DuoEntityToolbarLabel(title: "Switch entity", icon: "circle.grid.3x3.fill")
             } else {
                 MiloomCircularToolbarLabel {
@@ -131,7 +154,28 @@ struct MiloomEntitySwitcher: View {
                 }
             }
         }
+        .menuOrder(isPhoneCommandCenter ? .fixed : .automatic)
         .accessibilityLabel("Switch entity")
+        .accessibilityValue(companyTitle ?? "")
+    }
+
+    private static let activeEntityEmblem: UIImage? = {
+        guard let emblem = UIImage(named: "miloom_emblem") else { return nil }
+        let width: CGFloat = 28
+        let size = CGSize(width: width, height: width * emblem.size.height / emblem.size.width)
+        let goldEmblem = emblem.withTintColor(UIColor(Color.zifrGold), renderingMode: .alwaysOriginal)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            goldEmblem.draw(in: CGRect(origin: .zero, size: size))
+        }.withRenderingMode(.alwaysOriginal)
+    }()
+
+    private var allEntitiesItem: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            onShowAllEntities()
+        } label: {
+            Label("All Entities", systemImage: "square.grid.2x2")
+        }
     }
 }
 
@@ -142,7 +186,7 @@ private struct DuoEntityToolbarLabel: View {
 
     var body: some View {
         let label = Label(title, systemImage: icon)
-        if layout.usesExpandedPortrait || layout.usesStackedLayout {
+        if layout.usesExpandedPortrait || layout.usesStackedLayout || layout.usesPadSideNavigation {
             label
                 .labelStyle(.iconOnly)
                 .font(.system(size: 21.5, weight: .medium))
@@ -245,14 +289,198 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
 
 #endif
 
+@available(iOS 26.0, *)
+private struct PhoneAddControlSource: UIViewRepresentable {
+    enum Command: Equatable {
+        case menu([String])
+        case action
+    }
+
+    @Binding var referenceView: UIView?
+    let command: Command?
+    let makeMenu: (PhoneAddControlButton) -> UIMenu
+    let performAction: () -> Void
+
+    func makeUIView(context: Context) -> PhoneAddControlAnchor {
+        let view = PhoneAddControlAnchor()
+        view.isUserInteractionEnabled = false
+        DispatchQueue.main.async { referenceView = view }
+        return view
+    }
+
+    func updateUIView(_ view: PhoneAddControlAnchor, context: Context) {
+        view.button.directAction = command == .action ? performAction : nil
+        if view.command != command {
+            view.command = command
+            if case .menu = command {
+                view.button.menu = makeMenu(view.button)
+                view.button.showsMenuAsPrimaryAction = true
+            } else {
+                view.button.showsMenuAsPrimaryAction = false
+                view.button.menu = nil
+            }
+        }
+        view.placeButton()
+    }
+
+    static func dismantleUIView(_ view: PhoneAddControlAnchor, coordinator: ()) {
+        view.button.directAction = nil
+        view.button.menu = nil
+        view.button.removeFromSuperview()
+    }
+}
+
+@available(iOS 26.0, *)
+private final class PhoneAddControlAnchor: UIView {
+    let button = PhoneAddControlButton()
+    var command: PhoneAddControlSource.Command?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        placeButton()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        placeButton()
+    }
+
+    func placeButton() {
+        guard command != nil, window != nil,
+              let controller = sequence(first: self as UIResponder, next: { $0.next })
+                .compactMap({ $0 as? UIViewController }).first,
+              let host = (controller.tabBarController ?? controller).view,
+              host.window != nil else {
+            button.removeFromSuperview()
+            return
+        }
+
+        let content = convert(bounds, to: host)
+        let frame = controller.tabBarController?.tabs.last?.frame(in: host)
+            ?? CGRect(x: content.maxX - 78, y: content.maxY, width: 60, height: 44)
+        guard !frame.isEmpty, host.bounds.contains(frame) else {
+            button.removeFromSuperview()
+            return
+        }
+        if button.frame != frame {
+            button.frame = frame
+        }
+        if button.superview !== host {
+            host.addSubview(button)
+        }
+    }
+}
+
+private final class PhoneAddControlButton: UIButton {
+    var directAction: (() -> Void)?
+    var selectedAction: (() -> Void)?
+    private weak var closingFade: UIView?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isAccessibilityElement = false
+        preferredMenuElementOrder = .fixed
+        addAction(UIAction { [weak self] _ in self?.directAction?() }, for: .primaryActionTriggered)
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                         willDisplayMenuFor configuration: UIContextMenuConfiguration,
+                                         animator: (any UIContextMenuInteractionAnimating)?) {
+        super.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: animator)
+        closingFade?.removeFromSuperview()
+    }
+
+    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                         willEndFor configuration: UIContextMenuConfiguration,
+                                         animator: (any UIContextMenuInteractionAnimating)?) {
+        super.contextMenuInteraction(interaction, willEndFor: configuration, animator: animator)
+        let finish = { [weak self] in
+            guard let self else { return }
+            let action = selectedAction
+            selectedAction = nil
+            action?()
+        }
+        if let animator {
+            animateClosingFade()
+            animator.addCompletion(finish)
+        } else {
+            DispatchQueue.main.async(execute: finish)
+        }
+    }
+
+    private func animateClosingFade() {
+        guard !UIAccessibility.isReduceMotionEnabled, let host = superview else { return }
+        closingFade?.removeFromSuperview()
+        // Carry the dismissing glass into a soft fade without redrawing the plus.
+        let diameter = min(bounds.width, bounds.height)
+        guard diameter > 0, let gradient = CGGradient(
+            colorsSpace: nil,
+            colors: [CGColor(gray: 0, alpha: 0.19), CGColor(gray: 0, alpha: 0.16),
+                     CGColor(gray: 0, alpha: 0)] as CFArray,
+            locations: [0, 0.65, 1]
+        ) else { return }
+        let radius = diameter / 2
+        let center = CGPoint(x: radius, y: radius)
+        let image = UIGraphicsImageRenderer(size: CGSize(width: diameter, height: diameter)).image { context in
+            context.cgContext.drawRadialGradient(gradient, startCenter: center, startRadius: 0,
+                                                 endCenter: center, endRadius: radius, options: [])
+        }
+        let shade = UIImageView(image: image)
+        shade.center = CGPoint(x: frame.midX, y: frame.midY)
+        shade.isUserInteractionEnabled = false
+        shade.accessibilityElementsHidden = true
+        shade.transform = CGAffineTransform(translationX: 0, y: -6).scaledBy(x: 1.15, y: 1.15)
+        host.insertSubview(shade, aboveSubview: self)
+        closingFade = shade
+        UIView.animate(withDuration: 0.48, delay: 0, options: [.curveLinear, .allowUserInteraction]) {
+            shade.transform = .identity
+            shade.alpha = 0
+        } completion: { _ in
+            shade.removeFromSuperview()
+        }
+    }
+}
+
 struct CompanyDetailView: View {
+    private enum AddResource: String, Identifiable {
+        case institution, card, loan, subscription, document
+
+        var id: Self { self }
+
+        func title(isOwner: Bool) -> String {
+            switch self {
+            case .institution: isOwner ? String(localized: "Add Account") : String(localized: "Add Institution Manually")
+            case .card: String(localized: "Add Card")
+            case .loan: String(localized: "Add Loan")
+            case .subscription: String(localized: "Add Service")
+            case .document: String(localized: "Add Document")
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .institution: "building.columns"
+            case .card: "creditcard"
+            case .loan: "dollarsign.circle"
+            case .subscription: "square.3.layers.3d"
+            case .document: "doc.badge.plus"
+            }
+        }
+    }
+
     @State var company: Company
     @Bindable var vm: AppViewModel
     let onShowAllEntities: () -> Void
+    var phoneSection: EntityHomeTab? = nil
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Environment(MiloomDuoLayoutState.self) private var duoLayout
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.layoutDirection) private var layoutDirection
 
     private var allCompanies: [Company] { appState.companies.sorted { $0.name < $1.name } }
@@ -357,6 +585,8 @@ struct CompanyDetailView: View {
     @State private var showFinancialReport = false
     @State private var showSubscriptionReport = false
     @State private var showTransactionCenter = false
+    @State private var phoneAddReferenceView: UIView?
+    @State private var showPhoneAddUnavailable = false
     @State private var showEntityCashFlow = false
     @State private var duoReport: DuoEntityReport?
     @State private var duoSection: DuoEntitySection = .cashFlow
@@ -375,6 +605,7 @@ struct CompanyDetailView: View {
     @State private var tutFrameSubscriptions: CGRect = .zero
     @State private var tutFrameDocuments: CGRect = .zero
     @State private var tutFrameTabBar: CGRect = .zero
+    @State private var nativeTabContainerFrame: CGRect = .zero
     @State private var customVaultCenterY: CGFloat?
     @State private var footerCenterY: CGFloat?
     @State private var nativeFooterOffset: CGFloat?
@@ -388,6 +619,53 @@ struct CompanyDetailView: View {
 
     @ViewBuilder
     var body: some View {
+        if #available(iOS 26.0, *), duoLayout.usesPadSideNavigation {
+            companySurface()
+                .safeAreaInset(edge: .trailing, spacing: 8) {
+                    padCommandRail
+                }
+                .toolbar(.hidden, for: .navigationBar)
+                .allowsHitTesting(duoPortraitSheet == nil || !usesDuoPortraitLayout)
+                .accessibilityHidden(duoPortraitSheet != nil && usesDuoPortraitLayout)
+                .overlay { portraitFilesOverlay }
+        } else if #available(iOS 26.0, *), phoneSection != nil {
+            companySurface()
+                .onChange(of: vm.phoneAddRequest) {
+                    guard let phoneSection, vm.phoneTab == .section(phoneSection), vm.path.isEmpty else { return }
+                    openPhoneAdd()
+                }
+                .background { phoneAddControl }
+                .alert("Add unavailable", isPresented: $showPhoneAddUnavailable) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("You don’t have permission to add items to this entity.")
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) { entitiesControlMenu }
+                    ToolbarItem(placement: .topBarTrailing) { phoneReportsMenu }
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    ToolbarItem(placement: .topBarTrailing) { duoShareControl }
+                }
+        } else if #available(iOS 26.0, *), duoLayout.usesPhoneAndPadGlassNavigation {
+            companySurface()
+                .toolbar {
+                    ToolbarItemGroup(placement: .topBarLeading) {
+                        duoProfileControl
+                        entitiesControlMenu
+                    }
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        duoToolbarReportsMenu
+                        duoShareControl
+                        duoAddControl
+                    }
+                }
+        } else {
+            adaptiveCompanySurface
+        }
+    }
+
+    @ViewBuilder
+    private var adaptiveCompanySurface: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
             companyWithLeftPanel
@@ -412,6 +690,8 @@ struct CompanyDetailView: View {
                 .overlay(alignment: .bottomTrailing) {
                     if usesDuoPortraitLayout {
                         portraitTabBar
+                            .padding(.trailing, 22)
+                            .padding(.bottom, 10)
                     }
                 }
                 .allowsHitTesting(duoPortraitSheet == nil || !usesDuoPortraitLayout)
@@ -426,8 +706,30 @@ struct CompanyDetailView: View {
         #endif
     }
 
+    @available(iOS 26.0, *)
+    private var padCommandRail: some View {
+        VStack(spacing: 8) {
+            VStack(spacing: 0) {
+                duoShareControl
+                duoAddControl
+            }
+            .padding(1)
+            .glassEffect(.regular.interactive(), in: Capsule())
+            if duoLayout.usesPadSplit {
+                duoToolbarReportsMenu.glassEffect(.regular.interactive(), in: Circle())
+            }
+            entitiesControlMenu.glassEffect(.regular.interactive(), in: Circle())
+            Spacer(minLength: 8)
+            portraitTabBar
+        }
+        .buttonStyle(.plain)
+        .padding(.top, duoLayout.padActionsTopInset)
+        .padding(.trailing, 22)
+        .padding(.bottom, 10)
+    }
+
     private var usesInlineEntityPanel: Bool {
-        duoLayout.usesExpandedLandscape
+        duoLayout.usesExpandedLandscape || duoLayout.usesPadSplit
     }
 
     private var usesDuoVaultSplit: Bool {
@@ -435,7 +737,7 @@ struct CompanyDetailView: View {
     }
 
     private var usesDuoPortraitLayout: Bool {
-        duoLayout.usesExpandedPortrait
+        duoLayout.usesExpandedPortrait || (duoLayout.usesPadSideNavigation && !duoLayout.usesPadSplit)
     }
 
     private var hidesManagedEntityTabBar: Bool {
@@ -443,7 +745,10 @@ struct CompanyDetailView: View {
     }
 
     private var showsCompanyHeader: Bool {
-        !duoLayout.usesNativeSideToolbarGroups && !usesDuoPortraitLayout && !duoLayout.usesStackedPortraitLayout
+        if duoLayout.usesPhoneTabs {
+            return false
+        }
+        return !duoLayout.usesPadSideNavigation && !duoLayout.usesNativeSideToolbarGroups && !usesDuoPortraitLayout && !duoLayout.usesStackedPortraitLayout
     }
 
     @ViewBuilder
@@ -566,7 +871,7 @@ struct CompanyDetailView: View {
                     }
                     portraitReportBar
                         .padding(.leading, 22)
-                        .padding(.top, duoLayout.portraitToolbarInsets.commandCenter)
+                        .padding(.top, duoLayout.usesPadSideNavigation ? duoLayout.padActionsTopInset : duoLayout.portraitToolbarInsets.commandCenter)
                         .allowsHitTesting(duoPortraitSheet == nil)
                         .accessibilityHidden(duoPortraitSheet != nil)
                 }
@@ -595,10 +900,15 @@ struct CompanyDetailView: View {
     @ViewBuilder
     private func portraitReportButton(_ sheet: DuoPortraitSheet) -> some View {
         let button = Button { togglePortraitFile(sheet) } label: {
-            Image(systemName: sheet.icon)
+            let icon = Image(systemName: sheet.icon)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color.zifrGold)
                 .frame(width: 44, height: 44)
+            if duoLayout.usesPadSideNavigation {
+                icon.contentShape(Rectangle())
+            } else {
+                icon
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(sheet.title)
@@ -745,7 +1055,7 @@ struct CompanyDetailView: View {
             )
         }
         .onChange(of: vm.activeTab) { oldTab, _ in
-            if oldTab == .documents && duoLayout.isDuoDevice {
+            if oldTab == .documents && (duoLayout.isDuoDevice || duoLayout.usesPadSideNavigation) {
                 duoVaultCategory = "All"
             }
         }
@@ -841,6 +1151,43 @@ struct CompanyDetailView: View {
 
     @ViewBuilder
     private func entityPages(duoContentWidth: CGFloat?) -> some View {
+        if let phoneSection {
+            entityPage(selection: .constant(phoneSection))
+        } else if duoLayout.usesPadSideNavigation {
+            HStack(spacing: 12) {
+                if duoLayout.usesPadSplit {
+                    duoLeftPanel
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                }
+                entityPage(selection: $vm.activeTab)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(.leading, duoLayout.usesPadSplit ? 0 : 80)
+        } else if #available(iOS 26.0, *), duoLayout.usesPhoneAndPadGlassNavigation {
+            TabView(selection: $vm.activeTab) {
+                ForEach(EntityHomeTab.allCases, id: \.self) { tab in
+                    Tab(tab.rawValue, systemImage: tab.icon, value: tab) {
+                        entityPage(selection: .constant(tab))
+                            .background(Color.zifrBG.ignoresSafeArea())
+                            .environment(\.horizontalSizeClass, horizontalSizeClass)
+                    }
+                }
+            }
+            .tabViewStyle(.tabBarOnly)
+            // Regular-width iPad tabs omit their symbols. Use the native bottom
+            // bar while keeping each page in the window's actual size class.
+            .environment(\.horizontalSizeClass, .compact)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                nativeTabContainerFrame = frame
+            }
+        } else {
+            adaptiveEntityPages(duoContentWidth: duoContentWidth)
+        }
+    }
+
+    @ViewBuilder
+    private func adaptiveEntityPages(duoContentWidth: CGFloat?) -> some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *), duoLayout.isDuoDevice {
             TabView(selection: $vm.activeTab) {
@@ -906,11 +1253,22 @@ struct CompanyDetailView: View {
                     }
                 }
         }
-        .safeAreaInset(edge: .bottom) { bottomBarInset }
+        .safeAreaInset(edge: .bottom, spacing: phoneSection == nil ? nil : 0) {
+            if phoneSection == nil { bottomBarInset }
+            else if onboardingState.isTutorialActive {
+                Color.clear.frame(height: 0)
+                    .onGeometryChange(for: CGRect.self) { geometry in
+                        let edge = geometry.frame(in: .global)
+                        return CGRect(x: edge.minX, y: edge.maxY, width: edge.width, height: 48)
+                    } action: { frame in
+                        tutFrameTabBar = frame
+                        tutFrameQuickAdd = CGRect(x: frame.minX, y: frame.minY, width: 76, height: frame.height)
+                    }
+            }
+        }
     }
 
-    #if compiler(>=6.4)
-    @available(iOS 27.1, *)
+    @available(iOS 26.0, *)
     private var portraitTabBar: some View {
         DuoTabBar(
             selection: $vm.activeTab, tabs: EntityHomeTab.allCases,
@@ -924,10 +1282,9 @@ struct CompanyDetailView: View {
             tutFrameTabBar = $0
         }
         .frame(width: 52)
-        .padding(.trailing, 22)
-        .padding(.bottom, 10)
     }
 
+    #if compiler(>=6.4)
     @available(iOS 27.1, *)
     private func duoEntityPage(for tab: EntityHomeTab, widthLimit: CGFloat?) -> some View {
         GeometryReader { geometry in
@@ -995,13 +1352,13 @@ struct CompanyDetailView: View {
             canAccessCredentials: canAccessCompanyCredentials,
             vm: vm,
             activeInternalTab: selection,
-            usesNativeTabs: duoLayout.isDuoDevice,
+            usesNativeTabs: isDuoDevice || duoLayout.usesPhoneAndPadGlassNavigation,
             reservesTabRow: duoLayout.usesStackedLayout,
             compactTopSpacing: false,
             tabSelectorHeaderHeight: duoLayout.isDuoDevice && showsCompanyHeader ? max(0, tutFrameHeader.height - companyHeaderTopInset) : nil,
             tabSelectorBottomInset: duoLayout.isDuoDevice && showsCompanyHeader ? companyHeaderVerticalPadding : nil,
             vaultPresentation: usesInlineEntityPanel ? .categories : (duoLayout.usesStackedLayout ? .scrolling : .combined),
-            vaultCategorySelection: duoLayout.isDuoDevice ? $duoVaultCategory : nil,
+            vaultCategorySelection: (duoLayout.isDuoDevice || duoLayout.usesPadSplit) ? $duoVaultCategory : nil,
             vaultTopContentInset: showsCompanyHeader ? nil : 12
         )
         #if compiler(>=6.4)
@@ -1027,7 +1384,15 @@ struct CompanyDetailView: View {
                 case .tutorialCommandFinancials:     return tutFrameFinancials != .zero ? tutFrameFinancials : tutFrameHeader
                 case .tutorialCommandSubscriptions:  return tutFrameSubscriptions != .zero ? tutFrameSubscriptions : tutFrameHeader
                 case .tutorialCommandDocuments:      return tutFrameDocuments != .zero ? tutFrameDocuments : tutFrameHeader
-                case .tutorialCommandTabBar:         return tutFrameTabBar != .zero ? tutFrameTabBar : tutFrameHeader
+                case .tutorialCommandTabBar:
+                    // The native tabs occupy the space below the measured footer.
+                    if duoLayout.usesPhoneAndPadGlassNavigation, !duoLayout.usesPadSideNavigation, !tutFrameTabBar.isEmpty,
+                       nativeTabContainerFrame.maxY > tutFrameTabBar.maxY {
+                        return CGRect(x: nativeTabContainerFrame.minX, y: tutFrameTabBar.maxY,
+                                      width: nativeTabContainerFrame.width,
+                                      height: nativeTabContainerFrame.maxY - tutFrameTabBar.maxY)
+                    }
+                    return tutFrameTabBar != .zero ? tutFrameTabBar : tutFrameHeader
                 case .tutorialFinancialPage:         return tutFrameFinancialActionBar != .zero ? tutFrameFinancialActionBar : tutFrameHeader
                 case .tutorialFinancialWallet:       return walletFrame != .zero ? walletFrame : tutFrameHeader
                 case .tutorialFinancialCardTap:      return institutionFrame != .zero ? institutionFrame : walletFrame
@@ -1089,10 +1454,12 @@ struct CompanyDetailView: View {
                         } else if vm.activeTab == .financial {
                             // From Financial (left-most tab), swipe right from the left edge returns to Dashboard
                             triggerDoubleHaptic()
-                            if !vm.path.isEmpty {
-                                vm.path.removeLast()
+                            if phoneSection != nil {
+                                vm.returnToDashboard()
+                            } else {
+                                if !vm.path.isEmpty { vm.path.removeLast() }
+                                dismiss()
                             }
-                            dismiss()
                         }
                     }
                 }
@@ -1124,7 +1491,7 @@ struct CompanyDetailView: View {
     private var bottomBarInset: some View {
         bottomBarSurface
             .background {
-                if !usesDuoPortraitLayout &&
+                if !usesDuoPortraitLayout && !duoLayout.usesPadSideNavigation &&
                     (onboardingState.isInFinancialTutorial || onboardingState.isInCommandCenterTutorial) {
                     GeometryReader { geo in
                         Color.clear
@@ -1214,15 +1581,16 @@ struct CompanyDetailView: View {
 
     private var bottomBarRow: some View {
         let geminiFirst = duoLayout.placesSplitControlsOnLeadingEdge(in: layoutDirection)
-        return HStack(alignment: isDuoDevice ? .center : .bottom, spacing: 10) {
-            if !isDuoDevice { profileControlButton }
+        let usesGlassControls = isDuoDevice || duoLayout.usesPhoneAndPadGlassNavigation
+        return HStack(alignment: usesGlassControls ? .center : .bottom, spacing: 10) {
+            if !usesGlassControls { profileControlButton }
             if isDuoDevice && geminiFirst { geminiControlButton }
 
             searchControlButton
 
-            if isDuoDevice && !geminiFirst { geminiControlButton }
+            if usesGlassControls && !geminiFirst { geminiControlButton }
 
-            if !isDuoDevice {
+            if !usesGlassControls {
                 entitiesControlMenu
                 if canAddInActiveTab {
                     plusControlMenu.buttonStyle(.plain)
@@ -1234,7 +1602,7 @@ struct CompanyDetailView: View {
     }
 
     private var searchControlButton: some View {
-        MiloomDuoFooterButton(borderShape: .capsule) {
+        MiloomFooterButton(borderShape: .capsule) {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             vm.showSearch = true
             searchBounce += 1
@@ -1341,7 +1709,7 @@ struct CompanyDetailView: View {
 
                     Spacer(minLength: 8)
 
-                    if !usesDuoPortraitLayout && !duoLayout.usesNativeSideToolbarGroups {
+                    if !duoLayout.usesPhoneAndPadGlassNavigation && !usesDuoPortraitLayout && !duoLayout.usesNativeSideToolbarGroups {
                         if vm.activeTab == .financial && !usesInlineEntityPanel && !duoLayout.usesStackedLayout {
                             transactionHeaderButton
                         }
@@ -1404,9 +1772,26 @@ struct CompanyDetailView: View {
         showTransactionCenter = true
     }
 
+    private var phoneReportsMenu: some View {
+        Menu {
+            Button(action: openAllTransactions) {
+                Label("All transactions", systemImage: "list.bullet.rectangle.portrait")
+            }
+            reportMenuItems
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "receipt")
+                    .accessibilityHidden(true)
+                Text("Reports")
+            }
+            .font(.subheadline.weight(.semibold))
+        }
+        .accessibilityHint("Choose a report or view transactions")
+    }
+
     private var duoToolbarReportsMenu: some View {
         Menu {
-            if duoLayout.usesClosedStyleLayout {
+            if duoLayout.usesClosedStyleLayout || duoLayout.usesPhoneAndPadGlassNavigation {
                 Button(action: openAllTransactions) {
                     Label("All transactions", systemImage: "list.bullet.rectangle.portrait")
                 }
@@ -1535,10 +1920,13 @@ struct CompanyDetailView: View {
 
     @ViewBuilder
     private var entitiesControlMenu: some View {
-        MiloomEntitySwitcher(vm: vm, selectedCompanyID: company.id, usesSystemToolbar: duoLayout.isDuoDevice) {
+        MiloomEntitySwitcher(vm: vm, selectedCompanyID: company.id, usesSystemToolbar: isDuoDevice || duoLayout.usesPhoneAndPadGlassNavigation,
+                            companyTitle: phoneSection == nil ? nil : company.name,
+                            isPhoneCommandCenter: phoneSection != nil,
+                            onOpenAdmin: duoLayout.usesPadSideNavigation || phoneSection != nil ? openAdminSettings : nil) {
             onShowAllEntities()
-            dismiss()
-            if isDuoDevice { duoLayout.dashboardRequest &+= 1 }
+            if phoneSection == nil { dismiss() }
+            if isDuoDevice || duoLayout.usesPadSideNavigation { duoLayout.dashboardRequest &+= 1 }
         }
     }
 
@@ -1569,7 +1957,7 @@ struct CompanyDetailView: View {
 
     @ViewBuilder
     private var plusButtonLabel: some View {
-        if duoLayout.isDuoDevice {
+        if isDuoDevice || duoLayout.usesPhoneAndPadGlassNavigation {
             DuoEntityToolbarLabel(title: "Add item", icon: "plus")
         } else {
             circularControlLabel {
@@ -1581,7 +1969,7 @@ struct CompanyDetailView: View {
     }
 
     private var geminiControlButton: some View {
-        MiloomDuoFooterButton(borderShape: .circle) {
+        MiloomFooterButton(borderShape: .circle) {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showAssistant = true
         } label: {
@@ -1636,63 +2024,118 @@ struct CompanyDetailView: View {
         .accessibilityValue("Cannot add items. Shared items may have separate edit access.")
     }
 
+    private var phoneAddResources: [AddResource] {
+        let resources: [AddResource]
+        switch phoneSection {
+        case .financial: resources = [.institution, .card, .loan]
+        case .subscriptions: resources = [.subscription]
+        case .documents: resources = [.document]
+        case nil: resources = []
+        }
+        return resources.filter { canCreate($0.rawValue) }
+    }
+
+    @available(iOS 26.0, *)
+    private var phoneAddControl: some View {
+        let resources = phoneAddResources
+        let isOwner = appState.portfolioUserID == company.userId
+        let active = phoneSection.map { vm.phoneTab == .section($0) } == true && vm.path.isEmpty
+        let command: PhoneAddControlSource.Command? = if !active || resources.isEmpty {
+            nil
+        } else if phoneSection == .financial {
+            .menu(resources.map { $0.title(isOwner: isOwner) })
+        } else {
+            .action
+        }
+        return PhoneAddControlSource(referenceView: $phoneAddReferenceView, command: command) { button in
+            UIMenu(children: resources.map { resource in
+                UIAction(title: resource.title(isOwner: isOwner),
+                         image: UIImage(systemName: resource.icon)) { [weak button] _ in
+                    button?.selectedAction = { add(resource) }
+                }
+            })
+        } performAction: {
+            if let resource = resources.first { add(resource) }
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private func openPhoneAdd() {
+        guard !phoneAddResources.isEmpty else {
+            showPhoneAddUnavailable = true
+            return
+        }
+        guard let anchor = phoneAddReferenceView as? PhoneAddControlAnchor else { return }
+        anchor.placeButton()
+        // VoiceOver can still activate the native tab beneath the direct touch target.
+        DispatchQueue.main.async {
+            anchor.button.performPrimaryAction()
+        }
+    }
+
+    private func addService() {
+        guard canCreate("subscription") else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        newSub = Subscription(userId: company.userId, companyId: company.id)
+    }
+
+    private func addDocument() {
+        guard canCreate("document") else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        newDoc = CompanyDocument(userId: company.userId, companyId: company.id)
+    }
+
+    private func add(_ resource: AddResource) {
+        guard canCreate(resource.rawValue) else { return }
+        switch resource {
+        case .institution:
+            let draft = Institution(userId: company.userId, companyId: company.id)
+            if appState.portfolioUserID == company.userId {
+                wizardInstitution = draft
+            } else {
+                // Bank linking and its multi-resource wizard remain owner-only.
+                newManualInstitution = draft
+            }
+        case .card:
+            newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+        case .loan:
+            newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
+        case .subscription:
+            addService()
+        case .document:
+            addDocument()
+        }
+    }
+
+    private var financialAddChoices: some View {
+        let resources: [AddResource] = [.loan, .card, .institution]
+        return ForEach(resources.filter { canCreate($0.rawValue) }) { resource in
+            Button { add(resource) } label: {
+                Label(resource.title(isOwner: appState.portfolioUserID == company.userId),
+                      systemImage: resource.icon)
+            }
+        }
+    }
+
     @ViewBuilder
     private var plusControlMenu: some View {
         switch vm.activeTab {
         case .financial:
             Menu {
-                if canCreate("loan") {
-                    Button {
-                        guard canCreate("loan") else { return }
-                        newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
-                    } label: {
-                        Label("Add Loan", systemImage: "dollarsign.circle")
-                    }
-                }
-                if canCreate("card") {
-                    Button {
-                        guard canCreate("card") else { return }
-                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                    } label: {
-                        Label("Add Card", systemImage: "creditcard")
-                    }
-                }
-                if canCreate("institution") {
-                    Button {
-                        guard canCreate("institution") else { return }
-                        let draft = Institution(userId: company.userId, companyId: company.id)
-                        if appState.portfolioUserID == company.userId {
-                            wizardInstitution = draft
-                        } else {
-                            // Bank linking and its multi-resource wizard remain owner-only.
-                            newManualInstitution = draft
-                        }
-                    } label: {
-                        Label(appState.portfolioUserID == company.userId ? "Add Account" : "Add Institution Manually",
-                              systemImage: "building.columns")
-                    }
-                }
+                financialAddChoices
             } label: {
                 plusButtonLabel
             }
             .accessibilityLabel("Add financial item")
 
         case .subscriptions:
-            Button {
-                guard canCreate("subscription") else { return }
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                newSub = Subscription(userId: company.userId, companyId: company.id)
-            } label: {
+            Button(action: addService) {
                 plusButtonLabel
             }
             .accessibilityLabel("Add service")
 
         case .documents:
-            Button {
-                guard canCreate("document") else { return }
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                newDoc = CompanyDocument(userId: company.userId, companyId: company.id)
-            } label: {
+            Button(action: addDocument) {
                 plusButtonLabel
             }
             .accessibilityLabel("Add document")
@@ -1929,6 +2372,9 @@ struct CompanyDetailView: View {
         case .tutorialCommandDocuments:
             return "Store articles of incorporation, tax documents, or any notes here. Everything organized by category."
         case .tutorialCommandTabBar:
+            if duoLayout.usesPhoneAndPadGlassNavigation {
+                return "Tap Financial, Services, or Vault to switch sections for this entity."
+            }
             return "These icons switch between Command Center, Subscriptions, Financials, and Documents. Tap to jump, or swipe the icon cluster left and right to cycle pages."
         case .tutorialFinancialPage:
             return "Connect banks, credit cards, and loans here. Use the top bar to add a new account — or sync automatically via Plaid."

@@ -1,5 +1,24 @@
 import SwiftUI
 
+/// Keeps the iPhone Command Center cards at the width of the inset viewport.
+struct PhoneCommandCenterContentWidth: ViewModifier {
+    static let sideInset: CGFloat = 20
+
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
+
+    func body(content: Content) -> some View {
+        if duoLayout.isStandardIPhone {
+            content
+                .frame(minWidth: 0, maxWidth: .infinity)
+                .containerRelativeFrame(.horizontal) { viewportWidth, _ in
+                    max(0, viewportWidth - 2 * Self.sideInset)
+                }
+        } else {
+            content
+        }
+    }
+}
+
 /// One disclosure direction across the app: right when closed, down when open.
 struct DisclosureStateChevron: View {
     let isExpanded: Bool
