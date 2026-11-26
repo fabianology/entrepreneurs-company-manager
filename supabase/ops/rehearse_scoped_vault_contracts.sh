@@ -17,9 +17,9 @@ pg_ctl -w -D "$scratch_dir/pg" -o "-k $scratch_dir/socket -p 5432 -c listen_addr
 started=true
 psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -d postgres -c 'CREATE ROLE service_role NOLOGIN BYPASSRLS'
 run_sql() { psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -d "$case_db" -f "$1" >>"$scratch_dir/$case_db.log" 2>&1; }
-if [ "$#" = 0 ]; then set -- foundation owner_stage device_grant owner_rewrap rotation status scoped_update owner_delete activation; fi
+if [ "$#" = 0 ]; then set -- foundation owner_stage device_grant owner_rewrap rotation status scoped_update owner_delete activation admin_credentials; fi
 for scenario in "$@"; do
-  case "$scenario" in foundation|owner_stage|device_grant|owner_rewrap|rotation|status|scoped_update|owner_delete|activation) ;; *) echo 'Unknown scenario' >&2; exit 1 ;; esac
+  case "$scenario" in foundation|owner_stage|device_grant|owner_rewrap|rotation|status|scoped_update|owner_delete|activation|admin_credentials) ;; *) echo 'Unknown scenario' >&2; exit 1 ;; esac
   case_db="vault_$scenario"
   createdb -h "$scratch_dir/socket" "$case_db"
   run_sql supabase/tests/delegated_scope_fixture.sql
@@ -31,6 +31,13 @@ for scenario in "$@"; do
     run_sql "$1"
   done
   case "$scenario" in
+    admin_credentials)
+      run_sql supabase/tests/admin_entity_credentials_fixture.sql
+      run_sql supabase/migrations/202609270003_invitation_verified_email_guard.sql
+      run_sql supabase/migrations/202610010001_scoped_resource_secret_activation.sql
+      run_sql supabase/migrations/202610200001_admin_entity_credentials.sql
+      run_sql supabase/migrations/202610200002_admin_credential_resource_discovery.sql
+      run_sql supabase/tests/admin_entity_credentials_assertions.sql ;;
     foundation) run_sql supabase/tests/resource_secret_foundation_assertions.sql ;;
     owner_stage) run_sql supabase/tests/owner_resource_secret_staging_assertions.sql ;;
     device_grant) run_sql supabase/tests/resource_secret_device_grant_assertions.sql ;;

@@ -1536,6 +1536,8 @@ struct ShareEntitySheet: View {
     
     @State private var email: String = ""
     @State private var role: String = "Viewer"
+    @State private var includeEntityCredentials = AdminCredentialConsent.defaultEnabled
+    @State private var confirmingAdminCredentials = false
     @State private var isSending = false
     @State private var successMessage: String?
     @State private var warningMessage: String?
@@ -1623,7 +1625,9 @@ struct ShareEntitySheet: View {
                                             .font(.subheadline.weight(.medium))
                                             .foregroundStyle(Color(hex: "#C1AA78"))
                                     }
-                                    Text(scope.explanation)
+                                    Text(scope == .company && role == "Admin"
+                                         ? "Entity-wide business records and documents. Credential access is controlled separately below."
+                                         : scope.explanation)
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
@@ -1662,6 +1666,23 @@ struct ShareEntitySheet: View {
                         }
                     }
 
+                    if role == "Admin" && resourceType == "company" && !isDelegatedAdmin {
+                        ZifrSheetCard(title: "ENTITY CREDENTIALS", icon: "key.fill") {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Toggle("Include entity credentials", isOn: $includeEntityCredentials)
+                                    .tint(Color.zifrGold)
+                                Text(includeEntityCredentials
+                                     ? "Includes existing and future credentials in this entity only. This Admin can reveal and copy them after you approve their device and sync keys in Password Vault. Your personal vault and other entities are excluded."
+                                     : "Business records and documents only. No entity-wide password permission; individual credential grants remain separate.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text("Turning this off for an existing Admin revokes entity credential delivery and may require replacing affected resource keys. Previously copied passwords cannot be recalled.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
                     if let error = errorMessage {
                         shareStatusBanner(
                             message: error,
@@ -1689,6 +1710,7 @@ struct ShareEntitySheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 40)
+                .disabled(isSending)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -1712,7 +1734,11 @@ struct ShareEntitySheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
-                        sendInvite()
+                        if includesAdminCredentials {
+                            confirmingAdminCredentials = true
+                        } else {
+                            sendInvite()
+                        }
                     } label: {
                         if isSending {
                             ProgressView()
@@ -1730,6 +1756,12 @@ struct ShareEntitySheet: View {
         .sheet(isPresented: $showingPremiumUpgrade) {
             PremiumUpgradeView(gate: accessController.pendingGate)
         }
+        .confirmationDialog("Include Entity Credentials?", isPresented: $confirmingAdminCredentials, titleVisibility: .visible) {
+            Button("Send Admin Access with Credentials") { sendInvite() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("\(email) will be eligible for existing and future credentials in \(resourceTitle). Approve each device and use Sync Entity Credentials in Password Vault to deliver keys. They can copy revealed passwords; removal cannot erase copies.")
+        }
     }
 
     private var canSend: Bool {
@@ -1737,12 +1769,17 @@ struct ShareEntitySheet: View {
             && !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var includesAdminCredentials: Bool {
+        AdminCredentialConsent.includesCredentials(role: role, resourceType: resourceType,
+            isDelegatedAdmin: isDelegatedAdmin, enabled: includeEntityCredentials)
+    }
+
     private var roleDescription: String {
         switch role {
         case "Admin":
-            return "Entity-wide editing and Viewer management. Only the owner can manage Editors and Admins, block people, or grant password access."
+            return "Entity-wide editing and Viewer management. Only the owner can manage Editors and Admins, block people, or authorize credential access."
         case "Editor":
-            return "Can edit this resource’s business details. Passwords remain owner-only for now."
+            return "Can edit this resource’s business details. The owner approves password access separately for each resource and device."
         default:
             return isDelegatedAdmin
                 ? "Viewer access only. The owner manages Editors, Admins, blocks, and passwords."
@@ -1802,7 +1839,8 @@ struct ShareEntitySheet: View {
                         email: cleanedEmail,
                         role: role,
                         resourceId: resourceId,
-                        resourceType: resourceType
+                        resourceType: resourceType,
+                        includeEntityCredentials: includesAdminCredentials
                     )
                 }
 
@@ -1830,7 +1868,9 @@ struct ShareEntitySheet: View {
 
                     switch result {
                     case .sharedDirectly:
-                        successMessage = "Access granted successfully."
+                        successMessage = role == "Admin" && includeEntityCredentials
+                            ? "Admin access saved. Open Password Vault to approve their device and sync entity credentials."
+                            : "Access granted successfully."
                         generator.notificationOccurred(.success)
                     case .invitationEmailSent:
                         successMessage = "Invitation sent successfully."
