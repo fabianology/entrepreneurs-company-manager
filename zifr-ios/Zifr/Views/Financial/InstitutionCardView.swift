@@ -3,6 +3,7 @@ import SwiftData
 // MARK: - Institution Card
 struct InstitutionCardView: View {
     @Environment(AppState.self) private var appState
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     let institution: Institution
     let totalMonthlyPayment: Double
     let cardCount: Int
@@ -37,9 +38,11 @@ struct InstitutionCardView: View {
         return .zifrGreen
     }
     var body: some View {
+        let closedPortraitHeader = duoLayout.isDuoDevice && !duoLayout.isExpanded
+            && duoLayout.windowSize.height > duoLayout.windowSize.width && isExpanded && canEdit
         VStack(spacing: 0) {
             // ── Tappable header ──────────────────────
-            HStack(alignment: .center, spacing: 16) {
+            HStack(alignment: .center, spacing: closedPortraitHeader ? 4 : 16) {
                 HStack(alignment: .center, spacing: 16) {
                     if let loginUrl = institution.loginUrl, !loginUrl.isEmpty {
                             FaviconImage(website: loginUrl, size: 40)
@@ -70,11 +73,13 @@ struct InstitutionCardView: View {
                                 accounts: institution.accounts.count,
                                 cards: cardCount,
                                 loans: loanCount,
-                                fitsCompactWidth: fitsCompactWidth
+                                fitsCompactWidth: fitsCompactWidth,
+                                allowsWrappedCounts: closedPortraitHeader
                             )
                         }
-                        Spacer(minLength: 0)
+                        if !closedPortraitHeader { Spacer(minLength: 0) }
                     }
+                    .frame(maxWidth: closedPortraitHeader ? .infinity : nil, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -442,14 +447,24 @@ struct InstitutionCardCounts: View {
     let cards: Int
     let loans: Int
     let fitsCompactWidth: Bool
+    var allowsWrappedCounts = false
 
     var body: some View {
         if fitsCompactWidth {
             let divider = Text("  |  ").foregroundStyle(Color.white.opacity(0.2))
-            Text("\(compactCount(accounts, label: "Accounts"))\(divider)\(compactCount(cards, label: "Cards"))\(divider)\(compactCount(loans, label: "Loans"))")
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
+            let counts = Text("\(compactCount(accounts, label: "Accounts"))\(divider)\(compactCount(cards, label: "Cards"))\(divider)\(compactCount(loans, label: "Loans"))")
+            if allowsWrappedCounts {
+                ViewThatFits(in: .horizontal) {
+                    counts.font(.system(size: 12, weight: .medium)).fixedSize()
+                    counts.font(.system(size: 10, weight: .medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                counts
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
         } else {
             HStack(spacing: 6) {
                 countGroup(accounts, label: "Accounts")
