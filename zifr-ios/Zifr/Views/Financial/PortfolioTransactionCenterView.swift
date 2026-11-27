@@ -156,6 +156,19 @@ struct CashFlowInsightSnapshot: Equatable {
     let largestExpense: ResolvedTransaction?
     let records: [ResolvedTransaction]
 
+    var largestPurchases: [ResolvedTransaction] {
+        let purchases = expenseRecords.filter { record in
+            !TransactionIntelligence.isStatementPayment(record)
+        }
+        return Array(purchases.sorted { lhs, rhs in
+            let left = abs(lhs.transaction.amount ?? 0)
+            let right = abs(rhs.transaction.amount ?? 0)
+            if left != right { return left > right }
+            if lhs.transaction.date != rhs.transaction.date { return lhs.transaction.date > rhs.transaction.date }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }.prefix(3))
+    }
+
     var topExpenseCategory: CashFlowExpenseConcentration? { expenseCategories.first }
     var netChange: Double { current.net - previous.net }
     var hasCurrentActivity: Bool { current.transactionCount > 0 }
@@ -728,6 +741,16 @@ enum TransactionIntelligence {
         return patterns.contains { name.range(of: $0, options: .regularExpression) != nil }
     }
 
+    static func isStatementPayment(_ record: ResolvedTransaction) -> Bool {
+        // A payment can carry the bank's name as its merchant and the payment label only in its description.
+        let categories = [categoryPrimary(for: record), categoryDetailed(for: record)].compactMap { $0 }
+        if categories.contains(where: { $0.localizedCaseInsensitiveContains("payment") }) { return true }
+        let paymentLabel = #"(?i)^\s*(?:(?:online|automatic|mobile|credit card|loan|ach)\s+payment\b|payment(?:\s*$|[\s\-:]+(?:thank\s*you|received|to)\b))"#
+        return [record.transaction.name, record.transaction.merchantName].compactMap { $0 }.contains {
+            $0.range(of: paymentLabel, options: .regularExpression) != nil
+        }
+    }
+
     static func effectiveFlow(for record: ResolvedTransaction) -> TransactionFlowOverride {
         if let flowOverride = record.override?.flowOverride {
             return flowOverride
@@ -826,13 +849,16 @@ struct PortfolioTransactionCenterView: View {
     var embeddedCompanyID: UUID? = nil
     var embeddedSection: DuoTransactionSection = .all
     var usesGlassSummaryStyle = false
+    var reportMonth: Binding<CashFlowMonth>? = nil
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
     @State private var searchText = ""
     @State private var flowFilter: TransactionFlowFilter = .all
     @State private var postingFilter: TransactionPostingFilter = .all
-    @State private var cashFlowMonth: CashFlowMonth = .current
+    @State private var localMonth: CashFlowMonth = .current
+    private var monthSelection: Binding<CashFlowMonth> { reportMonth ?? $localMonth }
+    private var cashFlowMonth: CashFlowMonth { monthSelection.wrappedValue }
     @State private var selectedCompanyId: UUID?
     @State private var selectedAccountId: String?
     @State private var isSyncing = false
@@ -995,9 +1021,24 @@ struct PortfolioTransactionCenterView: View {
 
     private func embeddedTransactions(companyID: UUID) -> some View {
         VStack(spacing: 0) {
-            transactionContent
+            if embeddedSection == .cashFlow && usesGlassSummaryStyle {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Cash flow").font(.headline).accessibilityAddTraits(.isHeader)
+                    if isPreparing {
+                        ProgressView("Preparing cash flow…")
+                    } else if allRecords.isEmpty {
+                        Text("No transactions for this company yet.").foregroundStyle(DuoGlassReportStyle.muted)
+                        reportTransactionsButton
+                    } else {
+                        portraitCashFlow
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                transactionContent
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: embeddedSection == .cashFlow && usesGlassSummaryStyle ? nil : .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .sheet(isPresented: $showTaxOpportunities) { TaxOpportunitiesView(initialCompanyId: companyID) }
         .sheet(isPresented: $showSpendingCategories) {
@@ -1123,9 +1164,9 @@ struct PortfolioTransactionCenterView: View {
 
     private var transactionSections: some View {
         LazyVStack(alignment: .leading, spacing: 16) {
-            if embeddedSection != .transactions { cashFlowInsightsCard }
+            if embeddedSection == .all || embeddedSection == .cashFlow { cashFlowInsightsCard }
             if embeddedSection == .transactions {
-                MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: true)
+                MiloomMonthPicker(selection: monthSelection, anchorDate: Date(), usesSearchGlass: true)
             }
             if embeddedSection != .cashFlow {
                 searchAndFilters
@@ -1188,7 +1229,7 @@ struct PortfolioTransactionCenterView: View {
     private var portraitCashFlow: some View {
         let insights = cashFlowInsights
         return VStack(alignment: .leading, spacing: 14) {
-            MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date())
+            MiloomMonthPicker(selection: monthSelection, anchorDate: Date())
             VStack(alignment: .leading, spacing: 4) {
                 Text("Net cash flow")
                     .font(.subheadline)
@@ -1204,12 +1245,12 @@ struct PortfolioTransactionCenterView: View {
                 HStack(spacing: 18) {
                     cashFlowFigure("Money in", amount: insights.current.moneyIn, icon: "arrow.down.left")
                     Spacer(minLength: 4)
-                    cashFlowFigure("Money out", amount: insights.current.moneyOut, icon: "arrow.up.right")
+                    moneyOutFigure(insights)
                     Spacer(minLength: 0)
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     cashFlowFigure("Money in", amount: insights.current.moneyIn, icon: "arrow.down.left")
-                    cashFlowFigure("Money out", amount: insights.current.moneyOut, icon: "arrow.up.right")
+                    moneyOutFigure(insights)
                 }
             }
             Divider().overlay(DuoGlassReportStyle.border)
@@ -1218,14 +1259,62 @@ struct PortfolioTransactionCenterView: View {
                 .foregroundStyle(DuoGlassReportStyle.muted)
 
             VStack(spacing: 8) {
+                if embeddedSection == .cashFlow { reportTransactionsButton }
                 spendingByCategory(insights)
                 taxOpportunitiesAction
+                if embeddedSection == .cashFlow { largestPurchasesSection(insights.largestPurchases) }
             }
             if let syncError {
                 Label(syncError, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(DuoHologram.coral)
             }
+        }
+    }
+
+    @ViewBuilder private var reportTransactionsButton: some View {
+        if let companyID = embeddedCompanyID {
+            DuoReportTransactionsButton(vm: vm, companyID: companyID, month: monthSelection)
+        }
+    }
+
+    @ViewBuilder private func largestPurchasesSection(_ purchases: [ResolvedTransaction]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Largest outflows")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.zifrGold)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.top, 10)
+            if purchases.isEmpty {
+                Text("No posted purchases this month.")
+                    .font(.subheadline)
+                    .foregroundStyle(DuoGlassReportStyle.muted)
+                    .padding(.vertical, 10)
+            }
+            ForEach(purchases) { record in
+                Button { selectedTransaction = record } label: {
+                    insightActionRow(icon: "arrow.up.right.circle", title: TransactionIntelligence.displayName(for: record),
+                        subtitle: formattedInsightDate(record.transaction.date),
+                        trailing: formatCurrency(abs(record.transaction.amount ?? 0), currency: record.transaction.currency))
+                }
+                .buttonStyle(.plain)
+                if record.id != purchases.last?.id { Divider() }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private func moneyOutFigure(_ insights: CashFlowInsightSnapshot) -> some View {
+        let figure = cashFlowFigure("Money out", amount: insights.current.moneyOut, icon: "arrow.up.right")
+        if embeddedSection == .cashFlow {
+            Button { showSpendingCategories = true } label: {
+                HStack { figure; Image(systemName: "chevron.right").font(.caption) }
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Shows spending by category")
+        } else {
+            figure
         }
     }
 
@@ -1270,7 +1359,7 @@ struct PortfolioTransactionCenterView: View {
             },
             content: {
                 VStack(alignment: .leading, spacing: 16) {
-                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: embeddedCompanyID != nil)
+                    MiloomMonthPicker(selection: monthSelection, anchorDate: Date(), usesSearchGlass: embeddedCompanyID != nil)
 
                     if insights.hasCurrentActivity {
                         cashFlowNetSummary(insights)
@@ -2281,6 +2370,78 @@ struct PortfolioTransactionCenterView: View {
         formatter.currencyCode = currency
         formatter.maximumFractionDigits = 2
         return formatter.string(from: NSNumber(value: amount)) ?? "$\(String(format: "%.2f", amount))"
+    }
+}
+
+private struct DuoCompanyTransactionsSheet: View {
+    let vm: AppViewModel
+    let companyID: UUID
+    @Binding var month: CashFlowMonth
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            PortfolioTransactionCenterView(vm: vm, embeddedCompanyID: companyID,
+                embeddedSection: .transactions, usesGlassSummaryStyle: true, reportMonth: $month)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                }
+        }
+        .preferredColorScheme(.dark)
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct DuoReportTransactionsButton: View {
+    let vm: AppViewModel
+    let companyID: UUID
+    @Binding var month: CashFlowMonth
+    @Namespace private var transition
+    @State private var showsTransactions = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let tile = Button { showsTransactions = true } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "list.bullet.rectangle.portrait")
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(Color.zifrGold)
+                    .frame(width: 30)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Transactions").font(.subheadline.bold())
+                    Text(month.title()).font(.caption).foregroundStyle(DuoGlassReportStyle.muted)
+                }
+                Spacer()
+                Image(systemName: "chevron.up").font(.caption.bold()).foregroundStyle(Color.zifrGold)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 64)
+            .background(DuoGlassReportStyle.tile, in: RoundedRectangle(cornerRadius: 14))
+            .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(DuoGlassReportStyle.border) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("duo.reportTransactions")
+        .accessibilityHint("Opens this company’s transactions for the selected month")
+        Group {
+            if #available(iOS 18.0, *), !reduceMotion {
+                tile.matchedTransitionSource(id: "transactions", in: transition) { source in
+                    source.clipShape(.rect(cornerRadius: 14))
+                }
+            } else {
+                tile
+            }
+        }
+        .sheet(isPresented: $showsTransactions) {
+            let sheet = DuoCompanyTransactionsSheet(vm: vm, companyID: companyID, month: $month)
+                .presentationDragIndicator(.visible)
+            if #available(iOS 18.0, *), !reduceMotion {
+                sheet.navigationTransition(.zoom(sourceID: "transactions", in: transition))
+            } else {
+                sheet
+            }
+        }
     }
 }
 

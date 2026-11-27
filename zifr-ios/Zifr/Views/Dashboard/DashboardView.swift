@@ -36,6 +36,7 @@ struct DashboardView: View {
     @State private var showConnectionGraph = false
     @State private var duoBriefing = DuoBriefingStore()
     @State private var showBriefing = false
+    @State private var landscapeBriefingFillsPage = false
     @State private var showPortraitBriefing = false
     @State private var showNotificationInbox = false
     @State private var showPortraitInbox = false
@@ -223,7 +224,7 @@ struct DashboardView: View {
             switch self {
             case .entities: "square.grid.2x2"
             case .briefing: "receipt"
-            case .inbox: "bell"
+            case .inbox: "tray.full.fill"
             }
         }
     }
@@ -277,7 +278,7 @@ struct DashboardView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(action: openDashboardInbox) {
-                            Label("Notification inbox", systemImage: "bell")
+                            dashboardInboxLabel
                         }
                         .badge(appState.unreadNotificationCount)
                     }
@@ -305,7 +306,7 @@ struct DashboardView: View {
                             Label("Executive Briefing", systemImage: "receipt")
                         }
                         Button(action: openDashboardInbox) {
-                            Label("Notification inbox", systemImage: "bell")
+                            dashboardInboxLabel
                         }
                         .badge(appState.unreadNotificationCount)
                     }
@@ -349,9 +350,9 @@ struct DashboardView: View {
             }
             .allowsHitTesting(!isPortraitDrawerOpen)
             .accessibilityHidden(isPortraitDrawerOpen)
-            .toolbar(showsPortraitToolbar ? .hidden : .automatic, for: .navigationBar)
+            .toolbar(showsPortraitToolbar || landscapeBriefingFillsPage ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
-                if isDuoDevice && vm.path.isEmpty && !showsCustomToolbar {
+                if isDuoDevice && vm.path.isEmpty && !showsCustomToolbar && !landscapeBriefingFillsPage {
                     if duoLayout.usesLeftSplitToolbar {
                         DuoLeftSplitToolbarClearance()
                     }
@@ -367,22 +368,22 @@ struct DashboardView: View {
                     if duoLayout.usesNativeSideToolbarGroups {
                         ToolbarSpacer(.fixed, placement: .topBarTrailing)
                             .axisBehavior(.verticalPreferred)
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                presentBriefing()
-                            } label: {
-                                Label("Executive Briefing", systemImage: "receipt")
+                        if !usesDuoLandscapeDashboard {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    presentBriefing()
+                                } label: {
+                                    Label("Executive Briefing", systemImage: "receipt")
+                                }
                             }
-                        }
-                        .axisBehavior(.verticalPreferred)
-                        if !duoLayout.isExpanded || duoLayout.displayIsPortrait {
+                            .axisBehavior(.verticalPreferred)
                             ToolbarSpacer(.fixed, placement: .topBarTrailing)
                                 .axisBehavior(.verticalPreferred)
                         }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button(action: openDashboardInbox) {
-                                Label("Notification inbox", systemImage: "bell")
+                                dashboardInboxLabel
                             }
                             .badge(appState.unreadNotificationCount)
                         }
@@ -425,6 +426,9 @@ struct DashboardView: View {
                 }
             }
             .overlay { portraitInboxOverlay }
+            .onChange(of: usesDuoLandscapeDashboard) { _, landscape in
+                if !landscape { landscapeBriefingFillsPage = false }
+            }
             .onChange(of: usesDuoPortraitDashboard) { _, portrait in
                 if !portrait {
                     showPortraitBriefing = false
@@ -433,6 +437,7 @@ struct DashboardView: View {
             }
             .onChange(of: vm.path.isEmpty) { _, dashboard in
                 if !dashboard {
+                    landscapeBriefingFillsPage = false
                     showPortraitBriefing = false
                     dismissPortraitInbox()
                 }
@@ -1440,9 +1445,10 @@ struct DashboardView: View {
         } else if #available(iOS 27.1, *) {
             DuoDashboardPanels(
                 expanded: usesDuoLandscapeDashboard,
+                briefingFillsPage: landscapeBriefingFillsPage,
                 bottomControlCenterY: nil,
                 cards: { expanded in entityList(isDuoExpanded: expanded) },
-                receipt: { inlineBriefingPanel(isActive: vm.path.isEmpty) },
+                receipt: { inlineBriefingPanel(isActive: vm.path.isEmpty, expansion: $landscapeBriefingFillsPage) },
                 header: { dashboardHeader },
                 footer: { dashboardBottomControls }
             )
@@ -1455,19 +1461,19 @@ struct DashboardView: View {
     }
 
     @ViewBuilder
-    private func inlineBriefingPanel(isActive: Bool) -> some View {
+    private func inlineBriefingPanel(isActive: Bool, expansion: Binding<Bool>? = nil) -> some View {
         if accessController.permits(.ownerBriefing, appState: appState, userId: currentUserId) {
             DuoInlineBriefingView(
                 vm: vm, store: duoBriefing, isActive: isActive,
                 onOpenResource: openBriefingResource,
                 onOpenHealthResource: openHealthResource,
-                onExploreConnections: { showConnectionGraph = true }
+                onExploreConnections: { showConnectionGraph = true }, expansion: expansion
             )
         } else {
             ScrollView {
                 DuoBriefingPlaceholder(
                     message: "Your executive briefing is available with Miloom Pro.",
-                    action: { presentBriefing(source: "duo_dashboard_inline") }
+                    action: { presentBriefing(source: "duo_dashboard_inline") }, expansion: expansion
                 )
             }
             .scrollIndicators(.hidden)
@@ -1945,10 +1951,15 @@ struct DashboardView: View {
         }
     }
 
+    private var dashboardInboxLabel: some View {
+        Label("Notification inbox", systemImage: StackedDashboardTab.inbox.icon)
+            .foregroundStyle(.white)
+    }
+
     private var notificationInboxButton: some View {
                 Button(action: openDashboardInbox) {
                     ZStack(alignment: .topTrailing) {
-                        dashboardHeaderShortcut(appState.unreadNotificationCount > 0 ? "bell.fill" : "bell")
+                        dashboardHeaderShortcut(StackedDashboardTab.inbox.icon)
 
                         if appState.unreadNotificationCount > 0 {
                             Text(appState.unreadNotificationCount > 99 ? "99+" : "\(appState.unreadNotificationCount)")
@@ -1968,13 +1979,13 @@ struct DashboardView: View {
                     : "\(appState.unreadNotificationCount) unread alerts")
     }
 
-    private func dashboardHeaderShortcut(_ symbol: String) -> some View {
+    private func dashboardHeaderShortcut(_ symbol: String, headerOpacity: Double = 1) -> some View {
         let sideControl = usesDuoPortraitDashboard || duoLayout.usesPadSplit
         let size: CGFloat = sideControl ? duoControlSize : 40
         return Image(systemName: symbol)
             .font(.system(size: sideControl ? 21.5 : 17,
                           weight: sideControl ? .medium : .semibold))
-            .foregroundStyle(Color.white.opacity(sideControl ? 1 : 0.82))
+            .foregroundStyle(Color.white.opacity(sideControl ? 1 : headerOpacity))
             .frame(width: size, height: size)
             .background(Color.black.opacity(sideControl ? 0 : 0.32), in: Circle())
             .contentShape(Rectangle())
@@ -1985,7 +1996,7 @@ struct DashboardView: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             presentBriefing(source: "dashboard_header_receipt")
         } label: {
-            dashboardHeaderShortcut("receipt")
+            dashboardHeaderShortcut("receipt", headerOpacity: 0.82)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Executive briefing receipt")
@@ -2210,8 +2221,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     var portraitActionsTopInset: CGFloat = 16
     var reservesCompactContentWidth = false
     var usesSystemItems = false
-    var showsStandalonePortraitEntitySwitcher = false
-    var stackedEntityTabSelection: Binding<EntityHomeTab>? = nil
+    let entityTabSelection: Binding<EntityHomeTab>
     var onStackedVaultCenterChange: ((CGFloat?) -> Void)?
     var nativeReportMenu: AnyView? = nil
 
@@ -2223,7 +2233,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
 
     private var hasNativeSideToolbar: Bool {
         if usesSystemItems {
-            return layout.isDuoDevice && !layout.usesExpandedPortrait && !layout.usesStackedLayout
+            return layout.isDuoDevice && !layout.usesNativeSideToolbarGroups && !layout.usesExpandedPortrait && !layout.usesStackedLayout
         }
         return layout.usesExpandedLandscape
     }
@@ -2232,7 +2242,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     private var railPaddingEdge: Edge.Set { railOnLeadingEdge ? .leading : .trailing }
 
     func body(content: Content) -> some View {
-        let usesClosedRail = hasCustomSideToolbar && layout.usesCompactLayout && isActive
+        let usesClosedRail = hasCustomSideToolbar && (layout.usesCompactLayout || layout.usesExpandedLandscape) && isActive
         let usesFixedWidthRail = usesClosedRail && (reservesCompactContentWidth || layout.usesStackedLayout)
         // Entity pages route drags from this empty strip to the selected tab.
         let reservesGestureMargin = usesClosedRail && layout.usesStackedLayout && reservesCompactContentWidth
@@ -2290,24 +2300,12 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                         ToolbarItem(placement: .topBarTrailing) { add }
                             .axisBehavior(.verticalPreferred)
                             .visibilityPriority(.high)
-                        if layout.usesNativeSideToolbarGroups, let nativeReportMenu {
-                            ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                                .axisBehavior(.verticalPreferred)
-                            ToolbarItem(placement: .topBarTrailing) { nativeReportMenu }
-                                .axisBehavior(.verticalPreferred)
-                            ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                                .axisBehavior(.verticalPreferred)
-                            ToolbarItem(placement: .topBarTrailing) { entities }
-                                .axisBehavior(.verticalPreferred)
-                                .visibilityPriority(.high)
-                        } else {
-                            ToolbarItemGroup(placement: .topBarTrailing) {
-                                entities
-                                admin
-                            }
-                            .axisBehavior(.verticalPreferred)
-                            .visibilityPriority(.low)
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            entities
+                            admin
                         }
+                        .axisBehavior(.verticalPreferred)
+                        .visibilityPriority(.low)
                     } else {
                         if showsPrimaryActions {
                             ToolbarItem(placement: .topBarLeading) {
@@ -2337,6 +2335,22 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
             }
     }
 
+    private var entityNavigation: some View {
+        VStack(spacing: 8) {
+            entities
+                .labelStyle(.iconOnly)
+                .padding(1)
+                .glassEffect(.regular.interactive(), in: Circle())
+            DuoTabBar(
+                selection: entityTabSelection, tabs: EntityHomeTab.allCases,
+                title: { Text($0.rawValue) }, icon: { $0.icon },
+                horizontalInset: 3,
+                onBottomTabCenterChange: onStackedVaultCenterChange
+            )
+        }
+        .fixedSize()
+    }
+
     @ViewBuilder
     private func sideToolbar(isClosed: Bool) -> some View {
         if isClosed && showsPrimaryActions {
@@ -2352,15 +2366,26 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     }
 
     private func toolbarContents(topInset: CGFloat, isClosed: Bool) -> some View {
-        VStack(spacing: stackedEntityTabSelection == nil ? 16 : 4) {
+        VStack(spacing: layout.usesStackedLayout ? 4 : 16) {
             if usesSystemItems {
-                if layout.usesExpandedPortrait && showsStandalonePortraitEntitySwitcher {
-                    primaryActionGroup
-                    entities
+                if layout.usesNativeSideToolbarGroups {
+                    VStack(spacing: 8) {
+                        VStack(spacing: 0) {
+                            primaryAction
+                            add
+                        }
                         .padding(1)
-                        .glassEffect(.regular.interactive(), in: Circle())
+                        .glassEffect(.regular.interactive(), in: Capsule())
+                        if let nativeReportMenu {
+                            nativeReportMenu.glassEffect(.regular.interactive(), in: Circle())
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    entityNavigation
+                } else if layout.usesExpandedPortrait {
+                    primaryActionGroup
                     Spacer(minLength: 0)
-                } else if let stackedEntityTabSelection {
+                } else if layout.usesStackedLayout {
                     if layout.usesStackedPortraitLayout {
                         primaryActionGroup
                         if let nativeReportMenu {
@@ -2368,27 +2393,19 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                                 .padding(1)
                                 .glassEffect(.regular.interactive(), in: Circle())
                         }
-                        entities
-                            .padding(1)
-                            .glassEffect(.regular.interactive(), in: Circle())
                     } else {
-                        ViewThatFits(in: .vertical) {
-                            stackedActions(compact: false)
-                            stackedActions(compact: true)
-                            ScrollView {
-                                stackedActions(compact: true)
+                        ScrollView {
+                            VStack(spacing: 4) {
+                                primaryActionGroup
+                                measuredAdmin.glassEffect(.regular.interactive(), in: Circle())
                             }
-                            .scrollIndicators(.never)
                         }
+                        .scrollIndicators(.never)
+                        .scrollBounceBehavior(.basedOnSize)
                     }
-                    Spacer(minLength: 12)
-                    DuoTabBar(
-                        selection: stackedEntityTabSelection, tabs: EntityHomeTab.allCases,
-                        title: { Text($0.rawValue) }, icon: { $0.icon },
-                        horizontalInset: 3,
-                        onBottomTabCenterChange: onStackedVaultCenterChange
-                    )
-                    .layoutPriority(1)
+                    Spacer(minLength: 4)
+                    entityNavigation
+                        .layoutPriority(1)
                 } else {
                     primaryActionGroup
                     Spacer(minLength: 24)
@@ -2412,7 +2429,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
         .buttonStyle(.plain)
         .frame(width: toolbarWidth)
         .padding(.top, showsPrimaryActions ? topInset : 12)
-        .padding(.bottom, isClosed ? 0 : 12)
+        .padding(.bottom, layout.usesNativeSideToolbarGroups ? 10 : (isClosed ? 0 : 12))
         .padding(railPaddingEdge, toolbarTrailingPadding)
         .frame(maxHeight: .infinity)
         .accessibilityElement(children: .contain)
@@ -2423,32 +2440,6 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
         VStack(spacing: 8) {
             primaryAction.glassEffect(.regular.interactive(), in: Circle())
             add.glassEffect(.regular.interactive(), in: Circle())
-        }
-    }
-
-    private func stackedActions(compact: Bool) -> some View {
-        VStack(spacing: 4) {
-            primaryActionGroup
-            if compact {
-                Menu {
-                    entities
-                    admin
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 21.5, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: 48, height: 48)
-                }
-                .accessibilityLabel("More entity actions")
-                .glassEffect(.regular.interactive(), in: Circle())
-            } else {
-                VStack(spacing: 0) {
-                    entities
-                    measuredAdmin
-                }
-                .padding(1)
-                .glassEffect(.regular.interactive(), in: Capsule())
-            }
         }
     }
 

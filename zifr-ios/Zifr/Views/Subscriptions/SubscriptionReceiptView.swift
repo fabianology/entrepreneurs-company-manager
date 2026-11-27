@@ -12,12 +12,18 @@ struct SubscriptionReceiptSummary {
     struct Charge: Identifiable {
         let id: String
         let subscriptionId: UUID
+        let addonID: String?
+        let renewal: Date?
         let name: String
         let amount: Double
         let cycle: SubService.BillingCycle
         let currency: String
         let source: Source
         let serviceType: RecurringServiceType
+
+        var serviceRecordID: String {
+            "subscription:\(subscriptionId.uuidString)" + (addonID.map { ":addon:\($0)" } ?? "")
+        }
 
         var annualAmount: Double { cycle == .monthly ? amount * 12 : amount }
     }
@@ -50,7 +56,7 @@ struct SubscriptionReceiptSummary {
             let code = currency.isEmpty ? "USD" : currency
             if !sub.isFree, sub.cost != 0 {
                 charges.append(Charge(
-                    id: "\(sub.id):base", subscriptionId: sub.id,
+                    id: "\(sub.id):base", subscriptionId: sub.id, addonID: nil, renewal: sub.nextRenewalAt,
                     name: name.isEmpty ? "Unnamed Service" : name, amount: sub.cost,
                     cycle: sub.billingCycle == "Yearly" ? .yearly : .monthly, currency: code,
                     source: Self.source(paymentMethod: sub.paymentMethod, paymentMethodId: sub.paymentMethodId,
@@ -60,7 +66,7 @@ struct SubscriptionReceiptSummary {
             }
             for (index, service) in sub.subServices.enumerated() where service.status == .active && service.cost != 0 {
                 charges.append(Charge(
-                    id: "\(sub.id):service:\(index)", subscriptionId: sub.id,
+                    id: "\(sub.id):service:\(index)", subscriptionId: sub.id, addonID: service.id, renewal: service.renewsOn,
                     name: "\(name.isEmpty ? "Unnamed Service" : name) · \(service.name.isEmpty ? "Unnamed Service" : service.name)",
                     amount: service.cost, cycle: service.billingCycle, currency: code,
                     source: Self.source(paymentMethod: service.paymentMethod, paymentMethodId: service.paymentMethodId,
@@ -140,6 +146,7 @@ struct SubscriptionReceiptView: View {
     var isEmbedded = false
     var usesHolographicStyle = false
     var usesGlassSummaryStyle = false
+    var showsChargeHistory = false
     @State private var showsServices = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -148,7 +155,10 @@ struct SubscriptionReceiptView: View {
     }
 
     private var summary: SubscriptionReceiptSummary {
-        SubscriptionReceiptSummary(subscriptions: activeSubscriptions, institutions: institutions, cards: cards)
+        let services = showsChargeHistory
+            ? activeSubscriptions.map { SubscriptionRenewalScheduler.normalized($0) }
+            : activeSubscriptions
+        return SubscriptionReceiptSummary(subscriptions: services, institutions: institutions, cards: cards)
     }
 
     private var serviceCount: Int {
@@ -180,7 +190,7 @@ struct SubscriptionReceiptView: View {
 
     private var glassScroll: some View {
         DuoGlassReportBody {
-            DuoGlassSubscriptionSummary(summary: summary)
+            DuoGlassSubscriptionSummary(summary: summary, showsChargeHistory: showsChargeHistory)
 
             DuoGlassReportDisclosure(title: "Payment sources") {
                 paymentBreakdown

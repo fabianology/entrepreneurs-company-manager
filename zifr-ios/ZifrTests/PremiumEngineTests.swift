@@ -1597,6 +1597,27 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(TransactionIntelligence.displayName(for: insights.largestExpense!), "Software")
     }
 
+    func testReportRanksThreePostedPurchasesAndOmitsPayments() {
+        let owner = UUID(), company = UUID()
+        func purchase(_ name: String, _ amount: Double, _ date: String = "2027-08-12") -> Zifr.Transaction {
+            makeTransaction(owner: owner, company: company, name: name, amount: amount, date: date)
+        }
+        let laptop = purchase("Laptop", 750)
+        let desk = purchase("Desk", 450, "2027-08-13")
+        let monitor = purchase("Monitor", 450)
+        var payment = purchase("Payment - Thank You", 3500)
+        payment.merchantName = "Example Bank"
+        var loan = purchase("Bank debit", 1100)
+        loan.personalFinancePrimary = "LOAN_PAYMENTS"
+        var pending = purchase("Pending authorization", 1500)
+        pending.pending = true
+        let rows = [monitor, payment, loan, purchase("Dinner", 40), desk, pending, laptop,
+                    purchase("Income", -5000), purchase("Old purchase", 3100, "2027-07-01")]
+        let records = TransactionIntelligence.resolveAll(rows, companies: [], institutions: [], cards: [])
+        let report = CashFlowInsightEngine.analyze(records: records, anchorDate: utcDate("2027-08-30"))
+        XCTAssertEqual(report.largestPurchases.map(\.id), [laptop.id, desk.id, monitor.id])
+    }
+
     func testCashFlowInsightsReportNoActivityOutsideCurrentWindow() {
         let owner = UUID(), companyId = UUID()
         let oldExpense = makeTransaction(

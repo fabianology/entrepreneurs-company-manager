@@ -200,6 +200,7 @@ private struct ExecutiveBriefingReceipt: View {
         financials.reduce(0) { $0 + $1.insight.records.count }
     }
 
+    var expansion: Binding<Bool>? = nil
     var showsLoadingArtwork = false
 
     private var accountCount: Int {
@@ -283,8 +284,8 @@ private struct ExecutiveBriefingReceipt: View {
             Text("EXECUTIVE BRIEFING")
                 .font(.system(.headline, design: .monospaced).weight(.bold))
                 .foregroundStyle(Color.white)
-                .padding(.horizontal, 10)
-                .frame(maxWidth: .infinity, minHeight: 34)
+                .padding(.horizontal, expansion == nil ? 10 : 44)
+                .frame(maxWidth: .infinity, minHeight: expansion == nil ? 34 : 44)
                 .background(Color(hex: "#3A3A3C"))
             Text(now.formatted(date: .numeric, time: .shortened))
                 .font(.system(.caption2, design: .monospaced))
@@ -293,6 +294,12 @@ private struct ExecutiveBriefingReceipt: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+        .overlay(alignment: .topTrailing) {
+            if let expansion {
+                DuoBriefingExpansionButton(expanded: expansion)
+                    .foregroundStyle(.white)
+            }
+        }
     }
 
     private var selectors: some View {
@@ -1595,6 +1602,7 @@ struct DuoInlineBriefingView: View {
     let onOpenResource: (PortfolioObligation) -> Void
     let onOpenHealthResource: (ResourceKind, UUID) -> Void
     let onExploreConnections: () -> Void
+    var expansion: Binding<Bool>? = nil
     @State private var activeHUD: BriefingReceiptHUD?
     @State private var showingReminders = false
     @State private var selectedRecurringReview: RecurringSuggestionReview?
@@ -1647,7 +1655,7 @@ struct DuoInlineBriefingView: View {
                             onExploreConnections: onExploreConnections,
                             onOpenResource: onOpenHealthResource,
                             onOpenUrgent: openUrgent,
-                            preparedFinancials: report.financials
+                            preparedFinancials: report.financials, expansion: expansion
                         )
                         .modifier(DuoReceiptReveal(store: store))
                         if store.isRefreshing {
@@ -1661,13 +1669,13 @@ struct DuoInlineBriefingView: View {
                             isLoading: store.preparationError == nil,
                             animate: isActive,
                             actionTitle: "Try Again",
-                            action: { store.retryRevision += 1 }
+                            action: { store.retryRevision += 1 }, expansion: expansion
                         )
                     }
                 }
-                .frame(maxWidth: 560)
+                .frame(maxWidth: expansion == nil ? 560 : .infinity)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, expansion == nil ? 20 : 4)
                 .padding(.top, 4)
                 .padding(.bottom, 20)
             }
@@ -1788,12 +1796,33 @@ private struct DuoReceiptReveal: ViewModifier {
     }
 }
 
+private struct DuoBriefingExpansionButton: View {
+    @Binding var expanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                expanded.toggle()
+            }
+        } label: {
+            Image(systemName: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(expanded ? "Collapse executive briefing" : "Expand executive briefing")
+    }
+}
+
 struct DuoBriefingPlaceholder: View {
     let message: String
     var isLoading = false
     var animate = true
     var actionTitle = "Open Executive Briefing"
     let action: () -> Void
+    var expansion: Binding<Bool>? = nil
 
     var body: some View {
         VStack(spacing: 16) {
@@ -1815,7 +1844,13 @@ struct DuoBriefingPlaceholder: View {
         .frame(maxWidth: .infinity, minHeight: 220)
         .background(BriefingReceiptTheme.paper)
         .clipShape(ReceiptPaperShape())
-        .padding(.horizontal, 20)
+        .overlay(alignment: .topTrailing) {
+            if let expansion {
+                DuoBriefingExpansionButton(expanded: expansion)
+                    .foregroundStyle(BriefingReceiptTheme.ink)
+            }
+        }
+        .padding(.horizontal, expansion == nil ? 20 : 4)
         .padding(.top, 4)
     }
 }
@@ -1824,6 +1859,7 @@ struct DuoBriefingPlaceholder: View {
 /// frames on rotation; neither navigation nor scroll state is rebuilt.
 private struct DuoDashboardPanelLayout: Layout {
     let expanded: Bool
+    let briefingFillsPage: Bool
     let division: CGRect?
     let footerControlCenterY: CGFloat?
 
@@ -1842,7 +1878,7 @@ private struct DuoDashboardPanelLayout: Layout {
             footerHeight: subviews[3].sizeThatFits(measurement).height,
             footerControlCenterY: footerControlCenterY
         )
-        let ordered = [frames.cards, frames.receipt, frames.header, frames.footer]
+        let ordered = [frames.cards, briefingFillsPage ? CGRect(origin: .zero, size: bounds.size) : frames.receipt, frames.header, frames.footer]
         for (index, subview) in subviews.enumerated() where index < ordered.count {
             let frame = ordered[index].offsetBy(dx: bounds.minX, dy: bounds.minY)
             subview.place(at: frame.origin, anchor: .topLeading, proposal: ProposedViewSize(frame.size))
@@ -1854,16 +1890,18 @@ private struct DuoDashboardPanelLayout: Layout {
 @available(iOS 27.1, *)
 struct DuoDashboardPanels<Cards: View, Receipt: View, Header: View, Footer: View>: View {
     let expanded: Bool
+    let briefingFillsPage: Bool
     let bottomControlCenterY: CGFloat?
     let cards: (Bool) -> Cards
     let receipt: () -> Receipt
     let header: () -> Header
     let footer: () -> Footer
 
-    init(expanded: Bool, bottomControlCenterY: CGFloat?,
+    init(expanded: Bool, briefingFillsPage: Bool, bottomControlCenterY: CGFloat?,
          @ViewBuilder cards: @escaping (Bool) -> Cards, @ViewBuilder receipt: @escaping () -> Receipt,
          @ViewBuilder header: @escaping () -> Header, @ViewBuilder footer: @escaping () -> Footer) {
         self.expanded = expanded
+        self.briefingFillsPage = briefingFillsPage
         self.bottomControlCenterY = bottomControlCenterY
         self.cards = cards
         self.receipt = receipt
@@ -1887,10 +1925,13 @@ struct DuoDashboardPanels<Cards: View, Receipt: View, Header: View, Footer: View
             }
             let landscape = expanded && !portrait
             let localBottomControlCenterY = bottomControlCenterY.map { $0 - geometry.frame(in: .global).minY }
-            DuoDashboardPanelLayout(expanded: expanded, division: division,
+            let fullPage = landscape && briefingFillsPage
+            DuoDashboardPanelLayout(expanded: expanded, briefingFillsPage: fullPage, division: division,
                                     footerControlCenterY: landscape ? localBottomControlCenterY : nil) {
-                cards(expanded)
-                    .clipped()
+                ZStack {
+                    if !fullPage { cards(expanded) }
+                }
+                .clipped()
                 ZStack {
                     if expanded { receipt() }
                 }
@@ -1898,11 +1939,11 @@ struct DuoDashboardPanels<Cards: View, Receipt: View, Header: View, Footer: View
                 .clipped()
                 .accessibilityIdentifier("duo.receiptPanel")
                 ZStack {
-                    if landscape { header() }
+                    if landscape && !fullPage { header() }
                 }
                 .frame(height: landscape ? nil : 0)
                 ZStack {
-                    if landscape { footer() }
+                    if landscape && !fullPage { footer() }
                 }
                 .frame(height: landscape ? nil : 0)
             }

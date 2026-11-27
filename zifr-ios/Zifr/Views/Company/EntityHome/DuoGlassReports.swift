@@ -199,6 +199,8 @@ struct DuoGlassFinancialSummary: View {
 
 struct DuoGlassSubscriptionSummary: View {
     let summary: SubscriptionReceiptSummary
+    var showsChargeHistory = false
+    @State private var expandedChargeID: String?
     @State private var selectedType: RecurringServiceType?
     @State private var selectedCurrency: String?
     @State private var isAnnual = false
@@ -258,9 +260,29 @@ struct DuoGlassSubscriptionSummary: View {
                         .font(.subheadline).foregroundStyle(DuoGlassReportStyle.muted).padding(.vertical, 10)
                 }
                 ForEach(visibleCharges) { charge in
-                    DuoGlassReportRow(name: charge.name,
-                        subtitle: "\(charge.cycle == .monthly ? "Monthly" : "Yearly") · \(charge.source.label)",
+                    let row = DuoGlassReportRow(name: charge.name,
+                        subtitle: "\(charge.cycle.rawValue) · \(charge.source.label)",
                         amount: amount(periodAmount(charge)))
+                    if showsChargeHistory {
+                        let expanded = expandedChargeID == charge.serviceRecordID
+                        Button {
+                            expandedChargeID = expanded ? nil : charge.serviceRecordID
+                        } label: {
+                            HStack {
+                                row
+                                Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+                        if expanded {
+                            DuoServiceChargeDetail(charge: charge)
+                                .id(charge.serviceRecordID)
+                        }
+                    } else {
+                        row
+                    }
                 }
             }
         }
@@ -314,6 +336,51 @@ struct DuoGlassSubscriptionSummary: View {
 
     private func amount(_ value: Double) -> String {
         DuoGlassReportStyle.amount(value, currency: currency)
+    }
+}
+
+private struct DuoServiceChargeDetail: View {
+    let charge: SubscriptionReceiptSummary.Charge
+    @Environment(AppState.self) private var appState
+    @State private var history: [SearchRecord]?
+    @State private var historyUnavailable = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledContent("Scheduled charge", value: DuoGlassReportStyle.amount(charge.amount,
+                currency: charge.currency) + " · " + charge.cycle.rawValue)
+            if let renewal = charge.renewal {
+                LabeledContent("Renewal", value: renewal.formatted(date: .abbreviated, time: .omitted))
+            }
+            Text("Posted charges").fontWeight(.semibold)
+            if let history {
+                if history.isEmpty { Text("No linked posted charges.") }
+                ForEach(history) { record in
+                    LabeledContent(record.date?.formatted(date: .abbreviated, time: .omitted) ?? record.title,
+                        value: SearchText.money(record.amount ?? 0, currency: record.currency))
+                }
+            } else if historyUnavailable {
+                Text("Charge history unavailable.")
+            } else {
+                ProgressView()
+            }
+        }
+        .font(.subheadline)
+        .padding(.vertical, 8)
+        .task(id: appState.searchRevision) {
+            history = nil
+            historyUnavailable = false
+            guard let user = appState.portfolioUserID,
+                  let index = try? await appState.searchIndexInBackground(for: user) else {
+                if !Task.isCancelled { historyUnavailable = true }
+                return
+            }
+            let id = charge.serviceRecordID
+            let posted = await Task.detached(priority: .userInitiated) {
+                index.postedServiceCharges(serviceID: id)
+            }.value
+            if !Task.isCancelled, user == appState.portfolioUserID { history = posted }
+        }
     }
 }
 

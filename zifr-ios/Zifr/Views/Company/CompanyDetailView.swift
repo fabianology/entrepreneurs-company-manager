@@ -186,7 +186,7 @@ private struct DuoEntityToolbarLabel: View {
 
     var body: some View {
         let label = Label(title, systemImage: icon)
-        if layout.usesExpandedPortrait || layout.usesStackedLayout || layout.usesPadSideNavigation {
+        if layout.isDuoDevice || layout.usesPadSideNavigation {
             label
                 .labelStyle(.iconOnly)
                 .font(.system(size: 21.5, weight: .medium))
@@ -258,7 +258,6 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
     let isSplit: Bool
     @ViewBuilder let page: (CGFloat) -> Page
     @ViewBuilder let panel: () -> Panel
-    @State private var hasShownPanel = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -267,8 +266,7 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
             page(geometry.size.width)
                 .overlay(alignment: .topLeading) {
                     ZStack {
-                        // Keep the analysis and its filters mounted once landscape needs them.
-                        if hasShownPanel || isSplit { panel() }
+                        if isSplit { panel() }
                     }
                     .frame(width: frame.width, height: frame.height)
                     .clipped()
@@ -281,9 +279,6 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
                 }
         }
         .background(Color.zifrBG.ignoresSafeArea())
-        .onChange(of: isSplit, initial: true) { _, visible in
-            if visible { hasShownPanel = true }
-        }
     }
 }
 
@@ -682,21 +677,30 @@ struct CompanyDetailView: View {
                 portraitActionsTopInset: usesDuoPortraitLayout ? duoLayout.portraitToolbarInsets.commandCenter : tutFrameHeader.height,
                 reservesCompactContentWidth: true,
                 usesSystemItems: true,
-                showsStandalonePortraitEntitySwitcher: true,
-                stackedEntityTabSelection: duoLayout.usesStackedLayout ? $vm.activeTab : nil,
+                entityTabSelection: $vm.activeTab,
                 onStackedVaultCenterChange: { customVaultCenterY = $0 },
-                nativeReportMenu: AnyView(duoToolbarReportsMenu)
+                nativeReportMenu: duoLayout.usesExpandedLandscape && activeDuoReport != nil
+                    ? nil : AnyView(duoToolbarReportsMenu)
             ))
                 .overlay(alignment: .bottomTrailing) {
                     if usesDuoPortraitLayout {
-                        portraitTabBar
-                            .padding(.trailing, 22)
-                            .padding(.bottom, 10)
+                        VStack(spacing: 8) {
+                            duoToolbarControl(entitiesControlMenu, anchor: .entities)
+                                .glassEffect(.regular.interactive(), in: Circle())
+                            portraitTabBar
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 22)
+                        .padding(.bottom, 10)
                     }
                 }
                 .allowsHitTesting(duoPortraitSheet == nil || !usesDuoPortraitLayout)
                 .accessibilityHidden(duoPortraitSheet != nil && usesDuoPortraitLayout)
-                .overlay { portraitFilesOverlay }
+                .overlay {
+                    if isDuoDevice {
+                        contextualReportOverlay
+                    }
+                }
 
         } else {
             companySurface()
@@ -718,8 +722,8 @@ struct CompanyDetailView: View {
             if duoLayout.usesPadSplit {
                 duoToolbarReportsMenu.glassEffect(.regular.interactive(), in: Circle())
             }
-            entitiesControlMenu.glassEffect(.regular.interactive(), in: Circle())
             Spacer(minLength: 8)
+            entitiesControlMenu.glassEffect(.regular.interactive(), in: Circle())
             portraitTabBar
         }
         .buttonStyle(.plain)
@@ -741,7 +745,7 @@ struct CompanyDetailView: View {
     }
 
     private var hidesManagedEntityTabBar: Bool {
-        usesDuoPortraitLayout || duoLayout.usesStackedLayout
+        usesDuoPortraitLayout || duoLayout.usesStackedLayout || duoLayout.usesNativeSideToolbarGroups
     }
 
     private var showsCompanyHeader: Bool {
@@ -758,8 +762,8 @@ struct CompanyDetailView: View {
             DuoEntityPanels(isSplit: usesInlineEntityPanel) { contentWidth in
                 companySurface(duoContentWidth: contentWidth)
             } panel: {
-                duoLeftPanel.background {
-                    if usesInlineEntityPanel {
+                if usesDuoVaultSplit {
+                    vaultPanel.background {
                         DuoSideGestureMarker(gestures: duoSideGestures, anchor: .leftPanel)
                     }
                 }
@@ -770,6 +774,103 @@ struct CompanyDetailView: View {
         #else
         companySurface()
         #endif
+    }
+
+    private var vaultPanel: some View {
+        DocumentListView(company: company, documents: documents, vm: vm, hideActionBar: true,
+            canEdit: canEditCompany, presentation: .attachments, categorySelection: $duoVaultCategory)
+    }
+
+    private var activeDuoReport: DuoEntityReport? {
+        switch vm.activeTab {
+        case .financial: .financial
+        case .subscriptions: .subscriptions
+        case .documents: nil
+        }
+    }
+
+    #if compiler(>=6.4)
+    @available(iOS 27.1, *)
+    private var contextualReportOverlay: some View {
+        let landscape = duoLayout.usesExpandedLandscape
+        let portrait = duoLayout.usesExpandedPortrait
+        return GeometryReader { geometry in
+            let panel = DuoEntityPanelFrames.resolve(in: geometry, isSplit: true, isPortrait: false).panel
+            let drawer = DuoBinderDrawerFrames.resolve(size: geometry.size, progress: duoBinderProgress, tabIndex: 0)
+            let frame = landscape ? panel : drawer.sheet
+            let visible = landscape || (portrait && duoPortraitSheet != nil)
+            ZStack(alignment: .topLeading) {
+                if portrait && duoPortraitSheet != nil {
+                    Color.clear.contentShape(Rectangle()).onTapGesture { settlePortraitFile(open: false) }
+                        .accessibilityHidden(true)
+                }
+                // Keep one report mounted while the open Duo changes orientation.
+                if let report = activeDuoReport, landscape || portrait {
+                    MiloomDuoPortraitSheet(title: DuoPortraitSheet.reports(report).title,
+                        onClose: { settlePortraitFile(open: false) }, showsCard: false, isInline: landscape) {
+                        contextualReport(report)
+                    }
+                    .id(company.id)
+                    .frame(width: frame.width, height: frame.height)
+                    .background {
+                        if landscape { DuoSideGestureMarker(gestures: duoSideGestures, anchor: .leftPanel) }
+                    }
+                    .offset(x: frame.minX, y: frame.minY)
+                    .opacity(visible ? 1 : 0)
+                    .allowsHitTesting(visible)
+                    .accessibilityHidden(!visible)
+                }
+                if portrait && duoPortraitSheet == nil, let report = activeDuoReport {
+                    MiloomDuoReportIconBar {
+                        portraitReportButton(.reports(report))
+                    }
+                    .padding(.leading, 22)
+                    .padding(.top, duoLayout.portraitToolbarInsets.commandCenter)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .clipped()
+        }
+        .onChange(of: duoPortraitSheet?.id) { _, id in
+            if portrait, id != nil { settlePortraitFile(open: true) }
+        }
+        .onChange(of: activeDuoReport) { _, report in
+            if portrait && duoPortraitSheet != nil {
+                duoPortraitSheet = report.map { .reports($0) }
+                if report == nil { duoBinderProgress = 0 }
+            }
+        }
+        .onChange(of: duoLayout.usesExpandedLandscape) { wasLandscape, isLandscape in
+            if wasLandscape && portrait, let report = activeDuoReport {
+                duoBinderProgress = 1
+                duoPortraitSheet = .reports(report)
+            } else if isLandscape {
+                duoBinderAnimationGeneration += 1
+                duoPortraitSheet = nil
+                duoBinderProgress = 0
+            }
+        }
+    }
+    #endif
+
+    @ViewBuilder private func contextualReport(_ report: DuoEntityReport) -> some View {
+        let banks = allInstitutions.filter { $0.companyId == company.id }
+        let entityCards = allCards.filter { $0.companyId == company.id }
+        let services = allSubscriptions.filter { $0.companyId == company.id }
+        Group {
+            switch report {
+            case .financial:
+                FinancialReceiptView(company: company, institutions: banks, cards: entityCards,
+                    loans: allLoans.filter { $0.companyId == company.id }, subscriptions: services,
+                    isEmbedded: true, usesGlassSummaryStyle: true, cashFlowViewModel: vm)
+                    .accessibilityIdentifier("duo.entityFinancialReport")
+            case .subscriptions:
+                SubscriptionReceiptView(company: company, subscriptions: services, institutions: banks,
+                    cards: entityCards, isEmbedded: true, usesGlassSummaryStyle: true, showsChargeHistory: true)
+                    .accessibilityIdentifier("duo.entitySubscriptionReport")
+            }
+        }
+        .scrollIndicators(.hidden)
     }
 
     private var duoLeftPanel: some View {
@@ -788,15 +889,7 @@ struct CompanyDetailView: View {
                 .accessibilityHidden(!showsCashFlow)
 
                 if usesDuoVaultSplit {
-                    DocumentListView(
-                        company: company,
-                        documents: documents,
-                        vm: vm,
-                        hideActionBar: true,
-                        canEdit: canEditCompany,
-                        presentation: .attachments,
-                        categorySelection: $duoVaultCategory
-                    )
+                    vaultPanel
                 } else if showsReport {
                     VStack(spacing: 0) {
                             HStack {
@@ -980,7 +1073,10 @@ struct CompanyDetailView: View {
     }
 
     private func presentReport(_ report: DuoEntityReport) {
-        if usesInlineEntityPanel && !usesDuoVaultSplit {
+        if isDuoDevice && (duoLayout.usesExpandedLandscape || duoLayout.usesExpandedPortrait) {
+            vm.activeTab = report == .financial ? .financial : .subscriptions
+            if duoLayout.usesExpandedPortrait { togglePortraitFile(.reports(report)) }
+        } else if usesInlineEntityPanel && !usesDuoVaultSplit {
             duoReport = report
             duoSection = .reports
         } else {

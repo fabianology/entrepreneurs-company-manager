@@ -9,6 +9,7 @@ struct FinancialReceiptView: View {
     var isEmbedded = false
     var usesHolographicStyle = false
     var usesGlassSummaryStyle = false
+    var cashFlowViewModel: AppViewModel?
     @State private var showsAccountDetails = false
     
     @Environment(\.dismiss) private var dismiss
@@ -76,6 +77,11 @@ struct FinancialReceiptView: View {
         DuoGlassReportBody {
             DuoGlassFinancialSummary(institutions: institutions,
                 creditCards: creditCards, availableCredit: availableCredit)
+
+            if let cashFlowViewModel {
+                PortfolioTransactionCenterView(vm: cashFlowViewModel, embeddedCompanyID: company.id,
+                    embeddedSection: .cashFlow, usesGlassSummaryStyle: true)
+            }
 
             DuoGlassReportDisclosure(title: "Account details") {
                 VStack(alignment: .leading, spacing: 16) {

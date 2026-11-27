@@ -38,11 +38,11 @@ struct InstitutionCardView: View {
         return .zifrGreen
     }
     var body: some View {
-        let closedPortraitHeader = duoLayout.isDuoDevice && !duoLayout.isExpanded
-            && duoLayout.windowSize.height > duoLayout.windowSize.width && isExpanded && canEdit
+        let compactExpandedHeader = isExpanded && canEdit && duoLayout.usesClosedStyleLayout
+            && (duoLayout.isExpanded || duoLayout.windowSize.height > duoLayout.windowSize.width)
         VStack(spacing: 0) {
             // ── Tappable header ──────────────────────
-            HStack(alignment: .center, spacing: closedPortraitHeader ? 4 : 16) {
+            HStack(alignment: .center, spacing: compactExpandedHeader ? 4 : 16) {
                 HStack(alignment: .center, spacing: 16) {
                     if let loginUrl = institution.loginUrl, !loginUrl.isEmpty {
                             FaviconImage(website: loginUrl, size: 40)
@@ -74,12 +74,12 @@ struct InstitutionCardView: View {
                                 cards: cardCount,
                                 loans: loanCount,
                                 fitsCompactWidth: fitsCompactWidth,
-                                allowsWrappedCounts: closedPortraitHeader
+                                allowsWrappedCounts: compactExpandedHeader
                             )
                         }
-                        if !closedPortraitHeader { Spacer(minLength: 0) }
+                        if !compactExpandedHeader { Spacer(minLength: 0) }
                     }
-                    .frame(maxWidth: closedPortraitHeader ? .infinity : nil, alignment: .leading)
+                    .frame(maxWidth: compactExpandedHeader ? .infinity : nil, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()

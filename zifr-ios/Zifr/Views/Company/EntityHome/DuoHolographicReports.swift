@@ -380,6 +380,7 @@ struct MiloomDuoPortraitSheet<Content: View>: View {
     let title: String
     let onClose: () -> Void
     var showsCard = true
+    var isInline = false
     @ViewBuilder let content: () -> Content
     @State private var dragOffset: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -404,34 +405,36 @@ struct MiloomDuoPortraitSheet<Content: View>: View {
         }
         .background(Color(hex: "#0D4635").opacity(showsCard ? 1 : 0), in: RoundedRectangle(cornerRadius: 20))
         .clipShape(RoundedRectangle(cornerRadius: showsCard ? 20 : 0))
-        .padding(.leading, 20 + stretch)
+        .padding(.leading, isInline ? 12 : 20 + stretch)
         // Preserve the previous 44-point control row plus its 4-point top inset.
-        .padding([.top, .trailing, .bottom], 48)
+        .padding([.top, .trailing, .bottom], isInline ? 12 : 48)
         .frame(width: geometry.size.width + stretch, height: geometry.size.height)
-        .background { clearGlass }
+        .background { if !isInline { clearGlass } }
         .overlay(alignment: .trailing) {
-            Capsule().fill(.white.opacity(0.6)).frame(width: 4, height: 36)
-                .frame(width: 44, height: 80).contentShape(Rectangle())
-                .padding(.trailing, 2)
-                .accessibilityLabel("Close \(title)")
-                .accessibilityHint("Pull firmly right, drag left, or double tap to close")
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction { onClose() }
-                .gesture(DragGesture(minimumDistance: 8, coordinateSpace: .global)
-                    .onChanged { dragOffset = $0.translation.width }
-                    .exclusively(before: TapGesture())
-                    .onEnded { result in
-                        switch result {
-                        case .first(let value):
-                            let closes = DuoReportPull.shouldClose(translation: value.translation.width,
-                                                                  predicted: value.predictedEndTranslation.width)
-                            withAnimation(reduceMotion ? nil : (closes ? .easeInOut(duration: 0.32) : .spring(response: 0.34, dampingFraction: 0.78))) {
-                                dragOffset = 0
+            if !isInline {
+                Capsule().fill(.white.opacity(0.6)).frame(width: 4, height: 36)
+                    .frame(width: 44, height: 80).contentShape(Rectangle())
+                    .padding(.trailing, 2)
+                    .accessibilityLabel("Close \(title)")
+                    .accessibilityHint("Pull firmly right, drag left, or double tap to close")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { onClose() }
+                    .gesture(DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                        .onChanged { dragOffset = $0.translation.width }
+                        .exclusively(before: TapGesture())
+                        .onEnded { result in
+                            switch result {
+                            case .first(let value):
+                                let closes = DuoReportPull.shouldClose(translation: value.translation.width,
+                                                                      predicted: value.predictedEndTranslation.width)
+                                withAnimation(reduceMotion ? nil : (closes ? .easeInOut(duration: 0.32) : .spring(response: 0.34, dampingFraction: 0.78))) {
+                                    dragOffset = 0
+                                }
+                                if closes { onClose() }
+                            case .second: onClose()
                             }
-                            if closes { onClose() }
-                        case .second: onClose()
-                        }
-                    })
+                        })
+            }
         }
         .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
         .offset(x: min(0, dragOffset))

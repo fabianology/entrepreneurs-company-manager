@@ -358,6 +358,23 @@ extension UniversalSearchIndex {
         }.max { ($0.date ?? .distantPast, $0.id) < ($1.date ?? .distantPast, $1.id) }
     }
 
+    /// Exact service identity keeps add-on charges separate from account-wide history.
+    func postedServiceCharges(serviceID: String) -> [SearchRecord] {
+        guard let service = records.first(where: { $0.id == serviceID && $0.kind == .subscription }) else { return [] }
+        let matches = serviceMerchantHistory()
+        let hasChildren = records.contains { $0.parentServiceID == serviceID }
+        let matched = service.parentServiceID == nil && !hasChildren ? matches.accounts[serviceID] : matches.services[serviceID]
+        let matchedIDs = Set((matched ?? []).map(\.id))
+        let direct = links[serviceID] ?? []
+        let otherServiceLinks = records.filter { $0.kind == .subscription && $0.id != serviceID }
+            .reduce(into: Set<String>()) { $0.formUnion(links[$1.id] ?? []) }
+        return records.filter {
+            $0.kind == .transaction && $0.companyID == service.companyID && !$0.pending && $0.flow == "expense"
+                && ($0.amount ?? 0) > 0 && (matchedIDs.contains($0.id) ||
+                    (direct.contains($0.id) && !otherServiceLinks.contains($0.id)))
+        }.sorted { ($0.date ?? .distantPast, $0.id) > ($1.date ?? .distantPast, $1.id) }
+    }
+
     /// Route service-history phrases through the same conservative attribution as overview history.
     func serviceHistorySelection(_ query: String, filters: SearchFilters, now: Date, calendar: Calendar) -> (ids: Set<String>, query: String, name: String)? {
         guard filters.kind == nil || filters.kind == .transaction else { return nil }

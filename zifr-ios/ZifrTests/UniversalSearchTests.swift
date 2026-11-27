@@ -55,6 +55,8 @@ final class UniversalSearchTests: XCTestCase {
         let child = try XCTUnwrap(overview.children.first { $0.title == "Full Self-Driving" })
         XCTAssertEqual(overview.serviceTransactions[child.id]?.map(\.modelID), [driving.id])
         XCTAssertEqual(overview.serviceTransactions[overview.root.id]?.map(\.modelID), [base.id])
+        XCTAssertEqual(index.postedServiceCharges(serviceID: child.id).map(\.modelID), [driving.id])
+        XCTAssertEqual(index.postedServiceCharges(serviceID: overview.root.id).map(\.modelID), [base.id])
         XCTAssertNotNil(child.scheduledDueDate, "An attributed recurring charge supplies the next billing day")
         XCTAssertEqual(overview.root.safeDetails["purpose"], "Company vehicle and driver access")
         XCTAssertTrue(overview.representedIDs.contains("transaction:\(driving.id)"))
@@ -1795,6 +1797,8 @@ extension UniversalSearchTests {
         XCTAssertEqual(result.transactions.count, 1)
         XCTAssertTrue(result.serviceTransactions[parent.id]?.isEmpty ?? false)
         XCTAssertTrue(result.serviceTransactions[child.id]?.isEmpty ?? false)
+        XCTAssertTrue(index.postedServiceCharges(serviceID: parent.id).isEmpty)
+        XCTAssertTrue(index.postedServiceCharges(serviceID: child.id).isEmpty)
         XCTAssertNil(result.chargeSummaries[child.id]?.latest)
     }
 }
