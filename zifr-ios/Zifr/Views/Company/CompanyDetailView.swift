@@ -353,6 +353,7 @@ private final class PhoneAddControlAnchor: UIView {
         let content = convert(bounds, to: host)
         let frame = controller.tabBarController?.tabs.last?.frame(in: host)
             ?? CGRect(x: content.maxX - 78, y: content.maxY, width: 60, height: 44)
+        button.tabController = controller.tabBarController
         guard !frame.isEmpty, host.bounds.contains(frame) else {
             button.removeFromSuperview()
             return
@@ -366,7 +367,9 @@ private final class PhoneAddControlAnchor: UIView {
     }
 }
 
+@available(iOS 26.0, *)
 private final class PhoneAddControlButton: UIButton {
+    weak var tabController: UITabBarController?
     var directAction: (() -> Void)?
     var selectedAction: (() -> Void)?
     private weak var closingFade: UIView?
@@ -380,6 +383,14 @@ private final class PhoneAddControlButton: UIButton {
 
     required init?(coder: NSCoder) {
         return nil
+    }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        guard super.point(inside: point, with: event) else { return false }
+        // After a swipe, UIKit can give Add and the collapsed section icon the same frame.
+        // Let the native tab bar receive taps on that icon so it can expand.
+        guard let selectedFrame = tabController?.selectedTab?.frame(in: self) else { return true }
+        return !selectedFrame.contains(point)
     }
 
     override func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
