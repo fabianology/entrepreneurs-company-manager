@@ -280,19 +280,6 @@ struct SubscriptionListView: View {
     }
 }
 
-// MARK: - Card Height Preference Key
-private struct ServiceCardMeasurement: Equatable {
-    let height: CGFloat
-    let revealLevel: CardRevealLevel
-}
-
-private struct CardHeightKey: PreferenceKey {
-    static var defaultValue: [UUID: ServiceCardMeasurement] = [:]
-    static func reduce(value: inout [UUID: ServiceCardMeasurement], nextValue: () -> [UUID: ServiceCardMeasurement]) {
-        value.merge(nextValue()) { _, new in new }
-    }
-}
-
 // MARK: - Stacked Subscription Deck View
 private struct ServiceCardFocus: Equatable {
     let subscriptionID: UUID
@@ -429,7 +416,7 @@ private struct ServiceCardCenteringView: UIViewRepresentable {
             centeringTask = Task { @MainActor [weak self] in
                 // Recheck after the navigation transition settles. Some layouts
                 // change the scroll view's bounds during the transition.
-                for delay in [0, 80, 240] {
+                for delay in [0, 80, 240, 200] {
                     do {
                         try await Task.sleep(for: .milliseconds(delay))
                     } catch {
@@ -487,10 +474,11 @@ private struct StackedServiceSection: View {
 
     @Environment(OnboardingStateManager.self) private var onboardingState
 
-    @State private var revealLevels: [UUID: CardRevealLevel] = [:]
+    @State private var selectedServiceID: UUID?
     @State private var draggingCardId: UUID? = nil
     @State private var dragOffset: CGFloat = 0
-    @State private var cardMeasurements: [UUID: ServiceCardMeasurement] = [:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var focusedHeight: CGFloat = 0
 
     private let collapsedPeekOffset: CGFloat = 71
     private let dragCommitDistance: CGFloat = 24
@@ -500,32 +488,23 @@ private struct StackedServiceSection: View {
     private var focusedCardIndex: Int? {
         guard let focus,
               let index = services.firstIndex(where: { $0.id == focus.subscriptionID }),
-              revealLevels[focus.subscriptionID] == .full else { return nil }
+              selectedServiceID == focus.subscriptionID else { return nil }
         return index
     }
 
-    private var focusedCardHeight: CGFloat? {
-        guard focusedCardIndex != nil, let focus,
-              let measurement = cardMeasurements[focus.subscriptionID],
-              measurement.revealLevel == .full else { return nil }
-        return measurement.height
-    }
-
     private var centeringInsets: (top: CGFloat, bottom: CGFloat) {
-        guard let index = focusedCardIndex, let height = focusedCardHeight else { return (0, 0) }
-        let desiredSpace = max(0, (viewportHeight - height) / 2)
-        let spaceBefore = calculateYOffset(forIndex: index)
-        let spaceAfter = max(0, totalStackHeight - spaceBefore - height)
-        return (max(0, desiredSpace - spaceBefore - deckTopInset),
-                max(0, desiredSpace - spaceAfter - deckBottomInset))
-    }
-
-    private func level(for sub: Subscription, index: Int) -> CardRevealLevel {
-        if let level = revealLevels[sub.id] { return level }
-        return index == services.count - 1 ? .full : .headerOnly
+        guard let index = focusedCardIndex, focusedHeight > 0 else { return (0, 0) }
+        // Focusing opens just this service. All other cards occupy their header peek.
+        let desiredSpace = max(0, (viewportHeight - focusedHeight) / 2)
+        let before = CGFloat(index) * collapsedPeekOffset
+        let remaining = services.count - index - 1
+        let after: CGFloat = remaining == 0 ? 16 : 8 + CGFloat(remaining - 1) * collapsedPeekOffset + 80
+        return (max(0, desiredSpace - before - deckTopInset),
+                max(0, desiredSpace - after - deckBottomInset))
     }
 
     var body: some View {
+        let expandedID = services.first { $0.id == selectedServiceID }?.id ?? services.last?.id
         VStack(spacing: 12) {
             if showsHeader {
                 HStack(spacing: 8) {
@@ -547,19 +526,10 @@ private struct StackedServiceSection: View {
                 .padding(.horizontal, 2)
             }
 
-            ZStack(alignment: .top) {
+            VStack(spacing: 0) {
                 ForEach(Array(services.enumerated()), id: \.element.id) { index, sub in
-                    let currentLevel = level(for: sub, index: index)
-                    let yOffset = calculateYOffset(forIndex: index)
+                    let currentLevel: CardRevealLevel = sub.id == expandedID ? .full : .headerOnly
                     let extendsUnderNextCard = currentLevel != .full && index < services.count - 1
-                    let showsBottomCorners = currentLevel == .full || !extendsUnderNextCard
-                    let cardShape = UnevenRoundedRectangle(
-                        topLeadingRadius: 24,
-                        bottomLeadingRadius: showsBottomCorners ? 24 : 0,
-                        bottomTrailingRadius: showsBottomCorners ? 24 : 0,
-                        topTrailingRadius: 24
-                    )
-
                     PremiumSubscriptionCard(
                         sub: sub,
                         allSubscriptions: allSubscriptions,
@@ -574,14 +544,14 @@ private struct StackedServiceSection: View {
                         isExplicitlyFull: currentLevel == .full,
                         extendsUnderNextCard: extendsUnderNextCard,
                         onExpand: {
-                            withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
-                                expandOnly(sub)
+                            withAnimation(reduceMotion ? nil : .cardDeckReveal) {
+                                selectedServiceID = sub.id
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             }
                         },
                         onCollapse: {
-                            withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
-                                revealLevels[sub.id] = .headerOnly
+                            withAnimation(reduceMotion ? nil : .cardDeckReveal) {
+                                selectedServiceID = nil
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             }
                         },
@@ -595,49 +565,23 @@ private struct StackedServiceSection: View {
                     .frame(maxWidth: .infinity)
                     .modifier(PhoneCommandCenterContentWidth())
                     .fixedSize(horizontal: false, vertical: true)
-                    .clipShape(cardShape)
-                    .overlay(
-                        cardShape
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#918457"),
-                                        currentLevel == .full ? Color(hex: "#918457").opacity(0.3) : Color.clear
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
                     .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 4)
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear.preference(
-                                key: CardHeightKey.self,
-                                value: [sub.id: ServiceCardMeasurement(height: geo.size.height, revealLevel: currentLevel)]
-                            )
-                        }
-                    )
-                    .onPreferenceChange(CardHeightKey.self) { measurements in
-                        for (id, measurement) in measurements where cardMeasurements[id] != measurement {
-                            cardMeasurements[id] = measurement
-                        }
-                    }
                     .background {
-                        if let focus, focus.subscriptionID == sub.id, currentLevel == .full,
-                           focusedCardHeight != nil {
+                        if let focus, focus.subscriptionID == sub.id, selectedServiceID == sub.id {
                             ServiceCardCenteringView(focus: focus)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                                    focusedHeight = height
+                                }
                         }
                     }
-                    .offset(y: yOffset)
+                    .padding(.bottom, bottomSpacing(level: currentLevel, isLast: index == services.count - 1))
+                    .offset(y: dragPreviewOffset(for: index))
                     .zIndex(Double(index))
                     .id(sub.id)
                     .spotlightTarget(isActive: onboardingState.isSpotlightingReview && isFirstSection && index == 0)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: totalStackHeight, alignment: .top)
         }
         .modifier(PhoneCommandCenterContentWidth())
         .padding(.horizontal, PhoneCommandCenterContentWidth.sideInset)
@@ -645,51 +589,22 @@ private struct StackedServiceSection: View {
         .padding(.bottom, bottomPadding + centeringInsets.bottom)
         .onChange(of: focus, initial: true) { _, request in
             guard let request, let service = services.first(where: { $0.id == request.subscriptionID }) else { return }
-            expandOnly(service)
+            selectedServiceID = service.id
         }
     }
 
-    private func calculateYOffset(forIndex index: Int) -> CGFloat {
-        var offset: CGFloat = 0
-        for i in 0..<index {
-            let sub = services[i]
-            let lvl = level(for: sub, index: i)
-            switch lvl {
-            case .headerOnly, .statusRevealed:
-                offset += collapsedPeekOffset
-            case .full:
-                offset += (cardMeasurements[sub.id]?.height ?? 340) + 8
-            }
-        }
-
-        // Apply live drag offset to cards below the dragged card
-        if let dragId = draggingCardId,
-           let dragIndex = services.firstIndex(where: { $0.id == dragId }) {
-            if index > dragIndex {
-                // Cards below follow the drag (clamped to positive for pull-down)
-                offset += max(0, dragOffset)
-            } else if index == dragIndex {
-                // The dragged card itself moves with resistance
-                offset += dragOffset * 0.3
-            }
-        }
-
-        return offset
+    private func bottomSpacing(level: CardRevealLevel, isLast: Bool) -> CGFloat {
+        if level == .full { return isLast ? 16 : 8 }
+        if isLast { return 4 }
+        // The 76-point header exposes 71 points before the next card overlaps it.
+        return collapsedPeekOffset - 76 - PremiumSubscriptionCard.underlap
     }
 
-    private var totalStackHeight: CGFloat {
-        guard !services.isEmpty else { return 0 }
-        let lastIndex = services.count - 1
-        let lastSub = services[lastIndex]
-        let lastLvl = level(for: lastSub, index: lastIndex)
-
-        let lastHeight: CGFloat
-        switch lastLvl {
-        case .headerOnly, .statusRevealed: lastHeight = 80
-        case .full: lastHeight = (cardMeasurements[lastSub.id]?.height ?? 340) + 16
-        }
-
-        return calculateYOffset(forIndex: lastIndex) + lastHeight
+    private func dragPreviewOffset(for index: Int) -> CGFloat {
+        guard let draggingCardId, let dragged = services.firstIndex(where: { $0.id == draggingCardId })
+        else { return 0 }
+        if index == dragged { return dragOffset * 0.3 }
+        return index > dragged ? max(0, dragOffset) : 0
     }
 
     private func handleDragChange(value: DragGesture.Value, index: Int, sub: Subscription) {
@@ -719,28 +634,17 @@ private struct StackedServiceSection: View {
             return
         }
 
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.86, blendDuration: 0)) {
+        withAnimation(reduceMotion ? nil : .cardDeckReveal) {
             if dy > 0 && (dy > dragCommitDistance || projectedDy > projectedDragCommitDistance) {
                 // ── Pulling DOWN on this card → expand this card to full ──
-                let currentLvl = level(for: sub, index: index)
-                if currentLvl != .full {
-                    expandOnly(sub)
+                if selectedServiceID != sub.id {
+                    selectedServiceID = sub.id
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
             } else if dy < 0 && (dy < -dragCommitDistance || projectedDy < -projectedDragCommitDistance) {
-                // ── Pulling UP on this card → collapse the card ABOVE (index - 1) ──
-                if index > 0 {
-                    let aboveSub = services[index - 1]
-                    let aboveLvl = level(for: aboveSub, index: index - 1)
-                    if aboveLvl == .full {
-                        revealLevels[aboveSub.id] = .headerOnly
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    }
-                }
-                // Also collapse this card if it's expanded
-                let currentLvl = level(for: sub, index: index)
-                if currentLvl == .full {
-                    revealLevels[sub.id] = .headerOnly
+                let aboveID = index > 0 ? services[index - 1].id : nil
+                if let selectedServiceID, selectedServiceID == sub.id || selectedServiceID == aboveID {
+                    self.selectedServiceID = nil
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
             }
@@ -748,15 +652,6 @@ private struct StackedServiceSection: View {
             dragOffset = 0
             draggingCardId = nil
         }
-    }
-
-    /// Keeps the stack accordion-like: opening one card closes every other
-    /// card, including the bottom card that starts open by default.
-    private func expandOnly(_ sub: Subscription) {
-        revealLevels = Dictionary(
-            uniqueKeysWithValues: services.map { ($0.id, CardRevealLevel.headerOnly) }
-        )
-        revealLevels[sub.id] = .full
     }
 
     /// Gives the deck a short, rubber-banded preview without allowing the

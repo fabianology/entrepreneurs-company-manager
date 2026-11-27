@@ -152,17 +152,7 @@ struct StandaloneLoanGroupCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(
             RoundedRectangle(cornerRadius: 24)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#918457"),
-                            Color(hex: "#918457").opacity(0.3)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
+                .stroke(.financialCardOutline, lineWidth: 1.5)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(title), \(loans.count) \(loans.count == 1 ? "loan" : "loans")")
@@ -264,17 +254,7 @@ struct LoanCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .overlay(
                 RoundedRectangle(cornerRadius: 24)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#918457"),
-                                Color(hex: "#918457").opacity(0.3)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1.5
-                    )
+                    .stroke(.financialCardOutline, lineWidth: 1.5)
             )
         }
         .buttonStyle(PremiumButtonStyle())

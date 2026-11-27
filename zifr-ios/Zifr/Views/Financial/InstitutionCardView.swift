@@ -3,7 +3,6 @@ import SwiftData
 // MARK: - Institution Card
 struct InstitutionCardView: View {
     @Environment(AppState.self) private var appState
-    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     let institution: Institution
     let totalMonthlyPayment: Double
     let cardCount: Int
@@ -16,6 +15,8 @@ struct InstitutionCardView: View {
     var editableLoanIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
     var fitsCompactWidth = false
+    var showsBody = true
+    var underlap: CGFloat = 0
     var isExpanded: Bool = true
     var onCollapse: (() -> Void)? = nil
     var onDragChanged: ((DragGesture.Value) -> Void)? = nil
@@ -28,92 +29,31 @@ struct InstitutionCardView: View {
     @State private var editingAccount: InstitutionAccount? = nil
     @State private var accountDraft = InstitutionAccount()
 
-    private var healthColor: Color {
-        if institution.isDisconnected {
-            return .red
-        }
-        if institution.accounts.contains(where: { $0.status != "Active" }) {
-            return .orange
-        }
-        return .zifrGreen
-    }
     var body: some View {
-        let compactExpandedHeader = isExpanded && canEdit && duoLayout.usesClosedStyleLayout
-            && (duoLayout.isExpanded || duoLayout.windowSize.height > duoLayout.windowSize.width)
+        let bottomRadius: CGFloat = underlap > 0 ? 0 : 24
+        let surface = UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: bottomRadius,
+                                             bottomTrailingRadius: bottomRadius, topTrailingRadius: 24)
+        let headerShape = UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24)
         VStack(spacing: 0) {
-            // ── Tappable header ──────────────────────
-            HStack(alignment: .center, spacing: compactExpandedHeader ? 4 : 16) {
-                HStack(alignment: .center, spacing: 16) {
-                    if let loginUrl = institution.loginUrl, !loginUrl.isEmpty {
-                            FaviconImage(website: loginUrl, size: 40)
-                                .frame(width: 56, height: 56)
-                        } else {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color.white.opacity(0.06))
-                                    .frame(width: 56, height: 56)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                                    )
-                                Image(systemName: "building.columns")
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.8))
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(institution.name.isEmpty ? "Bank" : institution.name)
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.85)
-
-                            InstitutionCardCounts(
-                                accounts: institution.accounts.count,
-                                cards: cardCount,
-                                loans: loanCount,
-                                fitsCompactWidth: fitsCompactWidth,
-                                allowsWrappedCounts: compactExpandedHeader
-                            )
-                        }
-                        if !compactExpandedHeader { Spacer(minLength: 0) }
-                    }
-                    .frame(maxWidth: compactExpandedHeader ? .infinity : nil, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        if let onCollapse = onCollapse {
-                            onCollapse()
-                        } else if canEdit {
-                            onEdit()
-                        }
-                    }
-
-                    if isExpanded && canEdit {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            onEdit()
-                        } label: {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 24, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.8))
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Edit institution")
-                    }
+            InstitutionCardHeader(
+                institution: institution, cards: cardCount, loans: loanCount,
+                fitsCompactWidth: fitsCompactWidth, isExpanded: isExpanded,
+                onEdit: canEdit ? onEdit : nil
+            ) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                if let onCollapse {
+                    onCollapse()
+                } else if canEdit {
+                    onEdit()
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 16)
+            }
                 .background(
-                    UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                        .fill(Color.black.opacity(0.70))
+                    headerShape
+                        .fill(.black)
+                        .padding(.bottom, -underlap)
                         .overlay(
-                            UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            headerShape
+                                .stroke(Color.white.opacity(showsBody ? 0.1 : 0), lineWidth: 1)
                         )
                 )
                 .overlay(alignment: .bottom) {
@@ -123,188 +63,192 @@ struct InstitutionCardView: View {
                     )
                 }
 
-                    // ── Credentials (tap-to-copy) ────
-                    if canAccessCredentials {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 12) {
-                                copyableCredential(
-                                    id: institution.id.uuidString,
-                                    label: "Login ID",
-                                    value: (institution.username ?? "").isEmpty ? ((institution.email ?? "").isEmpty ? "—" : (institution.email ?? "")) : (institution.username ?? ""),
-                                    field: "login"
-                                )
-                                copyableCredential(
-                                    id: institution.id.uuidString,
-                                    label: "Password",
-                                    value: institution.password ?? "",
-                                    field: "password",
-                                    isPassword: true
-                                )
-                            }
-
-                            let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
-                            DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
+            CardDeckDetails(isVisible: showsBody) {
+                // ── Credentials (tap-to-copy) ────
+                if canAccessCredentials {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            copyableCredential(
+                                id: institution.id.uuidString,
+                                label: "Login ID",
+                                value: (institution.username ?? "").isEmpty ? ((institution.email ?? "").isEmpty ? "—" : (institution.email ?? "")) : (institution.username ?? ""),
+                                field: "login"
+                            )
+                            copyableCredential(
+                                id: institution.id.uuidString,
+                                label: "Password",
+                                value: institution.password ?? "",
+                                field: "password",
+                                isPassword: true
+                            )
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 16)
-                        .padding(.bottom, institution.isDisconnected ? 16 : 24)
-                    } else {
-                        ownerOnlyCredentials
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 18)
-                    }
-                    
-                    if canEdit && canAccessCredentials && institution.isDisconnected {
-                        PlaidLinkButton(
-                            companyId: institution.companyId,
-                            institutionId: institution.id,
-                            buttonText: "Reconnect Bank",
-                            isReconnect: true,
-                            onSuccess: { _, _, _ in
-                                var updatedInst = institution
-                                updatedInst.isDisconnected = false
-                                vm.saveInstitution(updatedInst, appState: appState)
-                            }
-                        )
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 24)
-                    }
 
-            // ── Accordion ──────────────────────────────────────────────────
-            MiloomAccordion(title: expanded ? "Hide Accounts" : "Loans & Accounts", count: institution.accounts.count + loanCount, expanded: expanded, action: {
-                withAnimation(.spring(response: 0.35)) { expanded.toggle() }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            }) {
-                VStack(spacing: 0) {
-                    ForEach(institution.accounts) { acc in
-                        Button {
-                            guard canEdit, canAccessCredentials else { return }
-                            accountDraft = acc
-                            editingAccount = acc
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            VStack(spacing: 0) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack(spacing: 6) {
-                                            Text(acc.name.isEmpty ? "Account" : acc.name.cleanAccountName)
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .foregroundStyle(.white)
-                                        }
-                                        
-                                        HStack(spacing: 6) {
-                                            Text(acc.type)
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(Color.white.opacity(0.6))
-                                        }
-                                    }
-                                    Spacer()
-                                    VStack(alignment: .trailing, spacing: 4) {
-                                        Text(acc.balance.currencyString)
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                    }
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 12)
-                                .background(Color.clear)
-                                
-                                if acc.id != institution.accounts.last?.id || !loans.isEmpty {
-                                    Divider()
-                                        .background(Color.white.opacity(0.06))
-                                        .padding(.horizontal, 8)
-                                }
-                            }
+                        let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
+                        DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, institution.isDisconnected ? 16 : 24)
+                } else {
+                    ownerOnlyCredentials
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 18)
+                }
+
+                if canEdit && canAccessCredentials && institution.isDisconnected {
+                    PlaidLinkButton(
+                        companyId: institution.companyId,
+                        institutionId: institution.id,
+                        buttonText: "Reconnect Bank",
+                        isReconnect: true,
+                        onSuccess: { _, _, _ in
+                            var updatedInst = institution
+                            updatedInst.isDisconnected = false
+                            vm.saveInstitution(updatedInst, appState: appState)
                         }
-                        .buttonStyle(PremiumButtonStyle())
-                    }
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                }
 
-                    ForEach(loans) { loan in
-                        Button {
-                            guard editableLoanIDs.contains(loan.id) else { return }
-                            onEditLoan(loan)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            VStack(spacing: 0) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack(spacing: 6) {
-                                            Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .foregroundStyle(.white)
-                                        }
-                                        
-                                        HStack(spacing: 6) {
-                                            Text(loan.role)
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(Color.white.opacity(0.6))
-                                            Text("|")
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(Color.white.opacity(0.2))
-                                            let rateStr = String(format: loan.interestRate.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.2f%%", loan.interestRate)
-                                            Text("\(rateStr) APR")
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(Color.white.opacity(0.6))
-                                        }
-
-                                        if let notes = loan.notes, !notes.isEmpty {
+                // ── Accordion ──────────────────────────────────────────────────
+                MiloomAccordion(title: expanded ? "Hide Accounts" : "Loans & Accounts", count: institution.accounts.count + loanCount, expanded: expanded, action: {
+                    withAnimation(.spring(response: 0.35)) { expanded.toggle() }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }) {
+                    VStack(spacing: 0) {
+                        ForEach(institution.accounts) { acc in
+                            Button {
+                                guard canEdit, canAccessCredentials else { return }
+                                accountDraft = acc
+                                editingAccount = acc
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                VStack(spacing: 0) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        VStack(alignment: .leading, spacing: 4) {
                                             HStack(spacing: 6) {
-                                                Text("PURPOSE:")
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .foregroundStyle(Color.white.opacity(0.4))
-                                                Text(notes)
+                                                Text(acc.name.isEmpty ? "Account" : acc.name.cleanAccountName)
+                                                    .font(.system(size: 15, weight: .semibold))
+                                                    .foregroundStyle(.white)
+                                            }
+
+                                            HStack(spacing: 6) {
+                                                Text(acc.type)
                                                     .font(.system(size: 13, weight: .medium))
                                                     .foregroundStyle(Color.white.opacity(0.6))
                                             }
                                         }
+                                        Spacer()
+                                        VStack(alignment: .trailing, spacing: 4) {
+                                            Text(acc.balance.currencyString)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                        }
                                     }
-                                    Spacer()
-                                    VStack(alignment: .trailing, spacing: 4) {
-                                        Text(loan.principalAmount.currencyString)
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                    }
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 12)
-                                .background(Color.clear)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 12)
+                                    .background(Color.clear)
                                 
-                                if loan.id != loans.last?.id {
-                                    Divider()
-                                        .background(Color.white.opacity(0.06))
-                                        .padding(.horizontal, 8)
+                                    if acc.id != institution.accounts.last?.id || !loans.isEmpty {
+                                        Divider()
+                                            .background(Color.white.opacity(0.06))
+                                            .padding(.horizontal, 8)
+                                    }
                                 }
                             }
+                            .buttonStyle(PremiumButtonStyle())
                         }
-                        .buttonStyle(PremiumButtonStyle())
+
+                        ForEach(loans) { loan in
+                            Button {
+                                guard editableLoanIDs.contains(loan.id) else { return }
+                                onEditLoan(loan)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                VStack(spacing: 0) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
+                                                    .font(.system(size: 15, weight: .semibold))
+                                                    .foregroundStyle(.white)
+                                            }
+                                        
+                                            HStack(spacing: 6) {
+                                                Text(loan.role)
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                                Text("|")
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.2))
+                                                let rateStr = String(format: loan.interestRate.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.2f%%", loan.interestRate)
+                                                Text("\(rateStr) APR")
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                            }
+
+                                            if let notes = loan.notes, !notes.isEmpty {
+                                                HStack(spacing: 6) {
+                                                    Text("PURPOSE:")
+                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .foregroundStyle(Color.white.opacity(0.4))
+                                                    Text(notes)
+                                                        .font(.system(size: 13, weight: .medium))
+                                                        .foregroundStyle(Color.white.opacity(0.6))
+                                                }
+                                            }
+                                        }
+                                        Spacer()
+                                        VStack(alignment: .trailing, spacing: 4) {
+                                            Text(loan.principalAmount.currencyString)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                        }
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 12)
+                                    .background(Color.clear)
+                                
+                                    if loan.id != loans.last?.id {
+                                        Divider()
+                                            .background(Color.white.opacity(0.06))
+                                            .padding(.horizontal, 8)
+                                    }
+                                }
+                            }
+                            .buttonStyle(PremiumButtonStyle())
+                        }
                     }
                 }
+            }
+            .onGeometryChange(for: Bool.self) { $0.size.height > 0 } action: { hasVisibleHeight in
+                if !hasVisibleHeight && !showsBody { expanded = false }
             }
         }
         .frame(
             minWidth: fitsCompactWidth ? 0 : nil,
             maxWidth: fitsCompactWidth ? .infinity : nil
         )
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color(hex: "#1C1C1E").opacity(0.40))
-        )
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-         .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#918457"),
-                            Color(hex: "#918457").opacity(0.3)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-        )
+        .padding(.bottom, underlap)
+        .background {
+            surface.fill(Color(hex: "#1C1C1E").opacity(0.40))
+                .background(.regularMaterial, in: surface)
+        }
+        .clipShape(surface)
+        .overlay { surface.stroke(.financialCardOutline, lineWidth: 1.5) }
+        .overlay(alignment: .top) { CardTopEdgeStroke() }
+        .background(alignment: .top) {
+            headerShape.fill(.black)
+                .frame(height: 32)
+                .shadow(color: .black.opacity(isExpanded ? 0 : 0.32), radius: 3, y: -2)
+        }
+        .padding(.bottom, -underlap)
+        .onChange(of: showsBody) { _, visible in
+            if !visible {
+                passwordRevealed = false
+            }
+        }
         .onChange(of: scenePhase) { _, phase in if phase != .active { passwordRevealed = false } }
         .onDisappear { passwordRevealed = false }
         .sheet(item: $editingAccount) { _ in
@@ -442,29 +386,71 @@ struct InstitutionCardView: View {
     }
 }
 
+struct InstitutionCardHeader: View {
+    static let height: CGFloat = 68
+
+    let institution: Institution
+    let cards: Int
+    let loans: Int
+    let fitsCompactWidth: Bool
+    let isExpanded: Bool
+    let onEdit: (() -> Void)?
+    let onTap: () -> Void
+
+    var body: some View {
+        StackedCardHeader(showsDetailsButton: isExpanded, detailsLabel: "Edit institution",
+                          onEdit: onEdit, onTap: onTap) {
+            HStack(spacing: 16) {
+                if let url = institution.loginUrl, !url.isEmpty {
+                    FaviconImage(website: url, size: 40)
+                        .frame(width: 56, height: 56)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white.opacity(0.06))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            }
+                        Image(systemName: "building.columns")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.8))
+                    }
+                    .frame(width: 56, height: 56)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(institution.name.isEmpty ? "Bank" : institution.name)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    InstitutionCardCounts(accounts: institution.accounts.count, cards: cards,
+                                          loans: loans, fitsCompactWidth: fitsCompactWidth)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: Self.height)
+        }
+    }
+}
+
 struct InstitutionCardCounts: View {
     let accounts: Int
     let cards: Int
     let loans: Int
     let fitsCompactWidth: Bool
-    var allowsWrappedCounts = false
 
     var body: some View {
         if fitsCompactWidth {
             let divider = Text("  |  ").foregroundStyle(Color.white.opacity(0.2))
             let counts = Text("\(compactCount(accounts, label: "Accounts"))\(divider)\(compactCount(cards, label: "Cards"))\(divider)\(compactCount(loans, label: "Loans"))")
-            if allowsWrappedCounts {
-                ViewThatFits(in: .horizontal) {
-                    counts.font(.system(size: 12, weight: .medium)).fixedSize()
-                    counts.font(.system(size: 10, weight: .medium))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            } else {
-                counts
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+            ViewThatFits(in: .horizontal) {
+                counts.fixedSize()
+                counts.fixedSize(horizontal: false, vertical: true)
             }
+            .font(.system(size: 12, weight: .medium))
         } else {
             HStack(spacing: 6) {
                 countGroup(accounts, label: "Accounts")

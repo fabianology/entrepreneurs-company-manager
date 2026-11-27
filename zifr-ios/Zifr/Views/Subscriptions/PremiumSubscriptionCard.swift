@@ -1,16 +1,12 @@
 import SwiftUI
 
-enum CardRevealLevel: Int, Comparable {
-    case headerOnly = 0
-    case statusRevealed = 1
-    case full = 2
-
-    static func < (lhs: CardRevealLevel, rhs: CardRevealLevel) -> Bool {
-        lhs.rawValue < rhs.rawValue
-    }
+enum CardRevealLevel {
+    case headerOnly, full
 }
 
 struct PremiumSubscriptionCard: View {
+    static let underlap: CGFloat = 24
+
     let sub: Subscription
     let allSubscriptions: [Subscription]
     let institutions: [Institution]
@@ -137,430 +133,103 @@ struct PremiumSubscriptionCard: View {
             topTrailingRadius: 24
         )
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    // Logo + Name + Cost row
-                    HStack(alignment: .center, spacing: 16) {
-                        HStack(alignment: .top, spacing: 16) {
-                            // Logo
-                            if let website = sub.website, !website.isEmpty {
-                                FaviconImage(website: website, size: 40)
-                                    .frame(width: 56, height: 56)
-                            } else {
-                                ZStack {
+            StackedCardHeader(
+                showsDetailsButton: revealLevel == .full, detailsLabel: "Edit service",
+                onEdit: canEdit ? onEdit : nil, onTap: {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    if isExplicitlyFull, let onCollapse {
+                        onCollapse()
+                    } else {
+                        onExpand?()
+                    }
+                }
+            ) {
+                HStack(alignment: .top, spacing: 16) {
+                    // Logo
+                    if let website = sub.website, !website.isEmpty {
+                        FaviconImage(website: website, size: 40)
+                            .frame(width: 56, height: 56)
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.06))
+                                .frame(width: 56, height: 56)
+                                .overlay(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color.white.opacity(0.06))
-                                        .frame(width: 56, height: 56)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                                        )
-                                    Text(sub.name.isEmpty ? "?" : String(sub.name.prefix(1)).uppercased())
-                                        .font(.system(size: 22, weight: .black))
-                                        .foregroundStyle(Color.white.opacity(0.8))
-                                }
-                            }
-
-                            // Name + costs
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(sub.name.isEmpty ? "Service" : sub.name)
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.white)
-
-                                if sub.isFree {
-                                    HStack(spacing: 5) {
-                                        Circle()
-                                            .fill(Color.zifrGreen)
-                                            .frame(width: 6, height: 6)
-                                            .shadow(color: Color.zifrGreen, radius: 3)
-                                        Text("FREE")
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundStyle(Color.white.opacity(0.4))
-                                    }
-                                    .padding(.top, 2)
-                                } else {
-                                    HStack(spacing: revealLevel == .full ? 10 : 14) {
-                                        costColumn(value: primaryTotal, label: displayedPrimaryLabel)
-                                        if secondaryTotal > 0 {
-                                            dividerLine()
-                                            costColumn(value: secondaryTotal, label: displayedSecondaryLabel)
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.top, 8)
-                            Spacer(minLength: 0)
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            if isExplicitlyFull {
-                                if let onCollapse = onCollapse {
-                                    onCollapse()
-                                } else {
-                                    onExpand?()
-                                }
-                            } else {
-                                onExpand?()
-                            }
-                        }
-
-                        if revealLevel == .full && canEdit {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                onEdit()
-                            } label: {
-                                Image(systemName: "line.3.horizontal")
-                                    .font(.system(size: 24, weight: .regular))
-                                    .foregroundStyle(Color.white.opacity(0.8))
-                                    .frame(width: 44, height: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Edit service")
+                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                )
+                            Text(sub.name.isEmpty ? "?" : String(sub.name.prefix(1)).uppercased())
+                                .font(.system(size: 22, weight: .black))
+                                .foregroundStyle(Color.white.opacity(0.8))
                         }
                     }
-                    .padding(.leading, 24)
-                    .padding(.trailing, 24)
-                    .padding(.top, 10)
-                    .padding(.bottom, 10)
-                    .overlay(alignment: .bottom) {
-                        StackCardDragZone(
-                            onChanged: { value in onDragChanged?(value) },
-                            onEnded: { value in onDragEnded?(value) }
-                        )
-                    }
 
-                        // Status row — Dot + pipes style
-                        if revealLevel >= .statusRevealed && !sub.isFree {
-                            Divider()
-                                .background(Color.white.opacity(0.08))
-                                .padding(.horizontal, 24)
-                            
-                            HStack(spacing: 8) {
-                                let sTuple = statusRowTuple
-                                if sub.status == "Paused" {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        HStack(alignment: .center, spacing: 5) {
-                                            Text(sTuple.top)
-                                                .font(.system(size: 11, weight: .medium))
-                                                .foregroundStyle(Color(hex: "#911c26"))
-                                            statusDot(sub: sub)
-                                        }
-                                        if !sTuple.bottom.isEmpty {
-                                            Text(sTuple.bottom)
-                                                .font(.system(size: 10, weight: .medium))
-                                                .foregroundStyle(Color(hex: "#911c26").opacity(0.7))
-                                        }
-                                    }
-                                    .textCase(.uppercase)
-                                    .tracking(0.3)
-                                } else {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        HStack(alignment: .center, spacing: 5) {
-                                            Text(sTuple.top)
-                                                .font(.system(size: 11, weight: .medium))
-                                                .foregroundStyle(.white)
-                                            statusDot(sub: sub)
-                                        }
-                                        if !sTuple.bottom.isEmpty {
-                                            Text(sTuple.bottom)
-                                                .font(.system(size: 10, weight: .medium))
-                                                .foregroundStyle(Color(hex: "#C1AA78"))
-                                        }
-                                    }
-                                    .textCase(.uppercase)
-                                    .tracking(0.3)
-                                }
-                                
-                                if let accTuple = bankAccountTuple {
-                                    statusPipe()
-                                        .padding(.horizontal, 6)
-                                    Button {
-                                        if let id = accTuple.modelId {
-                                            onBankTapped?(id)
-                                        }
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            HStack(spacing: 4) {
-                                                Text(accTuple.bank)
-                                                    .font(.system(size: 11, weight: .medium))
-                                                    .foregroundStyle(.white)
-                                                if !accTuple.type.isEmpty {
-                                                    Text("·")
-                                                        .font(.system(size: 11, weight: .bold))
-                                                        .foregroundStyle(Color(hex: "#7D7D7D"))
-                                                    Text(accTuple.type)
-                                                        .font(.system(size: 11, weight: .medium))
-                                                        .foregroundStyle(.white)
-                                                }
-                                            }
-                                            Text(accTuple.account)
-                                                .font(.system(size: 10, weight: .medium))
-                                                .foregroundStyle(Color(hex: "#C1AA78"))
-                                        }
-                                        .textCase(.uppercase)
-                                        .tracking(0.3)
-                                    }
-                                    .buttonStyle(PremiumButtonStyle())
-                                }
-                                Spacer()
+                    // Name + costs
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(sub.name.isEmpty ? "Service" : sub.name)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+
+                        if sub.isFree {
+                            HStack(spacing: 5) {
+                                Circle()
+                                    .fill(Color.zifrGreen)
+                                    .frame(width: 6, height: 6)
+                                    .shadow(color: Color.zifrGreen, radius: 3)
+                                Text("FREE")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.4))
                             }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 10)
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .background(
-                        UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                            .fill(Color.black.opacity(0.70))
-                            .padding(.bottom, revealLevel == .full ? 0 : -80)
-                            .overlay(
-                                UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                            )
-                    )
-
-                    // Credentials row — tap-to-copy
-                    if revealLevel == .full {
-                        if canAccessCredentials {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 12) {
-                                    copyableCredential(id: sub.id.uuidString, label: "Login ID", value: sub.loginId ?? "", field: "login")
-                                    copyableCredential(id: sub.id.uuidString, label: "Password", value: sub.password ?? "", field: "password", isPassword: true)
-                                }
-                                .padding(.top, 4)
-
-                                DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.top, 16)
-                            .padding(.bottom, 24)
+                            .padding(.top, 2)
                         } else {
-                            ownerOnlyCredentials
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 18)
-                        }
-                    }
-                }
-                .contentShape(Rectangle())
-
-            // ── Supplemental Services accordion ─────────────────────────
-            if revealLevel == .full && sub.showSubServicesTab {
-                MiloomAccordion(title: "Supplemental Services", count: sub.subServices.count, expanded: showSubServices, action: {
-                    withAnimation(.easeInOut(duration: 0.2)) { showSubServices.toggle() }
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                }) {
-                VStack(spacing: 0) {
-                    ForEach(Array(sub.subServices.enumerated()), id: \.element.id) { i, ss in
-                        Button {
-                            guard canEdit else { return }
-                            subDraft = ss
-                            subDraftID = ss.id
-                            isNewSubService = false
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showSubServiceHUD = true
-                        } label: {
-                            VStack(spacing: 0) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack(spacing: 6) {
-                                            Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .foregroundStyle(.white)
-
-                                            statusPipe()
-
-                                            if ss.status == .paused {
-                                                Text("Paused")
-                                                    .font(.system(size: 13, weight: .medium))
-                                                    .foregroundStyle(Color.red)
-
-                                                Circle()
-                                                    .fill(Color.red)
-                                                    .frame(width: 6, height: 6)
-                                            } else {
-                                                Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
-                                                    .font(.system(size: 13, weight: .medium))
-                                                    .foregroundStyle(Color.white.opacity(0.6))
-
-                                                Circle()
-                                                    .fill(ss.autoPay == .auto ? Color.zifrGreen : Color.miloomGold)
-                                                    .frame(width: 6, height: 6)
-                                            }
-                                        }
-                                        
-                                        HStack(spacing: 6) {
-                                            Text("billing:")
-                                                .font(.system(size: 11, weight: .semibold))
-                                                .foregroundStyle(Color.white.opacity(0.4))
-                                                .textCase(.uppercase)
-                                                .tracking(0.5)
-                                                .layoutPriority(1)
-                                            
-                                            Text(ss.paymentMethod.isEmpty ? "No Card" : paymentMethodWithInstitution(for: ss))
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(Color.white.opacity(0.6))
-                                                .lineLimit(1)
-                                                .truncationMode(.tail)
-                                        }
-                                        .lineLimit(1)
-
-                                        if !ss.purpose.isEmpty {
-                                            HStack(spacing: 6) {
-                                                Text("PURPOSE:")
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .foregroundStyle(Color.white.opacity(0.4))
-                                                    .layoutPriority(1)
-                                                
-                                                Text(ss.purpose)
-                                                    .font(.system(size: 13, weight: .medium))
-                                                    .foregroundStyle(Color.white.opacity(0.6))
-                                                    .lineLimit(1)
-                                                    .truncationMode(.tail)
-                                            }
-                                            .lineLimit(1)
-                                        }
-                                    }
-                                    Spacer()
-                                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                        Text("$\(String(format: "%.0f", ss.cost))")
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundStyle(ss.status == .active ? .white : Color.white.opacity(0.4))
-                                        Text("/\(ss.billingCycle == .monthly ? "mo" : "yr")")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.5))
-                                    }
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 12)
-                                .background(Color.clear)
-                                
-                                if i < sub.subServices.count - 1 {
-                                    Divider()
-                                        .background(Color.white.opacity(0.06))
-                                        .padding(.horizontal, 8)
+                            HStack(spacing: 14) {
+                                costColumn(value: primaryTotal, label: displayedPrimaryLabel)
+                                if secondaryTotal > 0 {
+                                    dividerLine()
+                                    costColumn(value: secondaryTotal, label: displayedSecondaryLabel)
                                 }
                             }
                         }
-                        .buttonStyle(PremiumButtonStyle())
                     }
-                    
-                    if canEdit {
-                        Button {
-                            subDraft = SubService()
-                            subDraftID = nil
-                            isNewSubService = true
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            showSubServiceHUD = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus").font(.system(size: 12, weight: .bold))
-                                Text("Add Service").font(.system(size: 13, weight: .semibold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 36)
-                        }
-                        .buttonStyle(MiloomSecondaryButtonStyle())
-                        .padding(.top, sub.subServices.isEmpty ? 0 : 12)
-                    }
-                }
+                    .padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            .padding(.top, 10)
+            .padding(.bottom, 10)
+            .overlay(alignment: .bottom) {
+                StackCardDragZone(
+                    onChanged: { value in onDragChanged?(value) },
+                    onEnded: { value in onDragEnded?(value) }
+                )
+            }
+            .background {
+                Color.black.opacity(0.70)
+                    .padding(.bottom, extendsUnderNextCard ? -Self.underlap : 0)
+            }
 
-            // ── Linked Emails accordion ──────────────────────────────────
-            if revealLevel == .full && sub.showLinkedEmailsTab {
-                MiloomAccordion(title: "Linked Emails", count: sub.linkedEmails.count, expanded: showLinkedEmails, action: {
-                    withAnimation(.easeInOut(duration: 0.2)) { showLinkedEmails.toggle() }
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                }) {
-                VStack(spacing: 0) {
-                    ForEach(sub.linkedEmails.indices, id: \.self) { i in
-                        let email = sub.linkedEmails[i]
-                        Button {
-                            guard canEdit else { return }
-                            emailDraft = email
-                            emailDraftIndex = i
-                            isNewEmail = false
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showEmailHUD = true
-                        } label: {
-                            VStack(spacing: 0) {
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack(spacing: 6) {
-                                            Text(email.email.isEmpty ? "No Address" : email.email)
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .foregroundStyle(.white)
-                                                .lineLimit(1)
-                                        }
-
-                                        dynamicLabels(for: email)
-
-                                        // Role row
-                                        HStack(spacing: 6) {
-                                            Text("USED FOR:")
-                                                .font(.system(size: 11, weight: .semibold))
-                                                .foregroundStyle(Color.white.opacity(0.4))
-                                            
-                                            Text(email.usedFor.isEmpty ? "Unassigned" : email.usedFor)
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(Color.white.opacity(0.6))
-                                        }
-                                    }
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 12)
-                                .background(Color.clear)
-                                
-                                if i < sub.linkedEmails.count - 1 {
-                                    Divider()
-                                        .background(Color.white.opacity(0.06))
-                                        .padding(.horizontal, 8)
-                                }
-                            }
-                        }
-                        .buttonStyle(PremiumButtonStyle())
-                    }
-                    
-                    if canEdit {
-                        Button {
-                            emailDraft = LinkedEmail()
-                            emailDraftIndex = nil
-                            isNewEmail = true
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            showEmailHUD = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus").font(.system(size: 12, weight: .bold))
-                                Text("Add Email").font(.system(size: 13, weight: .semibold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 36)
-                        }
-                        .buttonStyle(MiloomSecondaryButtonStyle())
-                        .padding(.top, sub.linkedEmails.isEmpty ? 0 : 12)
-                    }
-                }
-                }
+            CardDeckDetails(isVisible: revealLevel == .full) {
+                if !sub.isFree { billingStatus }
+                credentials
+                serviceAccordions
             }
         }
         // Match the financial deck: a collapsed rear card continues beneath
         // the next card so its bottom edge cannot show around the front card.
-        .frame(minHeight: extendsUnderNextCard ? 148 : nil, alignment: .top)
+        .padding(.bottom, extendsUnderNextCard ? Self.underlap : 0)
         .background(
             innerShape
                 .fill(Color(hex: "#1C1C1E").opacity(0.40))
         )
         .background(.regularMaterial, in: innerShape)
         .clipShape(innerShape)
-        .overlay(
-            innerShape
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
+        .overlay { innerShape.stroke(.financialCardOutline, lineWidth: 1.5) }
+        .overlay(alignment: .top) { CardTopEdgeStroke() }
         // ── Sub-service HUD ───────────────────────────────────────────────
         .onChange(of: scenePhase) { _, phase in if phase != .active { passwordRevealed = false } }
+        .onChange(of: revealLevel) { _, level in if level != .full { passwordRevealed = false } }
         .onDisappear { passwordRevealed = false }
         .sheet(isPresented: $showSubServiceHUD) {
             SubServiceHUD(
@@ -630,6 +299,312 @@ struct PremiumSubscriptionCard: View {
             .presentationDetents([.fraction(0.70), .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
+        }
+    }
+
+    private var billingStatus: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .background(Color.white.opacity(0.08))
+                .padding(.horizontal, 24)
+
+            HStack(spacing: 8) {
+                let sTuple = statusRowTuple
+                if sub.status == "Paused" {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .center, spacing: 5) {
+                            Text(sTuple.top)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color(hex: "#911c26"))
+                            statusDot(sub: sub)
+                        }
+                        if !sTuple.bottom.isEmpty {
+                            Text(sTuple.bottom)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color(hex: "#911c26").opacity(0.7))
+                        }
+                    }
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+                } else {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(alignment: .center, spacing: 5) {
+                            Text(sTuple.top)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white)
+                            statusDot(sub: sub)
+                        }
+                        if !sTuple.bottom.isEmpty {
+                            Text(sTuple.bottom)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color(hex: "#C1AA78"))
+                        }
+                    }
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+                }
+
+                if let accTuple = bankAccountTuple {
+                    statusPipe()
+                        .padding(.horizontal, 6)
+                    Button {
+                        if let id = accTuple.modelId {
+                            onBankTapped?(id)
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 4) {
+                                Text(accTuple.bank)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.white)
+                                if !accTuple.type.isEmpty {
+                                    Text("·")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Color(hex: "#7D7D7D"))
+                                    Text(accTuple.type)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            Text(accTuple.account)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color(hex: "#C1AA78"))
+                        }
+                        .textCase(.uppercase)
+                        .tracking(0.3)
+                    }
+                    .buttonStyle(PremiumButtonStyle())
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+        }
+        .background { Rectangle().fill(.black.opacity(0.70)) }
+    }
+
+    @ViewBuilder private var credentials: some View {
+        if canAccessCredentials {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 12) {
+                    copyableCredential(id: sub.id.uuidString, label: "Login ID", value: sub.loginId ?? "", field: "login")
+                    copyableCredential(id: sub.id.uuidString, label: "Password", value: sub.password ?? "", field: "password", isPassword: true)
+                }
+                .padding(.top, 4)
+
+                DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
+        } else {
+            ownerOnlyCredentials
+                .padding(.horizontal, 24)
+                .padding(.vertical, 18)
+        }
+    }
+
+    @ViewBuilder private var serviceAccordions: some View {
+        // ── Supplemental Services accordion ─────────────────────────
+        if sub.showSubServicesTab {
+            MiloomAccordion(title: "Supplemental Services", count: sub.subServices.count, expanded: showSubServices, action: {
+                withAnimation(.easeInOut(duration: 0.2)) { showSubServices.toggle() }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }) {
+                VStack(spacing: 0) {
+                    ForEach(Array(sub.subServices.enumerated()), id: \.element.id) { i, ss in
+                        Button {
+                            guard canEdit else { return }
+                            subDraft = ss
+                            subDraftID = ss.id
+                            isNewSubService = false
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            showSubServiceHUD = true
+                        } label: {
+                            VStack(spacing: 0) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack(spacing: 6) {
+                                            Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+
+                                            statusPipe()
+
+                                            if ss.status == .paused {
+                                                Text("Paused")
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.red)
+
+                                                Circle()
+                                                    .fill(Color.red)
+                                                    .frame(width: 6, height: 6)
+                                            } else {
+                                                Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+
+                                                Circle()
+                                                    .fill(ss.autoPay == .auto ? Color.zifrGreen : Color.miloomGold)
+                                                    .frame(width: 6, height: 6)
+                                            }
+                                        }
+
+                                        HStack(spacing: 6) {
+                                            Text("billing:")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(Color.white.opacity(0.4))
+                                                .textCase(.uppercase)
+                                                .tracking(0.5)
+                                                .layoutPriority(1)
+
+                                            Text(ss.paymentMethod.isEmpty ? "No Card" : paymentMethodWithInstitution(for: ss))
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                                .lineLimit(1)
+                                                .truncationMode(.tail)
+                                        }
+                                        .lineLimit(1)
+
+                                        if !ss.purpose.isEmpty {
+                                            HStack(spacing: 6) {
+                                                Text("PURPOSE:")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundStyle(Color.white.opacity(0.4))
+                                                    .layoutPriority(1)
+
+                                                Text(ss.purpose)
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                                    .lineLimit(1)
+                                                    .truncationMode(.tail)
+                                            }
+                                            .lineLimit(1)
+                                        }
+                                    }
+                                    Spacer()
+                                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                        Text("$\(String(format: "%.0f", ss.cost))")
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(ss.status == .active ? .white : Color.white.opacity(0.4))
+                                        Text("/\(ss.billingCycle == .monthly ? "mo" : "yr")")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 12)
+                                .background(Color.clear)
+
+                                if i < sub.subServices.count - 1 {
+                                    Divider()
+                                        .background(Color.white.opacity(0.06))
+                                        .padding(.horizontal, 8)
+                                }
+                            }
+                        }
+                        .buttonStyle(PremiumButtonStyle())
+                    }
+
+                    if canEdit {
+                        Button {
+                            subDraft = SubService()
+                            subDraftID = nil
+                            isNewSubService = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showSubServiceHUD = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                                Text("Add Service").font(.system(size: 13, weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                        }
+                        .buttonStyle(MiloomSecondaryButtonStyle())
+                        .padding(.top, sub.subServices.isEmpty ? 0 : 12)
+                    }
+                }
+            }
+        }
+
+        // ── Linked Emails accordion ──────────────────────────────────
+        if sub.showLinkedEmailsTab {
+            MiloomAccordion(title: "Linked Emails", count: sub.linkedEmails.count, expanded: showLinkedEmails, action: {
+                withAnimation(.easeInOut(duration: 0.2)) { showLinkedEmails.toggle() }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }) {
+                VStack(spacing: 0) {
+                    ForEach(sub.linkedEmails.indices, id: \.self) { i in
+                        let email = sub.linkedEmails[i]
+                        Button {
+                            guard canEdit else { return }
+                            emailDraft = email
+                            emailDraftIndex = i
+                            isNewEmail = false
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            showEmailHUD = true
+                        } label: {
+                            VStack(spacing: 0) {
+                                HStack(alignment: .top) {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(spacing: 6) {
+                                            Text(email.email.isEmpty ? "No Address" : email.email)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                                .lineLimit(1)
+                                        }
+
+                                        dynamicLabels(for: email)
+
+                                        // Role row
+                                        HStack(spacing: 6) {
+                                            Text("USED FOR:")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(Color.white.opacity(0.4))
+
+                                            Text(email.usedFor.isEmpty ? "Unassigned" : email.usedFor)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 12)
+                                .background(Color.clear)
+
+                                if i < sub.linkedEmails.count - 1 {
+                                    Divider()
+                                        .background(Color.white.opacity(0.06))
+                                        .padding(.horizontal, 8)
+                                }
+                            }
+                        }
+                        .buttonStyle(PremiumButtonStyle())
+                    }
+
+                    if canEdit {
+                        Button {
+                            emailDraft = LinkedEmail()
+                            emailDraftIndex = nil
+                            isNewEmail = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showEmailHUD = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                                Text("Add Email").font(.system(size: 13, weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                        }
+                        .buttonStyle(MiloomSecondaryButtonStyle())
+                        .padding(.top, sub.linkedEmails.isEmpty ? 0 : 12)
+                    }
+                }
+            }
         }
     }
 

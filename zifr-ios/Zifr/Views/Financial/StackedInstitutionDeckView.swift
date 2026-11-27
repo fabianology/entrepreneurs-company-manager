@@ -1,12 +1,5 @@
 import SwiftUI
 
-struct InstitutionHeightKey: PreferenceKey {
-    static var defaultValue: [UUID: CGFloat] = [:]
-    static func reduce(value: inout [UUID: CGFloat], nextValue: () -> [UUID: CGFloat]) {
-        value.merge(nextValue(), uniquingKeysWith: { $1 })
-    }
-}
-
 struct StackedInstitutionDeckView: View {
     let institutions: [Institution]
     let cards: [FinancialCard]
@@ -26,14 +19,12 @@ struct StackedInstitutionDeckView: View {
     @State private var poppedCardId: String? = nil
     @State private var pullingUpCardId: String? = nil
     @State private var zIndexCardId: String? = nil
-    @State private var institutionHeights: [UUID: CGFloat] = [:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // Drag tracking for subscription-style pull animation
     @State private var draggingCardId: UUID? = nil
     @State private var dragOffset: CGFloat = 0
     
-    // Collapsed header height — matches subscription card overlap
-    private let collapsedHeight: CGFloat = 68
     private let dragCommitDistance: CGFloat = 24
     private let projectedDragCommitDistance: CGFloat = 64
     private let maximumDragPreview: CGFloat = 28
@@ -53,41 +44,19 @@ struct StackedInstitutionDeckView: View {
         return loans.filter { resolved.banks(for: .loan, id: $0.id).contains(institution.id) }
     }
 
-    private var totalStackHeight: CGFloat {
-        guard !institutions.isEmpty else { return 0 }
-        let lastIndex = institutions.count - 1
-        let lastInst = institutions[lastIndex]
-        let isExpanded = expandedInstId == lastInst.id
-        let isBottomMostDefault = expandedInstId == nil
-        
-        let lastHeight: CGFloat
-        if isExpanded || isBottomMostDefault {
-            let instCards = associatedCards(for: lastInst)
-            let showPhysicalCards = isExpanded
-            let cardPeekHeight: CGFloat = (!showPhysicalCards || instCards.isEmpty) ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
-            lastHeight = (institutionHeights[lastInst.id] ?? collapsedHeight) + cardPeekHeight
-        } else {
-            lastHeight = collapsedHeight
-        }
-        
-        return calculateYOffset(for: lastIndex) + lastHeight
-    }
-
     var body: some View {
-        ZStack(alignment: .top) {
+        let expandedIndex = institutions.firstIndex { $0.id == expandedInstId }
+        let walletCount = expandedIndex.map { associatedCards(for: institutions[$0]).count } ?? 0
+        let walletHeight: CGFloat = walletCount > 0 ? 36 + CGFloat(walletCount - 1) * 40 : 0
+
+        VStack(spacing: 0) {
             ForEach(Array(institutions.enumerated()), id: \.element.id) { index, inst in
-                institutionSlice(index: index, inst: inst)
+                institutionSlice(index: index, inst: inst,
+                                 peekHeight: index == expandedIndex ? walletHeight : 0,
+                                 nextPeekHeight: index + 1 == expandedIndex ? walletHeight : 0)
             }
         }
-        .frame(height: totalStackHeight, alignment: .top)
         .padding(.bottom, 20)
-        .onPreferenceChange(InstitutionHeightKey.self) { value in
-            let hasChangedHeight = value.contains { institutionHeights[$0.key] != $0.value }
-            guard hasChangedHeight else { return }
-            withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
-                institutionHeights.merge(value, uniquingKeysWith: { $1 })
-            }
-        }
         .onAppear {
             setSingleInstitutionDefaultIfNeeded()
         }
@@ -121,62 +90,53 @@ struct StackedInstitutionDeckView: View {
     // MARK: - Per-Institution Slice
     
     @ViewBuilder
-    private func institutionSlice(index: Int, inst: Institution) -> some View {
+    private func institutionSlice(index: Int, inst: Institution, peekHeight: CGFloat, nextPeekHeight: CGFloat) -> some View {
         let isExpanded = expandedInstId == inst.id
         let isBottomMostDefault = (expandedInstId == nil) && (index == institutions.count - 1)
         let showFullCard = isExpanded || isBottomMostDefault
-        let showPhysicalCards = isExpanded
-        
+        let isLast = index == institutions.count - 1
         let instCards = associatedCards(for: inst)
         let instLoans = associatedLoans(for: inst)
-        let yOffset = calculateYOffset(for: index)
-        let cardPeekHeight: CGFloat = (!showPhysicalCards || instCards.isEmpty) ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
-        
+        // Carry the preceding face behind the whole wallet slot and the following rounded corners.
+        let underlap: CGFloat = !showFullCard && !isLast ? nextPeekHeight + 24 : 0
+
         ZStack(alignment: .top) {
-            if showFullCard {
-                expandedInstitution(inst: inst, index: index, instCards: instCards, instLoans: instLoans, cardPeekHeight: cardPeekHeight, showPhysicalCards: showPhysicalCards)
-                    .transition(.opacity)
-            } else {
-                collapsedInstitutionHeader(inst: inst, index: index, instCards: instCards, instLoans: instLoans, isLast: index == institutions.count - 1)
-                    .transition(.opacity)
+            if isExpanded {
+                cardFanOut(instCards: instCards)
             }
+            InstitutionCardView(
+                institution: inst,
+                totalMonthlyPayment: instLoans.reduce(0) { $0 + $1.monthlyPayment },
+                cardCount: instCards.count, loanCount: instLoans.count, loans: instLoans,
+                vm: vm, onEdit: { onEditInst(inst) }, onEditLoan: { onEditLoan($0) },
+                canEdit: editableInstitutionIDs.contains(inst.id), editableLoanIDs: editableLoanIDs,
+                canAccessCredentials: canAccessCredentials, fitsCompactWidth: fitsCompactWidth,
+                showsBody: showFullCard, underlap: underlap,
+                isExpanded: isExpanded,
+                onCollapse: {
+                    withAnimation(reduceMotion ? nil : .cardDeckReveal) {
+                        expandedInstId = isExpanded ? nil : inst.id
+                        poppedCardId = nil
+                    }
+                },
+                onDragChanged: { handleDragChange(value: $0, inst: inst) },
+                onDragEnded: { handleDragEnd(value: $0, index: index, inst: inst) }
+            )
+            .layoutPriority(1)
+            .zIndex(10)
         }
         .frame(maxWidth: .infinity, alignment: .top)
-        .padding(.top, cardPeekHeight)
-        .offset(y: yOffset)
-        .zIndex(isExpanded ? 100 : Double(index))
-        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: expandedInstId)
+        .padding(.top, peekHeight)
+        .padding(.bottom, isExpanded && !isLast ? 8 : 0)
+        .offset(y: dragPreviewOffset(for: index))
+        .zIndex(isExpanded && zIndexCardId != nil ? Double(institutions.count) : Double(index))
     }
-    
-    // MARK: - Y-Offset Calculation (including drag offset)
-    
-    private func calculateYOffset(for index: Int) -> CGFloat {
-        var offset: CGFloat = 0
-        for i in 0..<index {
-            let inst = institutions[i]
-            if expandedInstId == inst.id {
-                let instCards = associatedCards(for: inst)
-                let cardPeekHeight: CGFloat = instCards.isEmpty ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
-                // Start from the compact header height, then animate to the
-                // measured content height. A large guessed fallback caused the
-                // deck to flash an empty 360pt gap when a new card opened.
-                offset += (institutionHeights[inst.id] ?? collapsedHeight) + cardPeekHeight + 8.0
-            } else {
-                offset += collapsedHeight
-            }
-        }
 
-        // Apply live drag offset: cards below move down, dragged card moves with resistance
-        if let dragId = draggingCardId,
-           let dragIndex = institutions.firstIndex(where: { $0.id == dragId }) {
-            if index > dragIndex {
-                offset += max(0, dragOffset)
-            } else if index == dragIndex {
-                offset += dragOffset * 0.3
-            }
-        }
-
-        return offset
+    private func dragPreviewOffset(for index: Int) -> CGFloat {
+        guard let draggingCardId, let dragged = institutions.firstIndex(where: { $0.id == draggingCardId })
+        else { return 0 }
+        if index == dragged { return dragOffset * 0.3 }
+        return index > dragged ? max(0, dragOffset) : 0
     }
 
     // MARK: - Drag Gesture Handlers
@@ -208,7 +168,7 @@ struct StackedInstitutionDeckView: View {
             return
         }
 
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.86, blendDuration: 0)) {
+        withAnimation(reduceMotion ? nil : .cardDeckReveal) {
             if dy > 0 && (dy > dragCommitDistance || projectedDy > projectedDragCommitDistance) {
                 // Drag down -> expand card
                 if expandedInstId != inst.id {
@@ -244,154 +204,6 @@ struct StackedInstitutionDeckView: View {
         let magnitude = abs(translation)
         let resistedMagnitude = maximumDragPreview * (1 - exp(-magnitude / 28))
         return direction * min(resistedMagnitude, maximumDragPreview)
-    }
-    
-    // MARK: - Collapsed Header (matches original InstitutionCardView header exactly)
-    
-    @ViewBuilder
-    private func collapsedInstitutionHeader(inst: Institution, index: Int, instCards: [FinancialCard], instLoans: [Loan], isLast: Bool) -> some View {
-        let healthColor = institutionHealthColor(inst)
-        
-        let cardShape = UnevenRoundedRectangle(
-            topLeadingRadius: 24,
-            bottomLeadingRadius: isLast ? 24 : 0,
-            bottomTrailingRadius: isLast ? 24 : 0,
-            topTrailingRadius: 24
-        )
-
-        return HStack(alignment: .center, spacing: 16) {
-            // Logo
-            if let loginUrl = inst.loginUrl, !loginUrl.isEmpty {
-                FaviconImage(website: loginUrl, size: 40)
-                    .frame(width: 56, height: 56)
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white.opacity(0.06))
-                        .frame(width: 56, height: 56)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                        )
-                    Image(systemName: "building.columns")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.8))
-                }
-            }
-            
-            VStack(alignment: .leading, spacing: 6) {
-                // Name with health dot
-                Text(inst.name.isEmpty ? "Bank" : inst.name)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                
-                InstitutionCardCounts(
-                    accounts: inst.accounts.count,
-                    cards: instCards.count,
-                    loans: instLoans.count,
-                    fitsCompactWidth: fitsCompactWidth
-                )
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 10)
-        .frame(height: collapsedHeight, alignment: .center)
-        .frame(minWidth: fitsCompactWidth ? 0 : nil, maxWidth: .infinity)
-        .overlay(alignment: .bottom) {
-            StackCardDragZone(
-                onChanged: { value in
-                    handleDragChange(value: value, inst: inst)
-                },
-                onEnded: { value in
-                    handleDragEnd(value: value, index: index, inst: inst)
-                }
-            )
-        }
-        .frame(height: isLast ? collapsedHeight : collapsedHeight + 80, alignment: .top)
-        .background(
-            cardShape
-                .fill(Color.black.opacity(0.70))
-        )
-        .clipShape(cardShape)
-        .overlay(
-            cardShape
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#918457"),
-                            Color(hex: "#918457").opacity(0.3)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-        )
-        .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 4)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                expandedInstId = inst.id
-                poppedCardId = nil
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            }
-        }
-    }
-    
-    // MARK: - Expanded Institution
-    
-    @ViewBuilder
-    private func expandedInstitution(inst: Institution, index: Int, instCards: [FinancialCard], instLoans: [Loan], cardPeekHeight: CGFloat, showPhysicalCards: Bool) -> some View {
-        // Credit cards fan out above
-        if showPhysicalCards {
-            cardFanOut(instCards: instCards)
-        }
-        
-        let isExpanded = expandedInstId == inst.id
-
-        // Full InstitutionCardView
-        InstitutionCardView(
-            institution: inst,
-            totalMonthlyPayment: instLoans.reduce(0) { $0 + $1.monthlyPayment },
-            cardCount: instCards.count,
-            loanCount: instLoans.count,
-            loans: instLoans,
-            vm: vm,
-            onEdit: { onEditInst(inst) },
-            onEditLoan: { onEditLoan($0) },
-            canEdit: editableInstitutionIDs.contains(inst.id),
-            editableLoanIDs: editableLoanIDs,
-            canAccessCredentials: canAccessCredentials,
-            fitsCompactWidth: fitsCompactWidth,
-            isExpanded: isExpanded,
-            onCollapse: {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                    if isExpanded {
-                        expandedInstId = nil
-                        poppedCardId = nil
-                    } else {
-                        expandedInstId = inst.id
-                        poppedCardId = nil
-                    }
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                }
-            },
-            onDragChanged: { value in
-                handleDragChange(value: value, inst: inst)
-            },
-            onDragEnded: { value in
-                handleDragEnd(value: value, index: index, inst: inst)
-            }
-        )
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(key: InstitutionHeightKey.self, value: [inst.id: geo.size.height])
-            }
-        )
-        .zIndex(10)
     }
     
     // MARK: - Card Fan-Out
@@ -440,16 +252,7 @@ struct StackedInstitutionDeckView: View {
             .offset(y: yOffset)
             .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, y: isPopped ? 12 : 2)
             .zIndex(zIndex)
-            .transition(.asymmetric(
-                insertion: AnyTransition.offset(y: 80)
-                    .combined(with: .scale(scale: 0.9))
-                    .combined(with: .opacity)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(Double(index) * 0.07)),
-                removal: AnyTransition.offset(y: 80)
-                    .combined(with: .scale(scale: 0.9))
-                    .combined(with: .opacity)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.9))
-            ))
+            .transition(.offset(y: 20).combined(with: .opacity))
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: poppedCardId)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: pullingUpCardId)
             .onTapGesture {
@@ -470,12 +273,6 @@ struct StackedInstitutionDeckView: View {
     }
     
     // MARK: - Helpers
-    
-    private func institutionHealthColor(_ inst: Institution) -> Color {
-        if inst.isDisconnected { return .red }
-        if inst.accounts.contains(where: { $0.status != "Active" }) { return .orange }
-        return .zifrGreen
-    }
     
     private func togglePop(for cardId: String) {
         if poppedCardId == cardId {

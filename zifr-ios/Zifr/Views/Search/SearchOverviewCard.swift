@@ -203,33 +203,12 @@ struct SearchResultLogo: View {
     }
 }
 
-/// Animate the occupied height while keeping the content at its natural size and
-/// anchored at the top. Clipping reveals it downward instead of fading or scaling.
-private struct SearchAccordionLayout: Layout {
-    var fraction: CGFloat
-    var animatableData: CGFloat {
-        get { fraction }
-        set { fraction = newValue }
-    }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard let content = subviews.first else { return .zero }
-        let size = content.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
-        return CGSize(width: size.width, height: size.height * min(1, max(0, fraction)))
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
-                             proposal: ProposedViewSize(width: bounds.width, height: nil))
-    }
-}
-
 private struct SearchAccordionContent<Content: View>: View {
     let isExpanded: Bool
     @ViewBuilder var content: Content
 
     var body: some View {
-        SearchAccordionLayout(fraction: isExpanded ? 1 : 0) { content }
+        VerticalRevealLayout(fraction: isExpanded ? 1 : 0) { content }
             .clipped()
             .allowsHitTesting(isExpanded)
             .accessibilityElement(children: .contain)

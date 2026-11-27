@@ -33,6 +33,149 @@ struct DisclosureStateChevron: View {
     }
 }
 
+/// Animate the occupied height while keeping the content at its natural size and
+/// anchored at the top. Clipping reveals it downward instead of fading or scaling.
+struct VerticalRevealLayout: Layout {
+    var fraction: CGFloat
+    var animatableData: CGFloat {
+        get { fraction }
+        set { fraction = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let size = content.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: size.width, height: size.height * min(1, max(0, fraction)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
+                             proposal: ProposedViewSize(width: bounds.width, height: nil))
+    }
+}
+
+extension Animation {
+    static let cardDeckReveal = Animation.smooth(duration: 0.46)
+}
+
+/// Lay out the rows at full width even while closed. Only the visible height changes.
+struct CardDeckDetails<Content: View>: View {
+    let isVisible: Bool
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VerticalRevealLayout(fraction: isVisible ? 1 : 0) {
+            VStack(spacing: 0, content: content)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .clipped()
+        .allowsHitTesting(isVisible)
+        .accessibilityHidden(!isVisible)
+    }
+}
+
+struct CardTopEdgeStroke: View {
+    var body: some View {
+        UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24)
+            .strokeBorder(Color(white: 0.23), lineWidth: 1)
+            .frame(height: 32)
+            .mask(LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .bottom))
+            .allowsHitTesting(false)
+    }
+}
+
+/// Uses the card's trailing inset for the details button so revealing it never reflows the text.
+struct StackedCardHeader<Content: View>: View {
+    let showsDetailsButton: Bool
+    let detailsLabel: LocalizedStringKey
+    let onEdit: (() -> Void)?
+    let onTap: () -> Void
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 24)
+            .padding(.trailing, onEdit == nil ? 24 : 52)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onTap)
+            .overlay(alignment: .trailing) {
+                if let onEdit {
+                    StackedCardDetailsButton(isExpanded: showsDetailsButton, label: detailsLabel, onEdit: onEdit)
+                }
+            }
+    }
+}
+
+struct StackedCardDetailsButton: View {
+    private enum Phase { case hidden, open, closing }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase = Phase.hidden
+
+    let isExpanded: Bool
+    let label: LocalizedStringKey
+    let onEdit: () -> Void
+
+    var body: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            onEdit()
+        } label: {
+            Image(systemName: "ellipsis")
+                .contentTransition(.identity)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.74))
+                .frame(width: 16, height: 16)
+                .keyframeAnimator(initialValue: CGFloat.zero, trigger: phase) { symbol, travel in
+                    if phase == .open || reduceMotion {
+                        symbol.scaleEffect(1 + travel / 8)
+                    } else {
+                        symbol.scaleEffect(x: 1 + travel / 8, y: 1)
+                    }
+                } keyframes: { _ in
+                    if reduceMotion {
+                        MoveKeyframe(0)
+                    } else if phase == .open {
+                        MoveKeyframe(0)
+                        CubicKeyframe(2.25, duration: 0.36)
+                        CubicKeyframe(0, duration: 0.54)
+                    } else if phase == .closing {
+                        CubicKeyframe(2.75, duration: 0.075)
+                        CubicKeyframe(-1.5, duration: 0.085)
+                    } else {
+                        MoveKeyframe(-1.5)
+                    }
+                }
+                .scaleEffect(phase == .hidden && !reduceMotion ? 0.86 : 1)
+                .offset(y: phase == .hidden && !reduceMotion ? -3 : 0)
+                .opacity(phase == .hidden ? 0 : 1)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityHidden(!isExpanded)
+        .allowsHitTesting(isExpanded)
+        .padding(.trailing, 6)
+        .task(id: isExpanded) {
+            if isExpanded {
+                if !reduceMotion { try? await Task.sleep(for: .milliseconds(50)) }
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.22)) { phase = .open }
+            } else if phase != .hidden {
+                if !reduceMotion {
+                    phase = .closing
+                    try? await Task.sleep(for: .milliseconds(160))
+                    guard !Task.isCancelled else { return }
+                }
+                withAnimation(.easeOut(duration: 0.065)) { phase = .hidden }
+            }
+        }
+    }
+
+}
+
 // MARK: - Stacked Card Drag Zone
 /// Reserves one small, invisible pull/push target so vertical drags everywhere
 /// else on a card remain available to the surrounding ScrollView.

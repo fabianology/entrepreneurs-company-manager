@@ -78,6 +78,14 @@ extension ShapeStyle where Self == LinearGradient {
         )
     }
 
+    static var financialCardOutline: LinearGradient {
+        LinearGradient(
+            colors: [Color(hex: "#191919"), Color(hex: "#393939")],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
     static var vaultOutline: LinearGradient {
         LinearGradient(
             colors: [
